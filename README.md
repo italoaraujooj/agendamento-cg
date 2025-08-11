@@ -1,30 +1,62 @@
-# Church room scheduler
+## Agendamento CG — Guia para rodar o projeto
 
-*Automatically synced with your [v0.app](https://v0.app) deployments*
+[![Deploy na Vercel](https://img.shields.io/badge/Deployed%20on-Vercel-black?style=for-the-badge&logo=vercel)](https://vercel.com/italoaraujoojs-projects/v0-church-room-scheduler)
 
-[![Deployed on Vercel](https://img.shields.io/badge/Deployed%20on-Vercel-black?style=for-the-badge&logo=vercel)](https://vercel.com/italoaraujoojs-projects/v0-church-room-scheduler)
-[![Built with v0](https://img.shields.io/badge/Built%20with-v0.app-black?style=for-the-badge)](https://v0.app/chat/projects/BhzZmWr4JUn)
+### Visão geral
+Aplicação Next.js para agendamento de salas/ambientes, utilizando Supabase para persistência de dados.
 
-## Overview
+### Requisitos
+- Node.js 20 LTS (recomendado) ou 18.18+
+- PNPM 9+ (ou npm/yarn; os comandos abaixo usam pnpm)
 
-This repository will stay in sync with your deployed chats on [v0.app](https://v0.app).
-Any changes you make to your deployed app will be automatically pushed to this repository from [v0.app](https://v0.app).
+### Passo a passo (primeira execução)
+1) Instale dependências
+```bash
+pnpm install
+```
 
-## Deployment
+2) Configure variáveis de ambiente
+Crie um arquivo `.env.local` na raiz do projeto com as chaves do seu projeto Supabase:
+```env
+NEXT_PUBLIC_SUPABASE_URL="https://SEU-PROJETO.supabase.co"
+NEXT_PUBLIC_SUPABASE_ANON_KEY="SUA-CHAVE-ANON"
+```
+Como obter:
+- No painel do Supabase: Project Settings → API
+  - Project URL → `NEXT_PUBLIC_SUPABASE_URL`
+  - anon public → `NEXT_PUBLIC_SUPABASE_ANON_KEY`
 
-Your project is live at:
+3) (Opcional) Preparar o banco no Supabase
+Os arquivos SQL em `scripts/` podem ser executados no SQL Editor do Supabase, na ordem:
+- `scripts/001-create-tables.sql`
+- `scripts/002-insert-church-spaces.sql`
+- `scripts/003-setup-complete-database.sql`
+- `scripts/004-setup-database-fixed.sql`
+ - `scripts/005-add-environment-availability.sql` (cria e popula a tabela de disponibilidades)
 
-**[https://vercel.com/italoaraujoojs-projects/v0-church-room-scheduler](https://vercel.com/italoaraujoojs-projects/v0-church-room-scheduler)**
+4) Rodar em desenvolvimento
+```bash
+pnpm dev
+```
+A aplicação sobe por padrão em `http://localhost:3000`.
 
-## Build your app
+### Scripts disponíveis
+- `pnpm dev`: inicia o servidor de desenvolvimento
+- `pnpm build`: cria o build de produção
+- `pnpm start`: roda o servidor em modo produção (após `pnpm build`)
+- `pnpm lint`: executa o linter
 
-Continue building your app on:
+### Deploy (Vercel)
+- Configure as mesmas variáveis de ambiente do `.env.local` no painel da Vercel (Project → Settings → Environment Variables)
+- Faça o deploy do projeto; o Next.js cuidará do build
 
-**[https://v0.app/chat/projects/BhzZmWr4JUn](https://v0.app/chat/projects/BhzZmWr4JUn)**
+### Estrutura do projeto (resumo)
+- `app/`: rotas e páginas (App Router)
+- `components/`: componentes reutilizáveis (inclui UI base)
+- `lib/`: utilidades e clientes (ex.: `lib/supabase/`)
+- `scripts/`: scripts SQL para preparar o banco no Supabase
 
-## How It Works
-
-1. Create and modify your project using [v0.app](https://v0.app)
-2. Deploy your chats from the v0 interface
-3. Changes are automatically pushed to this repository
-4. Vercel deploys the latest version from this repository
+### Solução de problemas
+- Mensagem “Supabase environment variables are not set.”: confira se `.env.local` está preenchido e se o servidor foi reiniciado após mudanças
+- 401/403 do Supabase: verifique se a chave anon está correta e se as políticas RLS/permits no banco permitem as operações esperadas
+- Erros de build: garanta Node 20+ e dependências instaladas com sucesso

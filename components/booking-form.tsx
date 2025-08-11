@@ -2,7 +2,7 @@
 
 import type React from "react"
 
-import { useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -25,6 +25,14 @@ interface BookingFormProps {
   preselectedEnvironment?: string
 }
 
+interface EnvironmentAvailability {
+  id: number
+  environment_id: number
+  weekday: number
+  start_time: string
+  end_time: string
+}
+
 export default function BookingForm({ environments, preselectedEnvironment }: BookingFormProps) {
   const router = useRouter()
   const [isSubmitting, setIsSubmitting] = useState(false)
@@ -45,12 +53,86 @@ export default function BookingForm({ environments, preselectedEnvironment }: Bo
     duration: "1", // duração em horas
   })
 
-  // Generate time options (8:00 to 22:00)
-  const timeOptions = []
-  for (let hour = 8; hour <= 22; hour++) {
-    const timeString = `${hour.toString().padStart(2, "0")}:00`
-    timeOptions.push(timeString)
+  // Disponibilidades e reservas do dia (para calcular horários e ambientes disponíveis)
+  const [availability, setAvailability] = useState<EnvironmentAvailability[]>([])
+  const [bookingsForDate, setBookingsForDate] = useState<
+    { environment_id: string | number; start_time: string; end_time: string }[]
+  >([])
+  const [isLoadingAvailability, setIsLoadingAvailability] = useState(false)
+
+  const WEEKDAY_LABELS_PT_BR: readonly string[] = [
+    "Domingo",
+    "Segunda",
+    "Terça",
+    "Quarta",
+    "Quinta",
+    "Sexta",
+    "Sábado",
+  ] as const
+
+  const getWeekdayFromDate = (date: string): number | null => {
+    if (!date) return null
+    const d = new Date(`${date}T00:00:00`)
+    if (Number.isNaN(d.getTime())) return null
+    return d.getDay()
   }
+
+  const timeStringToHour = (t: string): number => Number.parseInt(t.split(":")[0] || "0", 10)
+  const pad2 = (n: number) => n.toString().padStart(2, "0")
+
+  useEffect(() => {
+    const fetchDayData = async () => {
+      const weekday = getWeekdayFromDate(formData.bookingDate)
+      if (weekday === null) {
+        setAvailability([])
+        setBookingsForDate([])
+        return
+      }
+      try {
+        setIsLoadingAvailability(true)
+        const [availRes, bookingsRes] = await Promise.all([
+          supabase
+            .from("environment_availabilities")
+            .select("*")
+            .eq("weekday", weekday)
+            .order("start_time", { ascending: true }),
+          formData.bookingDate
+            ? supabase
+                .from("bookings")
+                .select("environment_id, start_time, end_time")
+                .eq("booking_date", formData.bookingDate)
+            : Promise.resolve({ data: [], error: null } as any),
+        ])
+        setAvailability(availRes.data || [])
+        setBookingsForDate((bookingsRes as any).data || [])
+      } finally {
+        setIsLoadingAvailability(false)
+      }
+    }
+    fetchDayData()
+    // ao mudar a data, reseta horário e ambiente
+    setFormData((prev) => ({ ...prev, startTime: "", environmentId: "" }))
+  }, [formData.bookingDate])
+
+  const startTimeOptions = useMemo(() => {
+    if (!availability.length) return [] as string[]
+    const options: string[] = []
+    for (const w of availability) {
+      const s = timeStringToHour(w.start_time)
+      const e = timeStringToHour(w.end_time)
+      for (let h = s; h < e; h++) {
+        options.push(`${pad2(h)}:00`)
+      }
+    }
+    return Array.from(new Set(options))
+  }, [availability])
+
+  // Seleciona automaticamente o primeiro horário disponível do dia
+  useEffect(() => {
+    if (!formData.startTime && startTimeOptions.length > 0) {
+      setFormData((prev) => ({ ...prev, startTime: startTimeOptions[0] }))
+    }
+  }, [startTimeOptions, formData.startTime])
 
   // Opções de duração
   const durationOptions = [
@@ -65,27 +147,68 @@ export default function BookingForm({ environments, preselectedEnvironment }: Bo
     { value: "12", label: "12 horas" },
   ]
 
-  // Função para calcular horário de fim baseado no início e duração
+  // Função para calcular horário de fim baseado no início e duração respeitando disponibilidade
   const calculateEndTime = (startTime: string, duration: string) => {
     if (!startTime || !duration) return ""
-
     const startHour = Number.parseInt(startTime.split(":")[0])
     const endHour = startHour + Number.parseInt(duration)
-
-    if (endHour > 22) return "" // Não pode passar das 22h
-
+    if (availability.length) {
+      const ok = availability.some((w) => {
+        const s = timeStringToHour(w.start_time)
+        const e = timeStringToHour(w.end_time)
+        return startHour >= s && endHour <= e
+      })
+      if (!ok) return ""
+    }
     return `${endHour.toString().padStart(2, "0")}:00`
   }
 
-  // Função para obter opções de duração válidas baseadas no horário de início
+  // Função para obter opções de duração válidas baseadas no horário de início e janela
   const getValidDurationOptions = (startTime: string) => {
     if (!startTime) return durationOptions
-
+    if (!availability.length) return durationOptions
     const startHour = Number.parseInt(startTime.split(":")[0])
-    const maxDuration = 22 - startHour
-
+    const containing = availability.find((w) => {
+      const s = timeStringToHour(w.start_time)
+      const e = timeStringToHour(w.end_time)
+      return startHour >= s && startHour < e
+    })
+    if (!containing) return []
+    const maxDuration = timeStringToHour(containing.end_time) - startHour
     return durationOptions.filter((option) => Number.parseInt(option.value) <= maxDuration)
   }
+
+  // Lista de ambientes disponíveis baseado em data/hora/duração e reservas existentes
+  const availableEnvironments = useMemo(() => {
+    if (!formData.bookingDate || !formData.startTime || !formData.duration) return [] as Environment[]
+    const startHour = Number.parseInt(formData.startTime.split(":")[0])
+    const endHour = startHour + Number.parseInt(formData.duration)
+    const windowsByEnv = availability.reduce<Record<string, EnvironmentAvailability[]>>((acc, w) => {
+      const key = String(w.environment_id)
+      if (!acc[key]) acc[key] = []
+      acc[key].push(w)
+      return acc
+    }, {})
+    const bookingsByEnv = bookingsForDate.reduce<Record<string, { start: number; end: number }[]>>((acc, b) => {
+      const key = String(b.environment_id)
+      if (!acc[key]) acc[key] = []
+      acc[key].push({ start: Number.parseInt(b.start_time.split(":")[0]), end: Number.parseInt(b.end_time.split(":")[0]) })
+      return acc
+    }, {})
+    const overlaps = (aStart: number, aEnd: number, bStart: number, bEnd: number) => aStart < bEnd && aEnd > bStart
+    return environments.filter((env) => {
+      const key = String(env.id)
+      const windows = windowsByEnv[key] || []
+      const fitsWindow = windows.some((w) => {
+        const s = timeStringToHour(w.start_time)
+        const e = timeStringToHour(w.end_time)
+        return startHour >= s && endHour <= e
+      })
+      if (!fitsWindow) return false
+      const taken = (bookingsByEnv[key] || []).some((b) => overlaps(startHour, endHour, b.start, b.end))
+      return !taken
+    })
+  }, [availability, bookingsForDate, environments, formData.bookingDate, formData.startTime, formData.duration])
 
   const handleInputChange = (field: string, value: string) => {
     setFormData((prev) => ({ ...prev, [field]: value }))
@@ -241,25 +364,7 @@ export default function BookingForm({ environments, preselectedEnvironment }: Bo
         <form onSubmit={handleSubmit} className="space-y-6">
           {error && <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded">{error}</div>}
 
-          {/* Environment Selection */}
-          <div className="space-y-2">
-            <Label htmlFor="environment" className="flex items-center gap-2">
-              <Building className="h-4 w-4" />
-              Ambiente
-            </Label>
-            <Select value={formData.environmentId} onValueChange={(value) => handleInputChange("environmentId", value)}>
-              <SelectTrigger>
-                <SelectValue placeholder="Selecione o ambiente" />
-              </SelectTrigger>
-              <SelectContent>
-                {environments.map((env) => (
-                  <SelectItem key={env.id} value={env.id}>
-                    {env.name} (Capacidade: {env.capacity})
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
+          
 
           {/* Personal Information */}
           <div className="grid md:grid-cols-2 gap-4">
@@ -367,12 +472,12 @@ export default function BookingForm({ environments, preselectedEnvironment }: Bo
                 <Clock className="h-4 w-4" />
                 Horário Início
               </Label>
-              <Select value={formData.startTime} onValueChange={handleStartTimeChange}>
+              <Select value={formData.startTime} onValueChange={handleStartTimeChange} disabled={!startTimeOptions.length || isLoadingAvailability}>
                 <SelectTrigger>
-                  <SelectValue placeholder="Selecione" />
+                  <SelectValue placeholder={isLoadingAvailability ? "Carregando..." : startTimeOptions.length ? "Selecione" : "indisponível"} />
                 </SelectTrigger>
                 <SelectContent>
-                  {timeOptions.slice(0, -1).map((time) => (
+                  {startTimeOptions.map((time) => (
                     <SelectItem key={time} value={time}>
                       {time}
                     </SelectItem>
@@ -412,6 +517,40 @@ export default function BookingForm({ environments, preselectedEnvironment }: Bo
             </div>
           </div>
 
+          {/* Environment Selection (após selecionar data e hora) */}
+          <div className="space-y-2">
+            <Label htmlFor="environment" className="flex items-center gap-2">
+              <Building className="h-4 w-4" />
+              Ambiente
+            </Label>
+            <Select
+              value={formData.environmentId}
+              onValueChange={(value) => handleInputChange("environmentId", value)}
+              disabled={!formData.bookingDate || !formData.startTime || !formData.duration || isLoadingAvailability}
+            >
+              <SelectTrigger>
+                <SelectValue
+                  placeholder={
+                    isLoadingAvailability
+                      ? "Carregando..."
+                      : !formData.bookingDate || !formData.startTime || !formData.duration
+                        ? "Escolha data e hora primeiro"
+                        : availableEnvironments.length
+                          ? "Selecione o ambiente"
+                          : "Nenhum ambiente disponível"
+                  }
+                />
+              </SelectTrigger>
+              <SelectContent>
+                {availableEnvironments.map((env) => (
+                  <SelectItem key={env.id} value={env.id}>
+                    {env.name} (Capacidade: {env.capacity})
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
           {/* Occasion */}
           <div className="space-y-2">
             <Label htmlFor="occasion">Ocasião/Motivo</Label>
@@ -423,6 +562,13 @@ export default function BookingForm({ environments, preselectedEnvironment }: Bo
               rows={3}
             />
           </div>
+
+          {/* Aviso de disponibilidade por dia */}
+          {formData.bookingDate && !isLoadingAvailability && availability.length === 0 && (
+            <div className="bg-amber-50 border border-amber-200 text-amber-800 px-4 py-2 rounded text-sm">
+              Não há disponibilidade configurada para {WEEKDAY_LABELS_PT_BR[getWeekdayFromDate(formData.bookingDate) || 0]}.
+            </div>
+          )}
 
           <Button type="submit" disabled={isSubmitting} className="w-full">
             {isSubmitting ? "Criando Reserva..." : "Criar Reserva"}

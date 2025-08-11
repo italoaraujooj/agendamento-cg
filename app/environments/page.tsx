@@ -13,6 +13,24 @@ interface Environment {
   created_at: string
 }
 
+interface EnvironmentAvailability {
+  id: number
+  environment_id: number
+  weekday: number // 0=Domingo ... 6=Sábado
+  start_time: string // HH:MM:SS
+  end_time: string   // HH:MM:SS
+}
+
+const WEEKDAY_LABELS_PT_BR: readonly string[] = [
+  "Domingo",
+  "Segunda",
+  "Terça",
+  "Quarta",
+  "Quinta",
+  "Sexta",
+  "Sábado",
+] as const
+
 export default async function EnvironmentsPage() {
   const supabase = createServerClient()
 
@@ -24,7 +42,10 @@ export default async function EnvironmentsPage() {
     )
   }
 
-  const { data: environments, error } = await supabase.from("environments").select("*").order("name")
+  const [{ data: environments, error }, { data: availabilities, error: availError }] = await Promise.all([
+    supabase.from("environments").select("*").order("name"),
+    supabase.from("environment_availabilities").select("*").order("weekday", { ascending: true }).order("start_time", { ascending: true }),
+  ])
 
   if (error) {
     return (
@@ -32,6 +53,31 @@ export default async function EnvironmentsPage() {
         <p className="text-lg text-red-600">Erro ao carregar ambientes: {error.message}</p>
       </div>
     )
+  }
+
+  if (availError) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <p className="text-lg text-red-600">Erro ao carregar disponibilidades: {availError.message}</p>
+      </div>
+    )
+  }
+
+  const availabilityByEnvironment: Record<string, EnvironmentAvailability[]> = {}
+  for (const av of availabilities || []) {
+    const key = String(av.environment_id)
+    if (!availabilityByEnvironment[key]) availabilityByEnvironment[key] = []
+    availabilityByEnvironment[key].push(av)
+  }
+
+  const groupAvailabilityByWeekday = (envId: string) => {
+    const items = availabilityByEnvironment[envId] || []
+    const grouped: Record<number, { start: string; end: string }[]> = {}
+    for (const it of items) {
+      if (!grouped[it.weekday]) grouped[it.weekday] = []
+      grouped[it.weekday].push({ start: it.start_time.slice(0, 5), end: it.end_time.slice(0, 5) })
+    }
+    return grouped
   }
 
   return (
@@ -68,6 +114,28 @@ export default async function EnvironmentsPage() {
 
               <CardContent>
                 <p className="text-gray-700 mb-4">{environment.description || "Sem descrição disponível"}</p>
+
+                <div className="space-y-2 mb-4">
+                  <h4 className="text-sm font-semibold text-gray-800">Disponibilidade</h4>
+                  <div className="space-y-1">
+                    {Object.entries(groupAvailabilityByWeekday(environment.id)).length === 0 ? (
+                      <p className="text-sm text-gray-500">Não configurada</p>
+                    ) : (
+                      Object.entries(groupAvailabilityByWeekday(environment.id)).map(([weekday, ranges]) => (
+                        <div key={`${environment.id}-${weekday}`} className="flex items-start gap-2">
+                          <span className="w-24 text-sm text-gray-600">{WEEKDAY_LABELS_PT_BR[Number(weekday)]}</span>
+                          <div className="flex flex-wrap gap-2">
+                            {ranges.map((r, idx) => (
+                              <Badge key={`${weekday}-${idx}`} variant="secondary">
+                                {r.start} - {r.end}
+                              </Badge>
+                            ))}
+                          </div>
+                        </div>
+                      ))
+                    )}
+                  </div>
+                </div>
 
                 <Button asChild className="w-full">
                   <Link href={`/booking?environment=${environment.id}`}>Agendar Este Espaço</Link>
