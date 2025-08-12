@@ -42,7 +42,7 @@ export default function NavigationHeader() {
         <div className="flex items-center justify-between h-16">
           <Link href="/" className="flex items-center gap-2">
             <Calendar className="h-6 w-6 text-primary" />
-            <span className="font-bold text-xl">Agendamento - Cidade Viva CG</span>
+            <span className="font-bold text-sm sm:text-base md:text-xl">Agendamento - Cidade Viva CG</span>
           </Link>
 
           <nav className="hidden md:flex items-center gap-1">

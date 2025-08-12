@@ -292,7 +292,7 @@ function BookingCard({ booking, compact = false }: { booking: Booking; compact?:
           </div>
         </div>
 
-        <div className="mt-4 p-3 bg-gray-50 rounded-lg">
+        <div className="mt-4 p-3 bg-muted rounded-lg">
           <p className="text-sm">
             <strong>Ocasião:</strong> {booking.occasion}
           </p>
