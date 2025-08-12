@@ -10,7 +10,6 @@ import { Badge } from "@/components/ui/badge"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Calendar as CalendarIcon, Clock, Users, Phone, Mail, Building, User, Filter, X, CalendarDays } from "lucide-react"
 import { DatePicker } from "@/components/ui/date-picker"
-import { format } from "date-fns"
 
 interface Booking {
   id: string
@@ -47,6 +46,14 @@ interface ReservationsViewProps {
   }
 }
 
+const parseLocalYmd = (ymd: string): Date => {
+  const [yearStr, monthStr, dayStr] = (ymd || "").split("-")
+  const year = Number.parseInt(yearStr || "0", 10)
+  const month = Number.parseInt(monthStr || "1", 10)
+  const day = Number.parseInt(dayStr || "1", 10)
+  return new Date(year, month - 1, day)
+}
+
 export default function ReservationsView({ bookings, environments, currentFilters }: ReservationsViewProps) {
   const router = useRouter()
   const searchParams = useSearchParams()
@@ -78,7 +85,8 @@ export default function ReservationsView({ bookings, environments, currentFilter
   }
 
   const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString("pt-BR", {
+    const date = parseLocalYmd(dateString)
+    return date.toLocaleDateString("pt-BR", {
       weekday: "long",
       year: "numeric",
       month: "long",
@@ -224,8 +232,9 @@ export default function ReservationsView({ bookings, environments, currentFilter
 }
 
 function BookingCard({ booking, compact = false }: { booking: Booking; compact?: boolean }) {
-  const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString("pt-BR", {
+  const formatDateShort = (dateString: string) => {
+    const date = parseLocalYmd(dateString)
+    return date.toLocaleDateString("pt-BR", {
       weekday: "short",
       year: "numeric",
       month: "short",
@@ -246,7 +255,7 @@ function BookingCard({ booking, compact = false }: { booking: Booking; compact?:
             <CardDescription className="flex items-center gap-4 mt-1">
               <span className="flex items-center gap-1">
                  <CalendarIcon className="h-3 w-3" />
-                {formatDate(booking.booking_date)}
+                {formatDateShort(booking.booking_date)}
               </span>
               <span className="flex items-center gap-1">
                 <Clock className="h-3 w-3" />
