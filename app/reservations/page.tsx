@@ -49,17 +49,31 @@ export default async function ReservationsPage({
   // Get all environments for filter
   const { data: environments } = await supabase.from("environments").select("id, name, capacity").order("name")
 
-  // Build query for bookings
+  // Build query for bookings (alias ministry -> ministry_network)
   let query = supabase
     .from("bookings")
-    .select(`
-      *,
+    .select(
+      `
+      id,
+      name,
+      email,
+      phone,
+      ministry_network:ministry,
+      estimated_participants,
+      responsible_person,
+      occasion,
+      booking_date,
+      start_time,
+      end_time,
+      created_at,
       environments (
         id,
         name,
         capacity
       )
-    `)
+    `,
+      { count: "exact" }
+    )
     .order("booking_date", { ascending: true })
     .order("start_time", { ascending: true })
 

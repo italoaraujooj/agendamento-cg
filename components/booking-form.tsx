@@ -85,6 +85,17 @@ export default function BookingForm({ environments, preselectedEnvironment }: Bo
   const timeStringToHour = (t: string): number => Number.parseInt(t.split(":")[0] || "0", 10)
   const pad2 = (n: number) => n.toString().padStart(2, "0")
 
+  const MAX_PHONE_DIGITS = 11
+  const MAX_PHONE_MASK_LENGTH = 15
+
+  const formatPhoneBR = (raw: string) => {
+    const digits = raw.replace(/\D/g, "").slice(0, MAX_PHONE_DIGITS)
+    if (digits.length <= 2) return `(${digits}`
+    if (digits.length <= 6) return `(${digits.slice(0, 2)}) ${digits.slice(2)}`
+    if (digits.length <= 10) return `(${digits.slice(0, 2)}) ${digits.slice(2, 6)}-${digits.slice(6)}`
+    return `(${digits.slice(0, 2)}) ${digits.slice(2, 7)}-${digits.slice(7)}`
+  }
+
   useEffect(() => {
     const fetchDayData = async () => {
       const weekday = getWeekdayFromDate(formData.bookingDate)
@@ -243,6 +254,9 @@ export default function BookingForm({ environments, preselectedEnvironment }: Bo
     })
   }, [availability, bookingsForDate, environments, formData.bookingDate, formData.startTime, formData.duration])
 
+  // Fallback: se não houver ambientes disponíveis calculados, exibir todos para não ficar vazio
+  const environmentsToShow = availableEnvironments.length > 0 ? availableEnvironments : environments
+
   const handleInputChange = (field: string, value: string) => {
     setFormData((prev) => ({ ...prev, [field]: value }))
     setError(null)
@@ -339,7 +353,7 @@ export default function BookingForm({ environments, preselectedEnvironment }: Bo
         name: formData.name,
         email: formData.email,
         phone: formData.phone,
-        ministry_network: formData.ministryNetwork,
+        ministry: formData.ministryNetwork,
         estimated_participants: Number.parseInt(formData.estimatedParticipants),
         responsible_person: formData.responsiblePerson,
         occasion: formData.occasion,
@@ -448,7 +462,9 @@ export default function BookingForm({ environments, preselectedEnvironment }: Bo
               <Input
                 id="phone"
                 value={formData.phone}
-                onChange={(e) => handleInputChange("phone", e.target.value)}
+                onChange={(e) => handleInputChange("phone", formatPhoneBR(e.target.value))}
+                maxLength={MAX_PHONE_MASK_LENGTH}
+                inputMode="numeric"
                 placeholder="(11) 99999-9999"
               />
             </div>
@@ -537,7 +553,7 @@ export default function BookingForm({ environments, preselectedEnvironment }: Bo
                 <SelectTrigger>
                   <SelectValue placeholder="Selecione" />
                 </SelectTrigger>
-                <SelectContent>
+                <SelectContent className="max-h-48 overflow-y-auto">
                   {getValidDurationOptions(formData.startTime).map((option) => (
                     <SelectItem key={option.value} value={option.value}>
                       {option.label}
@@ -570,14 +586,14 @@ export default function BookingForm({ environments, preselectedEnvironment }: Bo
               onValueChange={(value) => handleInputChange("environmentId", value)}
               disabled={!formData.bookingDate || !formData.startTime || !formData.duration || isLoadingAvailability}
             >
-              <SelectTrigger>
+              <SelectTrigger className="w-fit">
                 <SelectValue
                   placeholder={
                     isLoadingAvailability
                       ? "Carregando..."
                       : !formData.bookingDate || !formData.startTime || !formData.duration
                         ? "Escolha data e hora primeiro"
-                        : availableEnvironments.length
+                        : environmentsToShow.length
                           ? "Selecione o ambiente"
                           : "Nenhum ambiente disponível"
                   }
