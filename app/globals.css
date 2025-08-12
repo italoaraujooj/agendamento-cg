@@ -123,4 +123,21 @@
   body {
     @apply bg-background text-foreground;
   }
+
+  /* Ajustes de tema para react-day-picker (dropdown mês/ano no dark mode) */
+  .dark .rdp-dropdown,
+  .dark .rdp-caption_dropdowns select,
+  .dark .rdp-caption_label,
+  .dark .rdp-dropdown_month,
+  .dark .rdp-dropdown_year,
+  .dark select.rdp-dropdown {
+    background-color: var(--popover);
+    color: var(--popover-foreground);
+    border-color: var(--border);
+  }
+  .dark .rdp-dropdown option,
+  .dark .rdp-caption_dropdowns select option {
+    background-color: var(--popover);
+    color: var(--popover-foreground);
+  }
 }

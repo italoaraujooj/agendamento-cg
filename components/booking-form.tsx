@@ -10,7 +10,8 @@ import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Calendar as CalendarIcon, Clock, Users, Phone, Mail, Building, User, CheckCircle } from "lucide-react"
+import { Calendar as CalendarIcon, Clock, Users, Phone, Mail, Building, User, CheckCircle, Plus, X } from "lucide-react"
+import { cn } from "@/lib/utils"
 import { supabase } from "@/lib/supabase/client"
 import { DatePicker } from "@/components/ui/date-picker"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
@@ -43,6 +44,10 @@ export default function BookingForm({ environments, preselectedEnvironment }: Bo
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [success, setSuccess] = useState(false)
+  const [step, setStep] = useState<1 | 2>(1)
+  const [extraOccurrences, setExtraOccurrences] = useState<Array<{ date: string; startTime: string; duration: string }>>([])
+  const [envAvailabilityByWeekday, setEnvAvailabilityByWeekday] = useState<Record<number, { start: number; end: number }[]>>({})
+  const [isLoadingEnvAvailability, setIsLoadingEnvAvailability] = useState(false)
 
   const [formData, setFormData] = useState({
     environmentId: preselectedEnvironment || "",
@@ -56,6 +61,11 @@ export default function BookingForm({ environments, preselectedEnvironment }: Bo
     bookingDate: "",
     startTime: "",
     duration: "1", // duração em horas
+    recurrenceFrequency: "none" as "none" | "daily" | "weekly" | "monthly" | "monthly_weekday",
+    recurrenceInterval: "1",
+    recurrenceEndDate: "",
+    recurrenceNth: [] as Array<"1" | "2" | "3" | "4" | "last">,
+    recurrenceWeekdays: [] as number[],
   })
 
   // Disponibilidades e reservas do dia (para calcular horários e ambientes disponíveis)
@@ -84,6 +94,8 @@ export default function BookingForm({ environments, preselectedEnvironment }: Bo
 
   const timeStringToHour = (t: string): number => Number.parseInt(t.split(":")[0] || "0", 10)
   const pad2 = (n: number) => n.toString().padStart(2, "0")
+  const DEFAULT_START_HOUR = 8
+  const DEFAULT_END_HOUR = 22
 
   const MAX_PHONE_DIGITS = 11
   const MAX_PHONE_MASK_LENGTH = 15
@@ -114,9 +126,9 @@ export default function BookingForm({ environments, preselectedEnvironment }: Bo
             .order("start_time", { ascending: true }),
           formData.bookingDate
             ? supabase
-                .from("bookings")
-                .select("environment_id, start_time, end_time")
-                .eq("booking_date", formData.bookingDate)
+              .from("bookings")
+              .select("environment_id, start_time, end_time")
+              .eq("booking_date", formData.bookingDate)
             : Promise.resolve({ data: [], error: null } as any),
         ])
         setAvailability(availRes.data || [])
@@ -138,7 +150,7 @@ export default function BookingForm({ environments, preselectedEnvironment }: Bo
         const { data } = await supabase
           .from("environment_availabilities")
           .select("weekday,start_time,end_time")
-          .eq("environment_id", preselectedEnvironment)
+          .eq("environment_id", Number(preselectedEnvironment))
         if (!data || data.length === 0) return
         const availableWeekdays = new Set<number>(data.map((d: any) => Number(d.weekday)))
         const today = new Date()
@@ -191,19 +203,311 @@ export default function BookingForm({ environments, preselectedEnvironment }: Bo
     { value: "12", label: "12 horas" },
   ]
 
+  // Datas e recorrência
+  const MAX_RECURRENCE_OCCURRENCES = 100
+  const FREQUENCY_LABEL: Record<"none" | "daily" | "weekly" | "monthly" | "monthly_weekday", string> = {
+    none: "Não repetir",
+    daily: "Diariamente",
+    weekly: "Semanalmente",
+    monthly: "Mensalmente (pela data)",
+    monthly_weekday: "Mensal por dia da semana",
+  }
+
+  const parseLocalYmd = (ymd: string) => {
+    const [y, m, d] = (ymd || "").split("-")
+    return new Date(Number(y || 0), Number(m || 1) - 1, Number(d || 1))
+  }
+
+  const formatYmd = (date: Date) => format(date, "yyyy-MM-dd")
+
+  const addDays = (date: Date, days: number) => {
+    const d = new Date(date)
+    d.setDate(d.getDate() + days)
+    return d
+  }
+
+  const addWeeks = (date: Date, weeks: number) => addDays(date, weeks * 7)
+
+  const addMonthsClamped = (date: Date, months: number) => {
+    const year = date.getFullYear()
+    const monthIndex = date.getMonth() + months
+    const targetYear = year + Math.floor(monthIndex / 12)
+    const targetMonthIndex = ((monthIndex % 12) + 12) % 12
+    const targetLastDay = new Date(targetYear, targetMonthIndex + 1, 0).getDate()
+    const targetDay = Math.min(date.getDate(), targetLastDay)
+    return new Date(targetYear, targetMonthIndex, targetDay)
+  }
+
+  const generateRecurrenceDates = (
+    startYmd: string,
+    frequency: "none" | "daily" | "weekly" | "monthly" | "monthly_weekday",
+    intervalStr: string,
+    endYmd: string,
+  ): string[] => {
+    const start = parseLocalYmd(startYmd)
+    const interval = Math.max(1, Number.parseInt(intervalStr || "1", 10))
+
+    if (Number.isNaN(start.getTime())) return []
+
+    if (frequency === "none") return [startYmd]
+
+    const end = parseLocalYmd(endYmd)
+    if (Number.isNaN(end.getTime())) return []
+
+    const dates: string[] = []
+    if (frequency === "monthly_weekday") {
+      // Ex.: 1º e 3º sábado, última quinta-feira
+      const selectedNth = new Set(formData.recurrenceNth)
+      const selectedWds = new Set(formData.recurrenceWeekdays)
+      if (selectedNth.size === 0 || selectedWds.size === 0) return []
+
+      // Gera mês a mês, pegando os n-ésimos wds
+      let monthCursor = new Date(start.getFullYear(), start.getMonth(), 1)
+      let count = 0
+      while (monthCursor <= end && count < MAX_RECURRENCE_OCCURRENCES) {
+        const y = monthCursor.getFullYear()
+        const m = monthCursor.getMonth()
+        // Dias do mês
+        const daysInMonth = new Date(y, m + 1, 0).getDate()
+        // Para cada weekday selecionado, encontre as ocorrências no mês
+        for (const wd of selectedWds) {
+          const occurrences: number[] = []
+          for (let d = 1; d <= daysInMonth; d++) {
+            const dt = new Date(y, m, d)
+            if (dt.getDay() === wd) occurrences.push(d)
+          }
+          for (const nth of selectedNth) {
+            let dayNum: number | null = null
+            if (nth === "last") {
+              dayNum = occurrences[occurrences.length - 1] ?? null
+            } else {
+              const n = Number.parseInt(nth, 10)
+              dayNum = occurrences[n - 1] ?? null
+            }
+            if (dayNum) {
+              const cand = new Date(y, m, dayNum)
+              if (cand >= start && cand <= end) dates.push(formatYmd(cand))
+            }
+          }
+        }
+        // Avança em meses respeitando intervalo
+        monthCursor = addMonthsClamped(monthCursor, interval)
+        count += 1
+      }
+      // Remover duplicados e ordenar
+      return Array.from(new Set(dates)).sort()
+    } else {
+      let cursor = new Date(start)
+      let count = 0
+      while (cursor <= end && count < MAX_RECURRENCE_OCCURRENCES) {
+        dates.push(formatYmd(cursor))
+        if (frequency === "daily") cursor = addDays(cursor, interval)
+        else if (frequency === "weekly") cursor = addWeeks(cursor, interval)
+        else cursor = addMonthsClamped(cursor, interval)
+        count += 1
+      }
+      return dates
+    }
+  }
+
+  const expandOccurrencesWithRecurrence = (
+    seeds: Array<{ date: string; start: number; end: number }>,
+    frequency: "none" | "daily" | "weekly" | "monthly",
+    intervalStr: string,
+    endYmd: string,
+  ): Array<{ date: string; start: number; end: number }> => {
+    if (frequency === "none") return seeds
+    const expanded: Array<{ date: string; start: number; end: number }> = []
+    for (const seed of seeds) {
+      const dates = generateRecurrenceDates(seed.date, frequency, intervalStr, endYmd)
+      for (const d of dates) expanded.push({ date: d, start: seed.start, end: seed.end })
+    }
+    return expanded
+  }
+
+  // Carregar disponibilidades do ambiente selecionado (para construir opções por data)
+  useEffect(() => {
+    const loadEnvAvailability = async () => {
+      if (!formData.environmentId) {
+        setEnvAvailabilityByWeekday({})
+        return
+      }
+      try {
+        setIsLoadingEnvAvailability(true)
+        const { data } = await supabase
+          .from("environment_availabilities")
+          .select("weekday,start_time,end_time")
+          .eq("environment_id", Number(formData.environmentId))
+        const grouped = (data || []).reduce<Record<number, { start: number; end: number }[]>>((acc, row: any) => {
+          const wk = Number(row.weekday)
+          const s = timeStringToHour(row.start_time)
+          const e = timeStringToHour(row.end_time)
+          if (!acc[wk]) acc[wk] = []
+          acc[wk].push({ start: s, end: e })
+          return acc
+        }, {})
+        setEnvAvailabilityByWeekday(grouped)
+      } finally {
+        setIsLoadingEnvAvailability(false)
+      }
+    }
+    loadEnvAvailability()
+  }, [formData.environmentId])
+
+  const getStartTimeOptionsForDate = (ymd: string): string[] => {
+    if (!ymd) return []
+    const date = parseLocalYmd(ymd)
+    if (Number.isNaN(date.getTime())) return []
+    const wk = date.getDay()
+    const windows = envAvailabilityByWeekday[wk] || []
+    const opts: string[] = []
+    if (windows.length === 0) {
+      for (let h = DEFAULT_START_HOUR; h < DEFAULT_END_HOUR; h++) {
+        opts.push(`${pad2(h)}:00`)
+      }
+    } else {
+      for (const win of windows) {
+        for (let h = win.start; h < win.end; h++) {
+          opts.push(`${pad2(h)}:00`)
+        }
+      }
+    }
+    return Array.from(new Set(opts))
+  }
+
+  const getValidDurationForDateAndStart = (ymd: string, startTime: string) => {
+    if (!ymd || !startTime) return durationOptions
+    const date = parseLocalYmd(ymd)
+    const wk = date.getDay()
+    const windows = envAvailabilityByWeekday[wk] || []
+    const startHour = Number.parseInt(startTime.split(":")[0])
+    if (windows.length === 0) {
+      const maxDuration = DEFAULT_END_HOUR - startHour
+      if (maxDuration <= 0) return []
+      return durationOptions.filter((option) => Number.parseInt(option.value) <= maxDuration)
+    }
+    const containing = windows.find((w) => startHour >= w.start && startHour < w.end)
+    if (!containing) return []
+    const maxDuration = containing.end - startHour
+    return durationOptions.filter((option) => Number.parseInt(option.value) <= maxDuration)
+  }
+
+  const computeEndTimeFromStartAndDuration = (startTime: string, duration: string): string => {
+    if (!startTime || !duration) return ""
+    const startHour = Number.parseInt(startTime.split(":")[0])
+    const endHour = startHour + Number.parseInt(duration)
+    return `${pad2(endHour)}:00`
+  }
+
+  const handleRemovePrimaryDate = () => {
+    if (extraOccurrences.length === 0) return
+    const [first, ...rest] = extraOccurrences
+    setFormData((prev) => ({
+      ...prev,
+      bookingDate: first.date,
+      startTime: first.startTime,
+      duration: first.duration,
+    }))
+    setExtraOccurrences(rest)
+  }
+
+  const renderExtraOccurrence = (occ: { date: string; startTime: string; duration: string }, idx: number) => {
+    const startOpts = getStartTimeOptionsForDate(occ.date)
+    const durationOpts = getValidDurationForDateAndStart(occ.date, occ.startTime)
+    const endDisplay = computeEndTimeFromStartAndDuration(occ.startTime, occ.duration)
+    return (
+      <div key={idx} className="grid md:grid-cols-4 gap-3">
+        <div className="space-y-2">
+          <Label className="flex items-center gap-2"><CalendarIcon className="h-4 w-4" /> Data</Label>
+          <DatePicker
+            value={occ.date}
+            onChange={(d) => {
+              setExtraOccurrences((prev) => {
+                const next = [...prev]
+                next[idx] = { ...next[idx], date: d || "" }
+                return next
+              })
+            }}
+            disablePast
+          />
+        </div>
+
+        <div className="space-y-2">
+          <Label className="flex items-center gap-2"><Clock className="h-4 w-4" /> Horário Início</Label>
+          <Select
+            value={occ.startTime}
+            onValueChange={(v) =>
+              setExtraOccurrences((prev) => {
+                const next = [...prev]
+                next[idx] = { ...next[idx], startTime: v }
+                return next
+              })
+            }
+            disabled={!occ.date || startOpts.length === 0}
+          >
+            <SelectTrigger>
+              <SelectValue placeholder={occ.date ? (startOpts.length ? "Selecione" : "indisponível") : "Escolha a data"} />
+            </SelectTrigger>
+            <SelectContent className="max-h-48 overflow-y-auto">
+              {startOpts.map((t) => (
+                <SelectItem key={`${idx}-${t}`} value={t}>
+                  {t}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+
+        <div className="space-y-2">
+          <Label className="flex items-center gap-2"><Clock className="h-4 w-4" /> Duração</Label>
+          <Select
+            value={occ.duration}
+            onValueChange={(v) =>
+              setExtraOccurrences((prev) => {
+                const next = [...prev]
+                next[idx] = { ...next[idx], duration: v }
+                return next
+              })
+            }
+            disabled={!occ.startTime || durationOpts.length === 0}
+          >
+            <SelectTrigger>
+              <SelectValue placeholder={occ.startTime ? (durationOpts.length ? "Selecione" : "indisponível") : "Escolha o início"} />
+            </SelectTrigger>
+            <SelectContent>
+              {durationOpts.map((opt) => (
+                <SelectItem key={`${idx}-dur-${opt.value}`} value={opt.value}>
+                  {opt.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+
+        <div className="space-y-2">
+          <Label htmlFor={`extraEnd-${idx}`}>Horário Fim</Label>
+          <div className="flex items-center gap-2">
+            <Input id={`extraEnd-${idx}`} value={endDisplay} readOnly placeholder="Automático" className="bg-gray-50" />
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon"
+              onClick={() => setExtraOccurrences((prev) => prev.filter((_, i) => i !== idx))}
+              aria-label="Remover data adicional"
+            >
+              <X className="h-4 w-4" />
+            </Button>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
   // Função para calcular horário de fim baseado no início e duração respeitando disponibilidade
   const calculateEndTime = (startTime: string, duration: string) => {
     if (!startTime || !duration) return ""
     const startHour = Number.parseInt(startTime.split(":")[0])
     const endHour = startHour + Number.parseInt(duration)
-    if (availability.length) {
-      const ok = availability.some((w) => {
-        const s = timeStringToHour(w.start_time)
-        const e = timeStringToHour(w.end_time)
-        return startHour >= s && endHour <= e
-      })
-      if (!ok) return ""
-    }
     return `${endHour.toString().padStart(2, "0")}:00`
   }
 
@@ -319,16 +623,72 @@ export default function BookingForm({ environments, preselectedEnvironment }: Bo
     }
 
     const selectedEnv = environments.find((env) => String(env.id) === formData.environmentId)
-    if (selectedEnv && Number.parseInt(formData.estimatedParticipants) > selectedEnv.capacity) {
+    if (selectedEnv && Number.parseInt(formData.estimatedParticipants || "0") > selectedEnv.capacity) {
       return `Número de participantes excede a capacidade do ambiente (${selectedEnv.capacity})`
     }
 
     // Validação do horário de fim
     const endTime = calculateEndTime(formData.startTime, formData.duration)
-    if (!endTime) {
-      return "Duração selecionada ultrapassa o horário limite (22:00)"
+
+    // Extras: validar campos e horários
+    for (const [idx, occ] of extraOccurrences.entries()) {
+      if (!occ.date || !occ.startTime || !occ.duration) return `Preencha data, início e duração na ocorrência adicional #${idx + 1}`
+      const extraEnd = computeEndTimeFromStartAndDuration(occ.startTime, occ.duration)
+      if (!extraEnd) return `Horário inválido na ocorrência adicional #${idx + 1}`
     }
 
+    // Checar duplicidade de (data, início)
+    const seen = new Set<string>()
+    const key = (d: string, s: string) => `${d}|${s}`
+    seen.add(key(formData.bookingDate, formData.startTime))
+    for (const occ of extraOccurrences) {
+      const k = key(occ.date, occ.startTime)
+      if (seen.has(k)) return `Data/horário duplicado: ${occ.date} ${occ.startTime}`
+      seen.add(k)
+    }
+
+    // Recorrência: se habilitada, exigir data final válida e não anterior ao início
+    if (formData.recurrenceFrequency !== "none") {
+      if (!formData.recurrenceEndDate) return "Defina a data final da recorrência"
+      const start = parseLocalYmd(formData.bookingDate)
+      const end = parseLocalYmd(formData.recurrenceEndDate)
+      if (end < start) return "A data final da recorrência deve ser igual ou posterior à data inicial"
+      // Para monthly_weekday, exigir seleção de pelo menos um ordinal e um dia da semana
+      if (formData.recurrenceFrequency === "monthly_weekday") {
+        if (!formData.recurrenceNth.length) return "Selecione 1º/2º/3º/4º/Último para a recorrência mensal por dia da semana"
+        if (!formData.recurrenceWeekdays.length) return "Selecione ao menos um dia da semana para a recorrência"
+      }
+
+      const occurrences = generateRecurrenceDates(
+        formData.bookingDate,
+        formData.recurrenceFrequency,
+        formData.recurrenceInterval,
+        formData.recurrenceEndDate,
+      )
+      if (occurrences.length === 0) return "Não foi possível gerar as datas da recorrência"
+      if (occurrences.length >= MAX_RECURRENCE_OCCURRENCES)
+        return `Limite máximo de ${MAX_RECURRENCE_OCCURRENCES} ocorrências atingido`
+      // Observação: duplicidades entre recorrência e extras serão deduplicadas automaticamente no envio
+    }
+
+    return null
+  }
+
+  const validateStep1 = () => {
+    const requiredStep1 = [
+      "name",
+      "email",
+      "phone",
+      "ministryNetwork",
+      "estimatedParticipants",
+      "responsiblePerson",
+      "occasion",
+    ]
+    for (const field of requiredStep1) {
+      if (!formData[field as keyof typeof formData]) return `O campo é obrigatório`
+    }
+    if (!/\S+@\S+\.\S+/.test(formData.email)) return "Email inválido"
+    if (Number.parseInt(formData.estimatedParticipants || "0") <= 0) return "Número de participantes deve ser maior que zero"
     return null
   }
 
@@ -344,12 +704,107 @@ export default function BookingForm({ environments, preselectedEnvironment }: Bo
       return
     }
 
-    // Calculando endTime antes de enviar
+    // Datas alvo (recorrência ou única)
+    const allDates = generateRecurrenceDates(
+      formData.bookingDate,
+      formData.recurrenceFrequency,
+      formData.recurrenceInterval,
+      formData.recurrenceEndDate || formData.bookingDate,
+    )
+
+    // Calcula horário de fim uma vez
     const endTime = calculateEndTime(formData.startTime, formData.duration)
 
     try {
-      const { error: insertError } = await supabase.from("bookings").insert({
-        environment_id: formData.environmentId,
+      // Pré-checagem de disponibilidade por dia da semana do ambiente
+      const { data: allEnvAvail } = await supabase
+        .from("environment_availabilities")
+        .select("weekday,start_time,end_time")
+        .eq("environment_id", Number(formData.environmentId))
+
+      const windowsByWeekday = (allEnvAvail || []).reduce<Record<number, { s: number; e: number }[]>>((acc, w: any) => {
+        const s = timeStringToHour(w.start_time)
+        const e = timeStringToHour(w.end_time)
+        const wk = Number(w.weekday)
+        if (!acc[wk]) acc[wk] = []
+        acc[wk].push({ s, e })
+        return acc
+      }, {})
+
+      const startHour = Number.parseInt(formData.startTime.split(":")[0])
+      const endHour = Number.parseInt(endTime.split(":")[0])
+      const weekdayOf = (ymd: string) => parseLocalYmd(ymd).getDay()
+
+      // Construir ocorrências alvo: recorrência + extras (cada uma com seu horário)
+      const recurrenceOccurrences = allDates.map((d) => ({ date: d, start: startHour, end: endHour }))
+      const extraOccurrencesResolved = extraOccurrences.map((o) => ({
+        date: o.date,
+        start: Number.parseInt(o.startTime.split(":")[0]),
+        end: Number.parseInt(computeEndTimeFromStartAndDuration(o.startTime, o.duration).split(":")[0]),
+      }))
+
+      // Deduplicar por (date,start) para evitar bloqueios desnecessários
+      const uniqueMap = new Map<string, { date: string; start: number; end: number }>()
+      for (const occ of [...recurrenceOccurrences, ...extraOccurrencesResolved]) {
+        const k = `${occ.date}|${occ.start}`
+        if (!uniqueMap.has(k)) uniqueMap.set(k, occ)
+      }
+      const targetOccurrences = Array.from(uniqueMap.values())
+
+      // Validar disponibilidade por data
+      const invalidByAvailability: string[] = []
+      for (const occ of targetOccurrences) {
+        const wk = weekdayOf(occ.date)
+        const windows = windowsByWeekday[wk] || []
+        const fits = windows.some((w) => occ.start >= w.s && occ.end <= w.e)
+        if (!fits) invalidByAvailability.push(occ.date)
+      }
+
+      if (invalidByAvailability.length) {
+        setError(
+          `Sem disponibilidade no ambiente para: ${invalidByAvailability
+            .slice(0, 5)
+            .join(", ")} ${invalidByAvailability.length > 5 ? `+${invalidByAvailability.length - 5} dia(s)` : ""}`,
+        )
+        setIsSubmitting(false)
+        return
+      }
+
+      // Pré-checagem de conflitos já existentes
+      const queryDates = Array.from(new Set(targetOccurrences.map((o) => o.date)))
+      const { data: existing } = await supabase
+        .from("bookings")
+        .select("booking_date,start_time,end_time")
+        .eq("environment_id", Number(formData.environmentId))
+        .in("booking_date", queryDates)
+
+      const overlaps = (aStart: number, aEnd: number, bStart: number, bEnd: number) => aStart < bEnd && aEnd > bStart
+      const conflicting: string[] = []
+      const byDate = targetOccurrences.reduce<Record<string, { start: number; end: number }>>((acc, o) => {
+        acc[o.date] = { start: o.start, end: o.end }
+        return acc
+      }, {})
+      for (const row of existing || []) {
+        const d = (row as any).booking_date as string
+        const target = byDate[d]
+        if (!target) continue
+        const bS = timeStringToHour((row as any).start_time)
+        const bE = timeStringToHour((row as any).end_time)
+        if (overlaps(target.start, target.end, bS, bE)) conflicting.push(d)
+      }
+      if (conflicting.length) {
+        setError(
+          `Conflito com reservas existentes em: ${conflicting
+            .slice(0, 5)
+            .join(", ")} ${conflicting.length > 5 ? `+${conflicting.length - 5} dia(s)` : ""}`,
+        )
+        setIsSubmitting(false)
+        return
+      }
+
+      // Inserção em lote
+      const rows = targetOccurrences.map((o) => ({
+        environment_id: Number(formData.environmentId),
         name: formData.name,
         email: formData.email,
         phone: formData.phone,
@@ -357,34 +812,36 @@ export default function BookingForm({ environments, preselectedEnvironment }: Bo
         estimated_participants: Number.parseInt(formData.estimatedParticipants),
         responsible_person: formData.responsiblePerson,
         occasion: formData.occasion,
-        booking_date: formData.bookingDate,
-        start_time: formData.startTime,
-        end_time: endTime,
-      })
+        booking_date: o.date,
+        start_time: `${pad2(o.start)}:00`,
+        end_time: `${pad2(o.end)}:00`,
+      }))
 
+      const { error: insertError } = await supabase.from("bookings").insert(rows)
       if (insertError) {
-        if (insertError.code === "23P01") {
-          setError("Já existe uma reserva para este horário. Escolha outro horário.")
+        if ((insertError as any).code === "23P01") {
+          setError("Já existe uma reserva para este horário em uma das datas selecionadas.")
         } else {
-          setError(`Erro ao criar reserva: ${insertError.message}`)
+          setError(`Erro ao criar reservas: ${insertError.message}`)
         }
       } else {
         setSuccess(true)
-        toast.success("Reserva criada com sucesso")
+        toast.success(
+          rows.length > 1 ? `${rows.length} reservas criadas com sucesso` : "Reserva criada com sucesso",
+        )
         setTimeout(() => {
           router.push("/reservations")
-        }, 2000)
+        }, 1200)
       }
     } catch (err) {
-      setError("Erro inesperado ao criar reserva")
+      setError("Erro inesperado ao criar reserva(s)")
     } finally {
       setIsSubmitting(false)
     }
   }
 
-  const canSubmit = useMemo(() => {
-    return validateForm() === null
-  }, [formData, availability, environments])
+  const canSubmit = useMemo(() => validateForm() === null, [JSON.stringify({ formData, extraOccurrences, availability, environments })])
+  const canGoNext = useMemo(() => validateStep1() === null, [JSON.stringify({ formData })])
 
   if (success) {
     return (
@@ -421,10 +878,24 @@ export default function BookingForm({ environments, preselectedEnvironment }: Bo
             </Alert>
           )}
 
-          
+          {/* Steps Navigation */}
+          <div className="flex items-center justify-between">
+            <div className="text-sm text-muted-foreground">Etapa {step} de 2</div>
+            {step === 1 ? (
+              <Button type="button" onClick={() => setStep(2)} disabled={!canGoNext}>
+                Próximo
+              </Button>
+            ) : (
+              <Button type="button" variant="outline" onClick={() => setStep(1)}>
+                Voltar
+              </Button>
+            )}
+          </div>
 
-          {/* Personal Information */}
-          <div className="grid md:grid-cols-2 gap-4">
+          {step === 1 && (
+            <>
+              {/* Personal Information */}
+              <div className="grid md:grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label htmlFor="name" className="flex items-center gap-2">
                 <User className="h-4 w-4" />
@@ -451,9 +922,9 @@ export default function BookingForm({ environments, preselectedEnvironment }: Bo
                 placeholder="seu@email.com"
               />
             </div>
-          </div>
+              </div>
 
-          <div className="grid md:grid-cols-2 gap-4">
+              <div className="grid md:grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label htmlFor="phone" className="flex items-center gap-2">
                 <Phone className="h-4 w-4" />
@@ -481,9 +952,9 @@ export default function BookingForm({ environments, preselectedEnvironment }: Bo
                 placeholder="Nome do ministério ou rede"
               />
             </div>
-          </div>
+              </div>
 
-          <div className="grid md:grid-cols-2 gap-4">
+              <div className="grid md:grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label htmlFor="participants" className="flex items-center gap-2">
                 <Users className="h-4 w-4" />
@@ -508,10 +979,26 @@ export default function BookingForm({ environments, preselectedEnvironment }: Bo
                 placeholder="Nome do responsável"
               />
             </div>
-          </div>
+              </div>
 
-          {/* Date and Time */}
-          <div className="grid md:grid-cols-4 gap-4">
+              {/* Occasion */}
+              <div className="space-y-2">
+                <Label htmlFor="occasion">Ocasião/Motivo</Label>
+                <Textarea
+                  id="occasion"
+                  value={formData.occasion}
+                  onChange={(e) => handleInputChange("occasion", e.target.value)}
+                  placeholder="Descreva o motivo da reserva (reunião, evento, estudo, etc.)"
+                  rows={3}
+                />
+              </div>
+            </>
+          )}
+
+          {step === 2 && (
+            <>
+              {/* Date and Time */}
+              <div className="grid md:grid-cols-4 gap-4">
             <div className="space-y-2">
               <Label htmlFor="date" className="flex items-center gap-2">
                 <CalendarIcon className="h-4 w-4" />
@@ -565,13 +1052,169 @@ export default function BookingForm({ environments, preselectedEnvironment }: Bo
 
             <div className="space-y-2">
               <Label htmlFor="endTime">Horário Fim</Label>
-              <Input
-                id="endTime"
-                value={calculateEndTime(formData.startTime, formData.duration)}
-                readOnly
-                placeholder="Automático"
-                className="bg-gray-50"
-              />
+              <div className="flex items-center gap-2">
+                <Input
+                  id="endTime"
+                  value={calculateEndTime(formData.startTime, formData.duration)}
+                  readOnly
+                  placeholder="Automático"
+                  className="bg-gray-50"
+                />
+                {extraOccurrences.length > 0 && (
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    onClick={handleRemovePrimaryDate}
+                    aria-label="Remover primeira data (mover dados da próxima)"
+                  >
+                    <X className="h-4 w-4" />
+                  </Button>
+                )}
+              </div>
+            </div>
+              </div>
+
+          {/* Datas adicionais (somente exibir campos quando existir ao menos uma) */}
+          <div className="space-y-3">
+            <div className="flex items-center justify-between">
+              {extraOccurrences.length > 0 && (
+                <Label className="flex items-center gap-2">Datas adicionais</Label>
+              )}
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => setExtraOccurrences((prev) => [...prev, { date: "", startTime: "", duration: "1" }])}
+                disabled={isLoadingEnvAvailability}
+              >
+                <Plus className="h-4 w-4" /> Adicionar data
+              </Button>
+            </div>
+
+            {extraOccurrences.length > 0 && (
+              <div className="space-y-3">
+                {extraOccurrences.map((occ, idx) => renderExtraOccurrence(occ, idx))}
+              </div>
+            )}
+          </div>
+
+          {/* Recorrência (aplicada a todas as datas listadas) */}
+          <div className="space-y-2">
+            <Label className="block">Recorrência (aplicada a todas as datas listadas)</Label>
+              <div className={`grid gap-4 ${formData.recurrenceFrequency === "none" ? "md:grid-cols-1" : formData.recurrenceFrequency === "monthly_weekday" ? "md:grid-cols-3" : "md:grid-cols-3"}`}>
+              <div className={`space-y-2 ${formData.recurrenceFrequency === "monthly_weekday" ? "md:col-span-3" : ""}`}>
+                <Label htmlFor="recurrenceFrequency">Tipo</Label>
+                <Select
+                  value={formData.recurrenceFrequency}
+                  onValueChange={(v) => handleInputChange("recurrenceFrequency", v)}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Não repetir" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">{FREQUENCY_LABEL.none}</SelectItem>
+                    <SelectItem value="daily">{FREQUENCY_LABEL.daily}</SelectItem>
+                    <SelectItem value="weekly">{FREQUENCY_LABEL.weekly}</SelectItem>
+                    <SelectItem value="monthly">{FREQUENCY_LABEL.monthly}</SelectItem>
+                      <SelectItem value="monthly_weekday">{FREQUENCY_LABEL.monthly_weekday}</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {formData.recurrenceFrequency !== "none" && formData.recurrenceFrequency !== "monthly_weekday" && (
+                <>
+                  <div className="space-y-2">
+                    <Label htmlFor="recurrenceInterval">Intervalo</Label>
+                    <Input
+                      id="recurrenceInterval"
+                      type="number"
+                      min={1}
+                      value={formData.recurrenceInterval}
+                      onChange={(e) => handleInputChange("recurrenceInterval", e.target.value.replace(/[^0-9]/g, ""))}
+                      placeholder="1"
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="recurrenceEndDate">Repetir até</Label>
+                    <DatePicker
+                      id="recurrenceEndDate"
+                      value={formData.recurrenceEndDate}
+                      onChange={(yyyyMMdd) => handleInputChange("recurrenceEndDate", yyyyMMdd || "")}
+                      disablePast
+                    />
+                  </div>
+                </>
+              )}
+
+              {formData.recurrenceFrequency === "monthly_weekday" && (
+                <>
+                  <div className="space-y-2 md:col-span-3">
+                    <Label>Ocorrências</Label>
+                    <div className="grid grid-cols-5 md:grid-cols-5 gap-3 text-sm">
+                      {(["1","2","3","4","last"] as const).map((tag) => (
+                        <label
+                          key={tag}
+                          className={`inline-flex items-center justify-center rounded-md border px-3 py-2 cursor-pointer select-none ${formData.recurrenceNth.includes(tag) ? "bg-accent/40 border-primary" : "hover:bg-accent/20"}`}
+                        >
+                          <input
+                            type="checkbox"
+                            className="sr-only"
+                            checked={formData.recurrenceNth.includes(tag)}
+                            onChange={(e) => {
+                              setFormData((prev) => {
+                                const set = new Set(prev.recurrenceNth)
+                                if (e.target.checked) set.add(tag)
+                                else set.delete(tag)
+                                return { ...prev, recurrenceNth: Array.from(set) as Array<typeof tag> }
+                              })
+                            }}
+                          />
+                          {tag === "last" ? "Último" : `${tag}º`}
+                        </label>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className="space-y-2 md:col-span-3">
+                    <Label>Dias da semana</Label>
+                    <div className="grid grid-cols-7 gap-3 text-sm md:max-w-[560px]">
+                      {["D","S","T","Q","Q","S","S"].map((lbl, idx) => (
+                        <label
+                          key={idx}
+                          className={`inline-flex items-center justify-center rounded-md border px-3 py-2 cursor-pointer select-none ${formData.recurrenceWeekdays.includes(idx) ? "bg-accent/40 border-primary" : "hover:bg-accent/20"}`}
+                        >
+                          <input
+                            type="checkbox"
+                            className="sr-only"
+                            checked={formData.recurrenceWeekdays.includes(idx)}
+                            onChange={(e) => {
+                              setFormData((prev) => {
+                                const set = new Set(prev.recurrenceWeekdays)
+                                if (e.target.checked) set.add(idx)
+                                else set.delete(idx)
+                                return { ...prev, recurrenceWeekdays: Array.from(set).sort() }
+                              })
+                            }}
+                          />
+                          {lbl}
+                        </label>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="recurrenceEndDate">Repetir até</Label>
+                    <DatePicker
+                      id="recurrenceEndDate"
+                      value={formData.recurrenceEndDate}
+                      onChange={(yyyyMMdd) => handleInputChange("recurrenceEndDate", yyyyMMdd || "")}
+                      disablePast
+                    />
+                  </div>
+                </>
+              )}
             </div>
           </div>
 
@@ -608,18 +1251,8 @@ export default function BookingForm({ environments, preselectedEnvironment }: Bo
               </SelectContent>
             </Select>
           </div>
-
-          {/* Occasion */}
-          <div className="space-y-2">
-            <Label htmlFor="occasion">Ocasião/Motivo</Label>
-            <Textarea
-              id="occasion"
-              value={formData.occasion}
-              onChange={(e) => handleInputChange("occasion", e.target.value)}
-              placeholder="Descreva o motivo da reserva (reunião, evento, estudo, etc.)"
-              rows={3}
-            />
-          </div>
+            </>
+          )}
 
           {/* Aviso de disponibilidade por dia */}
           {formData.bookingDate && !isLoadingAvailability && availability.length === 0 && (
@@ -632,12 +1265,18 @@ export default function BookingForm({ environments, preselectedEnvironment }: Bo
             <Tooltip open={(!canSubmit && !isSubmitting) ? undefined : false}>
               <TooltipTrigger asChild>
                 <div>
-                  <Button type="submit" disabled={isSubmitting || !canSubmit} className="w-full">
-                    {isSubmitting ? "Criando Reserva..." : "Criar Reserva"}
-                  </Button>
+                  {step === 2 ? (
+                    <Button type="submit" disabled={isSubmitting || !canSubmit} className="w-full">
+                      {isSubmitting ? "Criando Reserva..." : "Criar Reserva"}
+                    </Button>
+                  ) : (
+                    <Button type="button" onClick={() => setStep(2)} disabled={!canGoNext} className="w-full">
+                      Próximo
+                    </Button>
+                  )}
                 </div>
               </TooltipTrigger>
-              {!canSubmit && !isSubmitting && (
+              {step === 2 && !canSubmit && !isSubmitting && (
                 <TooltipContent>
                   Preencha todos os campos obrigatórios para habilitar o envio
                 </TooltipContent>
