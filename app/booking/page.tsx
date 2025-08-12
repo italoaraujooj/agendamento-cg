@@ -14,7 +14,7 @@ interface Environment {
 export default async function BookingPage({
   searchParams,
 }: {
-  searchParams: { environment?: string }
+  searchParams: Promise<{ environment?: string }>
 }) {
   const supabase = createServerClient()
 
@@ -52,7 +52,7 @@ export default async function BookingPage({
         </div>
 
         <div className="max-w-2xl mx-auto">
-          <BookingForm environments={environments || []} preselectedEnvironment={searchParams.environment} />
+          <BookingForm environments={environments || []} preselectedEnvironment={(await searchParams).environment} />
         </div>
       </div>
     </div>

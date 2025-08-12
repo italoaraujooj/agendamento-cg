@@ -55,10 +55,10 @@ export default function ReservationsView({ bookings, environments, currentFilter
   const applyFilters = () => {
     const params = new URLSearchParams(searchParams.toString())
 
-    if (filterEnvironment) {
-      params.set("environment", filterEnvironment)
-    } else {
+    if (!filterEnvironment || filterEnvironment === "all") {
       params.delete("environment")
+    } else {
+      params.set("environment", filterEnvironment)
     }
 
     if (filterDate) {

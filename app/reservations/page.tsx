@@ -33,7 +33,7 @@ interface Environment {
 export default async function ReservationsPage({
   searchParams,
 }: {
-  searchParams: { environment?: string; date?: string }
+  searchParams: Promise<{ environment?: string; date?: string }>
 }) {
   const supabase = createServerClient()
 
@@ -48,27 +48,42 @@ export default async function ReservationsPage({
   // Get all environments for filter
   const { data: environments } = await supabase.from("environments").select("id, name, capacity").order("name")
 
-  // Build query for bookings
+  // Build query for bookings (alias ministry -> ministry_network)
   let query = supabase
     .from("bookings")
-    .select(`
-      *,
+    .select(
+      `
+      id,
+      name,
+      email,
+      phone,
+      ministry_network:ministry,
+      estimated_participants,
+      responsible_person,
+      occasion,
+      booking_date,
+      start_time,
+      end_time,
+      created_at,
       environments (
         id,
         name,
         capacity
       )
-    `)
+    `,
+      { count: "exact" }
+    )
     .order("booking_date", { ascending: true })
     .order("start_time", { ascending: true })
 
   // Apply filters
-  if (searchParams.environment) {
-    query = query.eq("environment_id", searchParams.environment)
+  const sp = await searchParams
+  if (sp.environment && sp.environment !== "all") {
+    query = query.eq("environment_id", sp.environment)
   }
 
-  if (searchParams.date) {
-    query = query.eq("booking_date", searchParams.date)
+  if (sp.date) {
+    query = query.eq("booking_date", sp.date)
   }
 
   const { data: bookings, error } = await query
@@ -100,8 +115,8 @@ export default async function ReservationsPage({
           bookings={bookings || []}
           environments={environments || []}
           currentFilters={{
-            environment: searchParams.environment,
-            date: searchParams.date,
+            environment: sp.environment,
+            date: sp.date,
           }}
         />
       </div>
