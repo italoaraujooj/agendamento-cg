@@ -6,8 +6,8 @@ import "./globals.css"
 import NavigationHeader from "@/components/navigation-header"
 
 export const metadata: Metadata = {
-  title: "Sistema de Agendamento - Igreja",
-  description: "Sistema para agendamento de espaços da igreja",
+  title: "Sistema de Agendamento - Igreja Cidade Viva Campina Grande",
+  description: "Sistema para agendamento de espaços",
   generator: "v0.dev",
 }
 

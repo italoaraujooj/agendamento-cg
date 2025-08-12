@@ -80,6 +80,54 @@ export default async function EnvironmentsPage() {
     return grouped
   }
 
+  // Agrupa dias que possuem intervalos idênticos para exibição compacta
+  const buildCondensedAvailability = (envId: string) => {
+    const byWeekday = groupAvailabilityByWeekday(envId)
+    // Mapa "chave de intervalos" -> lista de dias [0..6]
+    const keyToDays = new Map<string, number[]>()
+    for (let d = 0; d <= 6; d++) {
+      const ranges = (byWeekday[d] || [])
+        .slice()
+        .sort((a, b) => a.start.localeCompare(b.start))
+        .map((r) => `${r.start}-${r.end}`)
+      const key = ranges.length ? ranges.join(",") : "__fechado__"
+      if (!keyToDays.has(key)) keyToDays.set(key, [])
+      keyToDays.get(key)!.push(d)
+    }
+
+    // Converte lista de dias em segmentos consecutivos (ex.: [1,2,4,5,6] -> [[1,2],[4,6]])
+    const toSegments = (days: number[]) => {
+      const segs: Array<[number, number]> = []
+      let start = days[0]
+      let prev = days[0]
+      for (let i = 1; i < days.length; i++) {
+        const cur = days[i]
+        if (cur === prev + 1) {
+          prev = cur
+          continue
+        }
+        segs.push([start, prev])
+        start = prev = cur
+      }
+      segs.push([start, prev])
+      return segs
+    }
+
+    // Monta estrutura final, ignorando grupos "fechado" se houver outros grupos
+    const entries = Array.from(keyToDays.entries())
+    const anyOpen = entries.some(([k]) => k !== "__fechado__")
+    const filtered = entries.filter(([k]) => (anyOpen ? k !== "__fechado__" : true))
+
+    return filtered.map(([key, days]) => {
+      const segments = toSegments(days)
+      const dayLabel = segments
+        .map(([a, b]) => (a === b ? WEEKDAY_LABELS_PT_BR[a] : `${WEEKDAY_LABELS_PT_BR[a]}–${WEEKDAY_LABELS_PT_BR[b]}`))
+        .join("; ")
+      const ranges = key === "__fechado__" ? [] : key.split(",") // ["08:00-22:00", ...]
+      return { dayLabel, ranges }
+    })
+  }
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100">
       <div className="container mx-auto px-4 py-8">
@@ -95,9 +143,9 @@ export default async function EnvironmentsPage() {
           <p className="text-xl text-gray-600">Conheça os espaços da igreja e suas capacidades</p>
         </div>
 
-        <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+        <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6 auto-rows-fr items-stretch">
           {environments?.map((environment: Environment) => (
-            <Card key={environment.id} className="hover:shadow-lg transition-shadow">
+            <Card key={environment.id} className="hover:shadow-lg transition-shadow h-full flex flex-col">
               <CardHeader>
                 <div className="flex items-start justify-between">
                   <div className="flex items-center gap-2">
@@ -112,24 +160,28 @@ export default async function EnvironmentsPage() {
                 <CardDescription className="text-sm">Capacidade máxima: {environment.capacity} pessoas</CardDescription>
               </CardHeader>
 
-              <CardContent>
-                <p className="text-gray-700 mb-4">{environment.description || "Sem descrição disponível"}</p>
+              <CardContent className="flex flex-col flex-1">
+                <p className="text-gray-700 mb-4 line-clamp-3">{environment.description || "Sem descrição disponível"}</p>
 
                 <div className="space-y-2 mb-4">
                   <h4 className="text-sm font-semibold text-gray-800">Disponibilidade</h4>
                   <div className="space-y-1">
-                    {Object.entries(groupAvailabilityByWeekday(environment.id)).length === 0 ? (
+                    {buildCondensedAvailability(environment.id).length === 0 ? (
                       <p className="text-sm text-gray-500">Não configurada</p>
                     ) : (
-                      Object.entries(groupAvailabilityByWeekday(environment.id)).map(([weekday, ranges]) => (
-                        <div key={`${environment.id}-${weekday}`} className="flex items-start gap-2">
-                          <span className="w-24 text-sm text-gray-600">{WEEKDAY_LABELS_PT_BR[Number(weekday)]}</span>
-                          <div className="flex flex-wrap gap-2">
-                            {ranges.map((r, idx) => (
-                              <Badge key={`${weekday}-${idx}`} variant="secondary">
-                                {r.start} - {r.end}
-                              </Badge>
-                            ))}
+                      buildCondensedAvailability(environment.id).map((g, idx) => (
+                        <div key={`${environment.id}-g${idx}`} className="flex items-start gap-2 w-full">
+                          <span className="min-w-32 text-sm text-gray-600">{g.dayLabel}</span>
+                          <div className="flex flex-wrap gap-2 ml-auto justify-end">
+                            {g.ranges.length === 0 ? (
+                              <Badge variant="secondary">Fechado</Badge>
+                            ) : (
+                              g.ranges.map((range, rIdx) => (
+                                <Badge key={`${idx}-${rIdx}`} variant="secondary">
+                                  {range.replace("-", " - ")}
+                                </Badge>
+                              ))
+                            )}
                           </div>
                         </div>
                       ))
@@ -137,7 +189,7 @@ export default async function EnvironmentsPage() {
                   </div>
                 </div>
 
-                <Button asChild className="w-full">
+                <Button asChild className="w-full mt-auto">
                   <Link href={`/booking?environment=${environment.id}`}>Agendar Este Espaço</Link>
                 </Button>
               </CardContent>
