@@ -4,12 +4,13 @@ import { useState } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Badge } from "@/components/ui/badge"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { Calendar, Clock, Users, Phone, Mail, Building, User, Filter, X, CalendarDays } from "lucide-react"
+import { Calendar as CalendarIcon, Clock, Users, Phone, Mail, Building, User, Filter, X, CalendarDays } from "lucide-react"
+import { DatePicker } from "@/components/ui/date-picker"
+import { format } from "date-fns"
 
 interface Booking {
   id: string
@@ -55,10 +56,10 @@ export default function ReservationsView({ bookings, environments, currentFilter
   const applyFilters = () => {
     const params = new URLSearchParams(searchParams.toString())
 
-    if (!filterEnvironment || filterEnvironment === "all") {
-      params.delete("environment")
-    } else {
+    if (filterEnvironment && filterEnvironment !== "all") {
       params.set("environment", filterEnvironment)
+    } else {
+      params.delete("environment")
     }
 
     if (filterDate) {
@@ -117,7 +118,7 @@ export default function ReservationsView({ bookings, environments, currentFilter
           <div className="grid md:grid-cols-3 gap-4">
             <div className="space-y-2">
               <Label htmlFor="filterDate">Data</Label>
-              <Input id="filterDate" type="date" value={filterDate} onChange={(e) => setFilterDate(e.target.value)} />
+              <DatePicker id="filterDate" value={filterDate} onChange={(v) => setFilterDate(v || "")} />
             </div>
 
             <div className="space-y-2">
@@ -151,7 +152,7 @@ export default function ReservationsView({ bookings, environments, currentFilter
 
           {hasActiveFilters && (
             <div className="mt-4 flex gap-2">
-              {currentFilters.date && <Badge variant="secondary">Data: {formatDate(currentFilters.date)}</Badge>}
+               {currentFilters.date && <Badge variant="secondary">Data: {formatDate(currentFilters.date)}</Badge>}
               {currentFilters.environment && (
                 <Badge variant="secondary">
                   Ambiente: {environments.find((env) => env.id === currentFilters.environment)?.name}
@@ -244,7 +245,7 @@ function BookingCard({ booking, compact = false }: { booking: Booking; compact?:
             <CardTitle className="text-lg">{booking.name}</CardTitle>
             <CardDescription className="flex items-center gap-4 mt-1">
               <span className="flex items-center gap-1">
-                <Calendar className="h-3 w-3" />
+                 <CalendarIcon className="h-3 w-3" />
                 {formatDate(booking.booking_date)}
               </span>
               <span className="flex items-center gap-1">
