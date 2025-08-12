@@ -51,6 +51,7 @@ export default function BookingForm({ environments, preselectedEnvironment }: Bo
 
   const [formData, setFormData] = useState({
     environmentId: preselectedEnvironment || "",
+    environmentIds: [] as string[],
     name: "",
     email: "",
     phone: "",
@@ -595,7 +596,7 @@ export default function BookingForm({ environments, preselectedEnvironment }: Bo
 
   const validateForm = () => {
     const required = [
-      "environmentId",
+      "environmentIds",
       "name",
       "email",
       "phone",
@@ -622,10 +623,10 @@ export default function BookingForm({ environments, preselectedEnvironment }: Bo
       return "Número de participantes deve ser maior que zero"
     }
 
-    const selectedEnv = environments.find((env) => String(env.id) === formData.environmentId)
-    if (selectedEnv && Number.parseInt(formData.estimatedParticipants || "0") > selectedEnv.capacity) {
-      return `Número de participantes excede a capacidade do ambiente (${selectedEnv.capacity})`
-    }
+    const selectedEnvs = environments.filter((env) => formData.environmentIds.includes(String(env.id)))
+    if (selectedEnvs.length === 0) return "Selecione ao menos um ambiente"
+    const overCap = selectedEnvs.find((env) => Number.parseInt(formData.estimatedParticipants || "0") > env.capacity)
+    if (overCap) return `Número de participantes excede a capacidade do ambiente (${overCap.capacity})`
 
     // Validação do horário de fim
     const endTime = calculateEndTime(formData.startTime, formData.duration)
@@ -716,18 +717,21 @@ export default function BookingForm({ environments, preselectedEnvironment }: Bo
     const endTime = calculateEndTime(formData.startTime, formData.duration)
 
     try {
-      // Pré-checagem de disponibilidade por dia da semana do ambiente
+      // Pré-checagem de disponibilidade por dia da semana por ambiente selecionado
+      const envIds = (formData.environmentIds.length ? formData.environmentIds : [formData.environmentId]).map((id) => Number(id))
       const { data: allEnvAvail } = await supabase
         .from("environment_availabilities")
-        .select("weekday,start_time,end_time")
-        .eq("environment_id", Number(formData.environmentId))
+        .select("weekday,start_time,end_time,environment_id")
+        .in("environment_id", envIds)
 
-      const windowsByWeekday = (allEnvAvail || []).reduce<Record<number, { s: number; e: number }[]>>((acc, w: any) => {
+      const windowsByEnvByWeekday = (allEnvAvail || []).reduce<Record<number, Record<number, { s: number; e: number }[]>>>((acc, w: any) => {
+        const env = Number(w.environment_id)
+        const wk = Number(w.weekday)
         const s = timeStringToHour(w.start_time)
         const e = timeStringToHour(w.end_time)
-        const wk = Number(w.weekday)
-        if (!acc[wk]) acc[wk] = []
-        acc[wk].push({ s, e })
+        if (!acc[env]) acc[env] = {}
+        if (!acc[env][wk]) acc[env][wk] = []
+        acc[env][wk].push({ s, e })
         return acc
       }, {})
 
@@ -751,13 +755,15 @@ export default function BookingForm({ environments, preselectedEnvironment }: Bo
       }
       const targetOccurrences = Array.from(uniqueMap.values())
 
-      // Validar disponibilidade por data
+      // Validar disponibilidade por data e ambiente
       const invalidByAvailability: string[] = []
-      for (const occ of targetOccurrences) {
-        const wk = weekdayOf(occ.date)
-        const windows = windowsByWeekday[wk] || []
-        const fits = windows.some((w) => occ.start >= w.s && occ.end <= w.e)
-        if (!fits) invalidByAvailability.push(occ.date)
+      for (const envId of envIds) {
+        for (const occ of targetOccurrences) {
+          const wk = weekdayOf(occ.date)
+          const windows = (windowsByEnvByWeekday[envId] || {})[wk] || []
+          const fits = windows.some((w) => occ.start >= w.s && occ.end <= w.e)
+          if (!fits) invalidByAvailability.push(`${occ.date} (Ambiente ${envId})`)
+        }
       }
 
       if (invalidByAvailability.length) {
@@ -770,27 +776,31 @@ export default function BookingForm({ environments, preselectedEnvironment }: Bo
         return
       }
 
-      // Pré-checagem de conflitos já existentes
+      // Pré-checagem de conflitos já existentes por ambiente
       const queryDates = Array.from(new Set(targetOccurrences.map((o) => o.date)))
       const { data: existing } = await supabase
         .from("bookings")
-        .select("booking_date,start_time,end_time")
-        .eq("environment_id", Number(formData.environmentId))
+        .select("booking_date,start_time,end_time,environment_id")
+        .in("environment_id", envIds)
         .in("booking_date", queryDates)
 
       const overlaps = (aStart: number, aEnd: number, bStart: number, bEnd: number) => aStart < bEnd && aEnd > bStart
       const conflicting: string[] = []
-      const byDate = targetOccurrences.reduce<Record<string, { start: number; end: number }>>((acc, o) => {
-        acc[o.date] = { start: o.start, end: o.end }
+      const byEnvByDate = targetOccurrences.reduce<Record<number, Record<string, { start: number; end: number }>>>((acc, o) => {
+        for (const envId of envIds) {
+          if (!acc[envId]) acc[envId] = {}
+          acc[envId][o.date] = { start: o.start, end: o.end }
+        }
         return acc
       }, {})
       for (const row of existing || []) {
         const d = (row as any).booking_date as string
-        const target = byDate[d]
+        const env = Number((row as any).environment_id)
+        const target = (byEnvByDate[env] || {})[d]
         if (!target) continue
         const bS = timeStringToHour((row as any).start_time)
         const bE = timeStringToHour((row as any).end_time)
-        if (overlaps(target.start, target.end, bS, bE)) conflicting.push(d)
+        if (overlaps(target.start, target.end, bS, bE)) conflicting.push(`${d} (Ambiente ${env})`)
       }
       if (conflicting.length) {
         setError(
@@ -802,20 +812,22 @@ export default function BookingForm({ environments, preselectedEnvironment }: Bo
         return
       }
 
-      // Inserção em lote
-      const rows = targetOccurrences.map((o) => ({
-        environment_id: Number(formData.environmentId),
-        name: formData.name,
-        email: formData.email,
-        phone: formData.phone,
-        ministry: formData.ministryNetwork,
-        estimated_participants: Number.parseInt(formData.estimatedParticipants),
-        responsible_person: formData.responsiblePerson,
-        occasion: formData.occasion,
-        booking_date: o.date,
-        start_time: `${pad2(o.start)}:00`,
-        end_time: `${pad2(o.end)}:00`,
-      }))
+      // Inserção em lote para todos os ambientes selecionados
+      const rows = envIds.flatMap((envId) =>
+        targetOccurrences.map((o) => ({
+          environment_id: envId,
+          name: formData.name,
+          email: formData.email,
+          phone: formData.phone,
+          ministry: formData.ministryNetwork,
+          estimated_participants: Number.parseInt(formData.estimatedParticipants),
+          responsible_person: formData.responsiblePerson,
+          occasion: formData.occasion,
+          booking_date: o.date,
+          start_time: `${pad2(o.start)}:00`,
+          end_time: `${pad2(o.end)}:00`,
+        }))
+      )
 
       const { error: insertError } = await supabase.from("bookings").insert(rows)
       if (insertError) {
@@ -1104,7 +1116,6 @@ export default function BookingForm({ environments, preselectedEnvironment }: Bo
             <Label className="block">Recorrência (aplicada a todas as datas listadas)</Label>
               <div className={`grid gap-4 ${formData.recurrenceFrequency === "none" ? "md:grid-cols-1" : formData.recurrenceFrequency === "monthly_weekday" ? "md:grid-cols-3" : "md:grid-cols-3"}`}>
               <div className={`space-y-2 ${formData.recurrenceFrequency === "monthly_weekday" ? "md:col-span-3" : ""}`}>
-                <Label htmlFor="recurrenceFrequency">Tipo</Label>
                 <Select
                   value={formData.recurrenceFrequency}
                   onValueChange={(v) => handleInputChange("recurrenceFrequency", v)}
@@ -1180,7 +1191,7 @@ export default function BookingForm({ environments, preselectedEnvironment }: Bo
                   <div className="space-y-2 md:col-span-3">
                     <Label>Dias da semana</Label>
                     <div className="grid grid-cols-7 gap-3 text-sm md:max-w-[560px]">
-                      {["D","S","T","Q","Q","S","S"].map((lbl, idx) => (
+                      {["DOM","SEG","TER","QUA","QUI","SEX","SAB"].map((lbl, idx) => (
                         <label
                           key={idx}
                           className={`inline-flex items-center justify-center rounded-md border px-3 py-2 cursor-pointer select-none ${formData.recurrenceWeekdays.includes(idx) ? "bg-accent/40 border-primary" : "hover:bg-accent/20"}`}
@@ -1218,38 +1229,37 @@ export default function BookingForm({ environments, preselectedEnvironment }: Bo
             </div>
           </div>
 
-          {/* Environment Selection (após selecionar data e hora) */}
+          {/* Environment Selection (múltiplos ambientes) */}
           <div className="space-y-2">
-            <Label htmlFor="environment" className="flex items-center gap-2">
+            <Label className="flex items-center gap-2">
               <Building className="h-4 w-4" />
-              Ambiente
+              Ambientes
             </Label>
-            <Select
-              value={formData.environmentId}
-              onValueChange={(value) => handleInputChange("environmentId", value)}
-              disabled={!formData.bookingDate || !formData.startTime || !formData.duration || isLoadingAvailability}
-            >
-              <SelectTrigger className="w-fit">
-                <SelectValue
-                  placeholder={
-                    isLoadingAvailability
-                      ? "Carregando..."
-                      : !formData.bookingDate || !formData.startTime || !formData.duration
-                        ? "Escolha data e hora primeiro"
-                        : environmentsToShow.length
-                          ? "Selecione o ambiente"
-                          : "Nenhum ambiente disponível"
-                  }
-                />
-              </SelectTrigger>
-              <SelectContent>
-                {availableEnvironments.map((env) => (
-                  <SelectItem key={String(env.id)} value={String(env.id)}>
-                    {env.name} (Capacidade: {env.capacity})
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <div className="grid md:grid-cols-2 gap-2">
+              {environmentsToShow.map((env) => {
+                const id = String(env.id)
+                const checked = formData.environmentIds.includes(id)
+                return (
+                  <label key={id} className="flex items-center gap-2 border rounded px-3 py-2 cursor-pointer select-none">
+                    <input
+                      type="checkbox"
+                      className="accent-current"
+                      checked={checked}
+                      onChange={(e) => {
+                        setFormData((prev) => {
+                          const set = new Set(prev.environmentIds)
+                          if (e.target.checked) set.add(id)
+                          else set.delete(id)
+                          return { ...prev, environmentIds: Array.from(set) }
+                        })
+                      }}
+                    />
+                    <span className="flex-1">{env.name}</span>
+                    <span className="text-xs text-muted-foreground">Cap.: {env.capacity}</span>
+                  </label>
+                )
+              })}
+            </div>
           </div>
             </>
           )}
