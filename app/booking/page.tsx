@@ -14,14 +14,15 @@ interface Environment {
 export default async function BookingPage({
   searchParams,
 }: {
-  searchParams: { environment?: string }
+  searchParams: Promise<{ environment?: string }>
 }) {
+  const sp = await searchParams
   const supabase = createServerClient()
 
   if (!supabase) {
     return (
       <div className="min-h-screen flex items-center justify-center">
-        <p className="text-lg text-gray-600">Erro ao conectar com o banco de dados</p>
+        <p className="text-lg text-muted-foreground">Erro ao conectar com o banco de dados</p>
       </div>
     )
   }
@@ -31,13 +32,13 @@ export default async function BookingPage({
   if (error) {
     return (
       <div className="min-h-screen flex items-center justify-center">
-        <p className="text-lg text-red-600">Erro ao carregar ambientes: {error.message}</p>
+        <p className="text-lg text-destructive">Erro ao carregar ambientes: {error.message}</p>
       </div>
     )
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100">
+    <div className="min-h-screen bg-background">
       <div className="container mx-auto px-4 py-8">
         <div className="mb-8">
           <Button asChild variant="ghost" className="mb-4">
@@ -47,12 +48,12 @@ export default async function BookingPage({
             </Link>
           </Button>
 
-          <h1 className="text-4xl font-bold text-gray-900 mb-4">Fazer Reserva</h1>
-          <p className="text-xl text-gray-600">Preencha o formulário para agendar um espaço da igreja</p>
+          <h1 className="text-4xl font-bold mb-4">Fazer Reserva</h1>
+          <p className="text-xl text-muted-foreground">Preencha o formulário para agendar um espaço da igreja</p>
         </div>
 
         <div className="max-w-2xl mx-auto">
-          <BookingForm environments={environments || []} preselectedEnvironment={searchParams.environment} />
+          <BookingForm environments={environments || []} preselectedEnvironment={sp.environment} />
         </div>
       </div>
     </div>

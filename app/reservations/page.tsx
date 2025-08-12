@@ -33,14 +33,15 @@ interface Environment {
 export default async function ReservationsPage({
   searchParams,
 }: {
-  searchParams: { environment?: string; date?: string }
+  searchParams: Promise<{ environment?: string; date?: string }>
 }) {
+  const sp = await searchParams
   const supabase = createServerClient()
 
   if (!supabase) {
     return (
       <div className="min-h-screen flex items-center justify-center">
-        <p className="text-lg text-gray-600">Erro ao conectar com o banco de dados</p>
+        <p className="text-lg text-muted-foreground">Erro ao conectar com o banco de dados</p>
       </div>
     )
   }
@@ -63,12 +64,12 @@ export default async function ReservationsPage({
     .order("start_time", { ascending: true })
 
   // Apply filters
-  if (searchParams.environment) {
-    query = query.eq("environment_id", searchParams.environment)
+  if (sp.environment) {
+    query = query.eq("environment_id", sp.environment)
   }
 
-  if (searchParams.date) {
-    query = query.eq("booking_date", searchParams.date)
+  if (sp.date) {
+    query = query.eq("booking_date", sp.date)
   }
 
   const { data: bookings, error } = await query
@@ -76,13 +77,13 @@ export default async function ReservationsPage({
   if (error) {
     return (
       <div className="min-h-screen flex items-center justify-center">
-        <p className="text-lg text-red-600">Erro ao carregar reservas: {error.message}</p>
+        <p className="text-lg text-destructive">Erro ao carregar reservas: {error.message}</p>
       </div>
     )
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100">
+    <div className="min-h-screen bg-background">
       <div className="container mx-auto px-4 py-8">
         <div className="mb-8">
           <Button asChild variant="ghost" className="mb-4">
@@ -92,16 +93,16 @@ export default async function ReservationsPage({
             </Link>
           </Button>
 
-          <h1 className="text-4xl font-bold text-gray-900 mb-4">Visualizar Reservas</h1>
-          <p className="text-xl text-gray-600">Veja todas as reservas agendadas</p>
+          <h1 className="text-4xl font-bold mb-4">Visualizar Reservas</h1>
+          <p className="text-xl text-muted-foreground">Veja todas as reservas agendadas</p>
         </div>
 
         <ReservationsView
           bookings={bookings || []}
           environments={environments || []}
           currentFilters={{
-            environment: searchParams.environment,
-            date: searchParams.date,
+            environment: sp.environment,
+            date: sp.date,
           }}
         />
       </div>

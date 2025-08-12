@@ -10,8 +10,13 @@ import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Calendar, Clock, Users, Phone, Mail, Building, User, CheckCircle } from "lucide-react"
+import { Calendar as CalendarIcon, Clock, Users, Phone, Mail, Building, User, CheckCircle } from "lucide-react"
 import { supabase } from "@/lib/supabase/client"
+import { DatePicker } from "@/components/ui/date-picker"
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
+import { format } from "date-fns"
+import { toast } from "sonner"
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
 
 interface Environment {
   id: string
@@ -110,9 +115,37 @@ export default function BookingForm({ environments, preselectedEnvironment }: Bo
       }
     }
     fetchDayData()
-    // ao mudar a data, reseta horário e ambiente
-    setFormData((prev) => ({ ...prev, startTime: "", environmentId: "" }))
+    // ao mudar a data, reseta horário, mantendo ambiente selecionado
+    setFormData((prev) => ({ ...prev, startTime: "" }))
   }, [formData.bookingDate])
+
+  // Pré-seleciona próxima data disponível do ambiente vindo do fluxo de ambientes
+  useEffect(() => {
+    const prefillNextAvailableDate = async () => {
+      if (!preselectedEnvironment || formData.bookingDate) return
+      try {
+        const { data } = await supabase
+          .from("environment_availabilities")
+          .select("weekday,start_time,end_time")
+          .eq("environment_id", preselectedEnvironment)
+        if (!data || data.length === 0) return
+        const availableWeekdays = new Set<number>(data.map((d: any) => Number(d.weekday)))
+        const today = new Date()
+        for (let i = 0; i < 14; i++) {
+          const d = new Date(today)
+          d.setDate(today.getDate() + i)
+          if (availableWeekdays.has(d.getDay())) {
+            const next = format(d, "yyyy-MM-dd")
+            setFormData((prev) => ({ ...prev, bookingDate: next, environmentId: preselectedEnvironment }))
+            break
+          }
+        }
+      } catch {
+        // ignore
+      }
+    }
+    prefillNextAvailableDate()
+  }, [preselectedEnvironment, formData.bookingDate])
 
   const startTimeOptions = useMemo(() => {
     if (!availability.length) return [] as string[]
@@ -271,7 +304,7 @@ export default function BookingForm({ environments, preselectedEnvironment }: Bo
       return "Número de participantes deve ser maior que zero"
     }
 
-    const selectedEnv = environments.find((env) => env.id === formData.environmentId)
+    const selectedEnv = environments.find((env) => String(env.id) === formData.environmentId)
     if (selectedEnv && Number.parseInt(formData.estimatedParticipants) > selectedEnv.capacity) {
       return `Número de participantes excede a capacidade do ambiente (${selectedEnv.capacity})`
     }
@@ -323,6 +356,7 @@ export default function BookingForm({ environments, preselectedEnvironment }: Bo
         }
       } else {
         setSuccess(true)
+        toast.success("Reserva criada com sucesso")
         setTimeout(() => {
           router.push("/reservations")
         }, 2000)
@@ -333,6 +367,10 @@ export default function BookingForm({ environments, preselectedEnvironment }: Bo
       setIsSubmitting(false)
     }
   }
+
+  const canSubmit = useMemo(() => {
+    return validateForm() === null
+  }, [formData, availability, environments])
 
   if (success) {
     return (
@@ -354,7 +392,7 @@ export default function BookingForm({ environments, preselectedEnvironment }: Bo
     <Card>
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
-          <Calendar className="h-5 w-5" />
+          <CalendarIcon className="h-5 w-5" />
           Formulário de Reserva
         </CardTitle>
         <CardDescription>Preencha todos os campos para fazer sua reserva</CardDescription>
@@ -362,7 +400,12 @@ export default function BookingForm({ environments, preselectedEnvironment }: Bo
 
       <CardContent>
         <form onSubmit={handleSubmit} className="space-y-6">
-          {error && <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded">{error}</div>}
+          {error && (
+            <Alert variant="destructive">
+              <AlertTitle>Erro</AlertTitle>
+              <AlertDescription>{error}</AlertDescription>
+            </Alert>
+          )}
 
           
 
@@ -455,15 +498,14 @@ export default function BookingForm({ environments, preselectedEnvironment }: Bo
           <div className="grid md:grid-cols-4 gap-4">
             <div className="space-y-2">
               <Label htmlFor="date" className="flex items-center gap-2">
-                <Calendar className="h-4 w-4" />
+                <CalendarIcon className="h-4 w-4" />
                 Data
               </Label>
-              <Input
+              <DatePicker
                 id="date"
-                type="date"
                 value={formData.bookingDate}
-                onChange={(e) => handleInputChange("bookingDate", e.target.value)}
-                min={new Date().toISOString().split("T")[0]}
+                onChange={(yyyyMMdd) => handleInputChange("bookingDate", yyyyMMdd || "")}
+                disablePast
               />
             </div>
 
@@ -543,7 +585,7 @@ export default function BookingForm({ environments, preselectedEnvironment }: Bo
               </SelectTrigger>
               <SelectContent>
                 {availableEnvironments.map((env) => (
-                  <SelectItem key={env.id} value={env.id}>
+                  <SelectItem key={String(env.id)} value={String(env.id)}>
                     {env.name} (Capacidade: {env.capacity})
                   </SelectItem>
                 ))}
@@ -570,9 +612,22 @@ export default function BookingForm({ environments, preselectedEnvironment }: Bo
             </div>
           )}
 
-          <Button type="submit" disabled={isSubmitting} className="w-full">
-            {isSubmitting ? "Criando Reserva..." : "Criar Reserva"}
-          </Button>
+          <TooltipProvider>
+            <Tooltip open={(!canSubmit && !isSubmitting) ? undefined : false}>
+              <TooltipTrigger asChild>
+                <div>
+                  <Button type="submit" disabled={isSubmitting || !canSubmit} className="w-full">
+                    {isSubmitting ? "Criando Reserva..." : "Criar Reserva"}
+                  </Button>
+                </div>
+              </TooltipTrigger>
+              {!canSubmit && !isSubmitting && (
+                <TooltipContent>
+                  Preencha todos os campos obrigatórios para habilitar o envio
+                </TooltipContent>
+              )}
+            </Tooltip>
+          </TooltipProvider>
         </form>
       </CardContent>
     </Card>

@@ -37,7 +37,7 @@ export default async function EnvironmentsPage() {
   if (!supabase) {
     return (
       <div className="min-h-screen flex items-center justify-center">
-        <p className="text-lg text-gray-600">Erro ao conectar com o banco de dados</p>
+        <p className="text-lg text-muted-foreground">Erro ao conectar com o banco de dados</p>
       </div>
     )
   }
@@ -50,7 +50,7 @@ export default async function EnvironmentsPage() {
   if (error) {
     return (
       <div className="min-h-screen flex items-center justify-center">
-        <p className="text-lg text-red-600">Erro ao carregar ambientes: {error.message}</p>
+        <p className="text-lg text-destructive">Erro ao carregar ambientes: {error.message}</p>
       </div>
     )
   }
@@ -58,7 +58,7 @@ export default async function EnvironmentsPage() {
   if (availError) {
     return (
       <div className="min-h-screen flex items-center justify-center">
-        <p className="text-lg text-red-600">Erro ao carregar disponibilidades: {availError.message}</p>
+        <p className="text-lg text-destructive">Erro ao carregar disponibilidades: {availError.message}</p>
       </div>
     )
   }
@@ -129,7 +129,7 @@ export default async function EnvironmentsPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100">
+    <div className="min-h-screen bg-background">
       <div className="container mx-auto px-4 py-8">
         <div className="mb-8">
           <Button asChild variant="ghost" className="mb-4">
@@ -139,17 +139,17 @@ export default async function EnvironmentsPage() {
             </Link>
           </Button>
 
-          <h1 className="text-4xl font-bold text-gray-900 mb-4">Ambientes Disponíveis</h1>
-          <p className="text-xl text-gray-600">Conheça os espaços da igreja e suas capacidades</p>
+          <h1 className="text-4xl font-bold mb-4">Ambientes Disponíveis</h1>
+          <p className="text-xl text-muted-foreground">Conheça os espaços da igreja e suas capacidades</p>
         </div>
 
         <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6 auto-rows-fr items-stretch">
           {environments?.map((environment: Environment) => (
-            <Card key={environment.id} className="hover:shadow-lg transition-shadow h-full flex flex-col">
+            <Card key={environment.id} className="h-full flex flex-col">
               <CardHeader>
                 <div className="flex items-start justify-between">
                   <div className="flex items-center gap-2">
-                    <MapPin className="h-5 w-5 text-blue-600" />
+                    <MapPin className="h-5 w-5" />
                     <CardTitle className="text-lg">{environment.name}</CardTitle>
                   </div>
                   <Badge variant="secondary" className="flex items-center gap-1">
@@ -161,17 +161,17 @@ export default async function EnvironmentsPage() {
               </CardHeader>
 
               <CardContent className="flex flex-col flex-1">
-                <p className="text-gray-700 mb-4 line-clamp-3">{environment.description || "Sem descrição disponível"}</p>
+                <p className="mb-4 line-clamp-3">{environment.description || "Sem descrição disponível"}</p>
 
                 <div className="space-y-2 mb-4">
-                  <h4 className="text-sm font-semibold text-gray-800">Disponibilidade</h4>
+                  <h4 className="text-sm font-semibold">Disponibilidade</h4>
                   <div className="space-y-1">
                     {buildCondensedAvailability(environment.id).length === 0 ? (
-                      <p className="text-sm text-gray-500">Não configurada</p>
+                      <p className="text-sm text-muted-foreground">Não configurada</p>
                     ) : (
                       buildCondensedAvailability(environment.id).map((g, idx) => (
                         <div key={`${environment.id}-g${idx}`} className="flex items-start gap-2 w-full">
-                          <span className="min-w-32 text-sm text-gray-600">{g.dayLabel}</span>
+                          <span className="min-w-32 text-sm text-muted-foreground">{g.dayLabel}</span>
                           <div className="flex flex-wrap gap-2 ml-auto justify-end">
                             {g.ranges.length === 0 ? (
                               <Badge variant="secondary">Fechado</Badge>
