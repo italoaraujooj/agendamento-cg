@@ -6,6 +6,7 @@ import Link from "next/link"
 
 interface Booking {
   id: string
+  user_id: string
   name: string
   email: string
   phone: string
@@ -21,7 +22,19 @@ interface Booking {
     id: string
     name: string
     capacity: number
-  }
+  } | {
+    id: string
+    name: string
+    capacity: number
+  }[]
+}
+
+// Função para verificar se uma reserva já passou (executada no servidor)
+const isBookingPast = (booking: Booking): boolean => {
+  const now = new Date()
+  const bookingDateTime = new Date(`${booking.booking_date}T${booking.end_time}`)
+
+  return bookingDateTime < now
 }
 
 interface Environment {
@@ -36,7 +49,7 @@ export default async function ReservationsPage({
   searchParams: Promise<{ environment?: string; date?: string }>
 }) {
   const sp = await searchParams
-  const supabase = createServerClient()
+  const supabase = await createServerClient()
 
   if (!supabase) {
     return (
@@ -49,16 +62,17 @@ export default async function ReservationsPage({
   // Get all environments for filter
   const { data: environments } = await supabase.from("environments").select("id, name, capacity").order("name")
 
-  // Build query for bookings (alias ministry -> ministry_network)
+  // Build query for bookings
   let query = supabase
     .from("bookings")
     .select(
       `
       id,
+      user_id,
       name,
       email,
       phone,
-      ministry_network:ministry,
+      ministry_network,
       estimated_participants,
       responsible_person,
       occasion,
@@ -66,7 +80,9 @@ export default async function ReservationsPage({
       start_time,
       end_time,
       created_at,
-      environments (
+      google_event_id,
+      synced_at,
+      environments!inner (
         id,
         name,
         capacity
@@ -96,6 +112,18 @@ export default async function ReservationsPage({
     )
   }
 
+  // Separar reservas por status temporal no servidor
+  const pastBookings: Booking[] = []
+  const currentBookings: Booking[] = []
+
+  bookings?.forEach(booking => {
+    if (isBookingPast(booking)) {
+      pastBookings.push(booking)
+    } else {
+      currentBookings.push(booking)
+    }
+  })
+
   return (
     <div className="min-h-screen bg-background">
       <div className="container mx-auto px-4 py-8">
@@ -113,6 +141,8 @@ export default async function ReservationsPage({
 
         <ReservationsView
           bookings={bookings || []}
+          pastBookings={pastBookings}
+          currentBookings={currentBookings}
           environments={environments || []}
           currentFilters={{
             environment: sp.environment,

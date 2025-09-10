@@ -1,12 +1,21 @@
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Calendar, MapPin, Users, CheckCircle } from "lucide-react"
+import { Calendar, MapPin, Users, CheckCircle, LogIn } from "lucide-react"
+import { AuthButton } from "@/components/auth/auth-button"
 
 export default function HomePage() {
   return (
     <div className="min-h-screen bg-background">
       <div className="container mx-auto px-4 py-8">
+        {/* Header com botão de login */}
+        <div className="flex justify-between items-center mb-8">
+          <div></div>
+          <div className="flex items-center gap-4">
+            <AuthButton />
+          </div>
+        </div>
+
         <div className="text-center mb-12">
           <h1 className="text-4xl font-bold mb-4">Sistema de Agendamento de Espaços</h1>
           <p className="text-xl text-muted-foreground max-w-2xl mx-auto">
@@ -15,7 +24,7 @@ export default function HomePage() {
           </p>
         </div>
 
-        <div className="grid md:grid-cols-3 gap-6 max-w-4xl mx-auto mb-12">
+        <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6 max-w-6xl mx-auto mb-12">
           <Card>
             <CardHeader className="text-center">
               <Calendar className="h-12 w-12 mx-auto mb-4" />
@@ -51,6 +60,19 @@ export default function HomePage() {
             <CardContent>
               <Button asChild variant="outline" className="w-full">
                 <Link href="/reservations">Ver Agenda</Link>
+              </Button>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="text-center">
+              <LogIn className="h-12 w-12 mx-auto mb-4" />
+              <CardTitle>Meu Perfil</CardTitle>
+              <CardDescription>Gerencie suas reservas e integrações</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <Button asChild variant="outline" className="w-full">
+                <Link href="/profile">Acessar Perfil</Link>
               </Button>
             </CardContent>
           </Card>
@@ -94,6 +116,7 @@ export default function HomePage() {
             </div>
           </div>
         </div>
+
       </div>
     </div>
   )

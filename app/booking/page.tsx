@@ -17,7 +17,7 @@ export default async function BookingPage({
   searchParams: Promise<{ environment?: string }>
 }) {
   const sp = await searchParams
-  const supabase = createServerClient()
+  const supabase = await createServerClient()
 
   if (!supabase) {
     return (
