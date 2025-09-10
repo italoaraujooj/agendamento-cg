@@ -1,4 +1,4 @@
-import { createClient } from "@supabase/supabase-js"
+import { createBrowserClient } from '@supabase/ssr'
 
 // Check if Supabase environment variables are available
 export const isSupabaseConfigured =
@@ -7,5 +7,18 @@ export const isSupabaseConfigured =
   typeof process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY === "string" &&
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY.length > 0
 
-// Create a singleton instance of the Supabase client
-export const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!)
+// Create a singleton instance of the Supabase client with proper cookie support and persistence
+export const supabase = createBrowserClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+  {
+    auth: {
+      persistSession: true,
+      autoRefreshToken: true,
+      flowType: 'pkce',
+      detectSessionInUrl: true,
+    },
+  }
+)
+
+
