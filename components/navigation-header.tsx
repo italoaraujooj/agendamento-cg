@@ -5,6 +5,8 @@ import { usePathname } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Calendar, MapPin, Users, Home } from "lucide-react"
 import { ModeToggle } from "@/components/mode-toggle"
+import { AuthButton } from "@/components/auth/auth-button"
+import { CalendarStatusIndicator } from "@/components/calendar-status-indicator"
 
 export default function NavigationHeader() {
   const pathname = usePathname()
@@ -62,6 +64,8 @@ export default function NavigationHeader() {
                 </Button>
               )
             })}
+            <CalendarStatusIndicator />
+            <AuthButton />
             <ModeToggle />
           </nav>
 
@@ -77,6 +81,7 @@ export default function NavigationHeader() {
                 </Button>
               )
             })}
+            <AuthButton />
             <ModeToggle />
           </nav>
         </div>

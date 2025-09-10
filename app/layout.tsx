@@ -5,6 +5,8 @@ import { GeistMono } from "geist/font/mono"
 import "./globals.css"
 import NavigationHeader from "@/components/navigation-header"
 import { ThemeProvider } from "@/components/theme-provider"
+import { AuthProvider } from "@/components/auth/auth-provider"
+import { AutoMigrateBookings } from "@/components/auth/auto-migrate"
 import { Toaster } from "@/components/ui/sonner"
 
 export const metadata: Metadata = {
@@ -30,10 +32,13 @@ html {
         `}</style>
       </head>
       <body className="bg-background min-h-screen">
-        <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
-          <NavigationHeader />
-          {children}
-          <Toaster />
+        <ThemeProvider>
+          <AuthProvider>
+            <AutoMigrateBookings />
+            <NavigationHeader />
+            {children}
+            <Toaster />
+          </AuthProvider>
         </ThemeProvider>
       </body>
     </html>
