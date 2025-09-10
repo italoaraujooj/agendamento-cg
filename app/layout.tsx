@@ -4,6 +4,7 @@ import { GeistSans } from "geist/font/sans"
 import { GeistMono } from "geist/font/mono"
 import "./globals.css"
 import NavigationHeader from "@/components/navigation-header"
+import Footer from "@/components/footer"
 import { ThemeProvider } from "@/components/theme-provider"
 import { AuthProvider } from "@/components/auth/auth-provider"
 import { AutoMigrateBookings } from "@/components/auth/auto-migrate"
@@ -31,12 +32,15 @@ html {
 }
         `}</style>
       </head>
-      <body className="bg-background min-h-screen">
+      <body className="bg-background min-h-screen flex flex-col">
         <ThemeProvider>
           <AuthProvider>
             <AutoMigrateBookings />
             <NavigationHeader />
-            {children}
+            <main className="flex-1">
+              {children}
+            </main>
+            <Footer />
             <Toaster />
           </AuthProvider>
         </ThemeProvider>
