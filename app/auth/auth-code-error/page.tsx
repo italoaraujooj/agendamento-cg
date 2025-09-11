@@ -5,8 +5,9 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button'
 import { AlertTriangle, Home, RefreshCw } from 'lucide-react'
 import Link from 'next/link'
+import { Suspense } from 'react'
 
-export default function AuthCodeErrorPage() {
+function AuthCodeErrorContent() {
   const searchParams = useSearchParams()
   const error = searchParams.get('error')
 
@@ -63,5 +64,26 @@ export default function AuthCodeErrorPage() {
         </CardContent>
       </Card>
     </div>
+  )
+}
+
+export default function AuthCodeErrorPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen bg-gradient-to-br from-red-50 to-orange-100 dark:from-gray-900 dark:to-gray-800 flex items-center justify-center p-4">
+        <Card className="max-w-md w-full">
+          <CardHeader className="text-center">
+            <div className="flex justify-center mb-4">
+              <AlertTriangle className="h-12 w-12 text-red-500" />
+            </div>
+            <CardTitle className="text-red-700 dark:text-red-400">
+              Carregando...
+            </CardTitle>
+          </CardHeader>
+        </Card>
+      </div>
+    }>
+      <AuthCodeErrorContent />
+    </Suspense>
   )
 }
