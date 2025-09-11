@@ -24,13 +24,13 @@ export function CalendarStatusIndicator() {
 
     setIsChecking(true)
     try {
-      const response = await fetch('/api/oauth/google-status')
+      const response = await fetch('/api/debug-calendar-status')
       if (response.ok) {
         const data = await response.json()
         setStatus({
-          isConnected: data.hasTokens && data.isIntegrationEnabled,
-          isExpired: data.isExpired,
-          expiresAt: data.expiresAt
+          isConnected: data.profile.hasGoogleAccessToken && data.profile.calendarIntegrationEnabled,
+          isExpired: data.profile.isExpired,
+          expiresAt: data.profile.tokenExpiry
         })
       }
     } catch (error) {

@@ -27,10 +27,15 @@ export function GoogleCalendarSetup() {
     if (!isAuthenticated) return
 
     try {
-      const response = await fetch('/api/oauth/google-status')
+      const response = await fetch('/api/debug-calendar-status')
       if (response.ok) {
-        const status = await response.json()
-        setTokenStatus(status)
+        const data = await response.json()
+        setTokenStatus({
+          hasTokens: data.profile.hasGoogleAccessToken,
+          isExpired: data.profile.isExpired,
+          isIntegrationEnabled: data.profile.calendarIntegrationEnabled,
+          expiresAt: data.profile.tokenExpiry
+        })
       }
     } catch (error) {
       console.error('Erro ao verificar status:', error)
@@ -86,7 +91,7 @@ export function GoogleCalendarSetup() {
         provider: 'google',
         options: {
           scopes: 'openid email profile https://www.googleapis.com/auth/calendar.events https://www.googleapis.com/auth/calendar.readonly https://www.googleapis.com/auth/calendar.calendarlist',
-          redirectTo: `${window.location.origin}/profile`,
+          redirectTo: `${window.location.origin}/auth/callback`,
           queryParams: {
             access_type: 'offline',
             prompt: 'consent'

@@ -57,20 +57,16 @@ export function AuthProvider({ children }: AuthProviderProps) {
   }, [])
 
   const signInWithGoogle = async () => {
+    console.log('🔄 Iniciando login com Google...')
     const { error } = await supabase.auth.signInWithOAuth({
       provider: 'google',
       options: {
-        scopes: OAUTH_CONFIG.SCOPES.join(' '),
-        redirectTo: `${window.location.origin}/auth/callback`,
-        queryParams: {
-          access_type: 'offline',
-          prompt: 'consent'
-        }
+        redirectTo: `${window.location.origin}/auth/callback`
       }
     })
 
     if (error) {
-      console.error('Erro no login:', error.message)
+      console.error('❌ Erro no login:', error.message)
       throw error
     }
   }
