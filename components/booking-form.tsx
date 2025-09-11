@@ -819,7 +819,7 @@ export default function BookingForm({ environments, preselectedEnvironment }: Bo
           name: formData.name,
           email: formData.email,
           phone: formData.phone,
-          ministry: formData.ministryNetwork,
+          ministry_network: formData.ministryNetwork,
           estimated_participants: Number.parseInt(formData.estimatedParticipants),
           responsible_person: formData.responsiblePerson,
           occasion: formData.occasion,
