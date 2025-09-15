@@ -54,6 +54,19 @@ const parseLocalYmd = (ymd: string): Date => {
   return new Date(year, month - 1, day)
 }
 
+const isBookingActive = (booking: Booking): boolean => {
+  const now = new Date()
+  const bookingDate = parseLocalYmd(booking.booking_date)
+  
+  // Adicionar horário de fim para comparação precisa
+  const [endHour, endMinute] = booking.end_time.split(':').map(Number)
+  const bookingEndDateTime = new Date(bookingDate)
+  bookingEndDateTime.setHours(endHour, endMinute, 0, 0)
+  
+  // Reserva é considerada ativa se ainda não passou do horário de fim
+  return bookingEndDateTime > now
+}
+
 export default function ReservationsView({ bookings, environments, currentFilters }: ReservationsViewProps) {
   const router = useRouter()
   const searchParams = useSearchParams()
@@ -98,12 +111,40 @@ export default function ReservationsView({ bookings, environments, currentFilter
     return timeString.slice(0, 5)
   }
 
+  // Separate bookings by time status
+  const activeBookings = bookings.filter((booking) => isBookingActive(booking))
+  const pastBookings = bookings.filter((booking) => !isBookingActive(booking))
+
   // Group bookings by environment for the "Por Ambiente" tab
   const bookingsByEnvironment = environments.reduce(
     (acc, env) => {
       acc[env.id] = {
         environment: env,
         bookings: bookings.filter((booking) => booking.environments.id === env.id),
+      }
+      return acc
+    },
+    {} as Record<string, { environment: Environment; bookings: Booking[] }>,
+  )
+
+  // Group active bookings by environment
+  const activeBookingsByEnvironment = environments.reduce(
+    (acc, env) => {
+      acc[env.id] = {
+        environment: env,
+        bookings: activeBookings.filter((booking) => booking.environments.id === env.id),
+      }
+      return acc
+    },
+    {} as Record<string, { environment: Environment; bookings: Booking[] }>,
+  )
+
+  // Group past bookings by environment
+  const pastBookingsByEnvironment = environments.reduce(
+    (acc, env) => {
+      acc[env.id] = {
+        environment: env,
+        bookings: pastBookings.filter((booking) => booking.environments.id === env.id),
       }
       return acc
     },
@@ -179,52 +220,119 @@ export default function ReservationsView({ bookings, environments, currentFilter
         </TabsList>
 
         <TabsContent value="all" className="space-y-4">
-          {bookings.length === 0 ? (
-            <Card>
-              <CardContent className="text-center py-12">
-                <CalendarDays className="h-16 w-16 text-gray-400 mx-auto mb-4" />
-                <h3 className="text-xl font-semibold text-gray-700 mb-2">Nenhuma reserva encontrada</h3>
-                <p className="text-gray-500">
-                  {hasActiveFilters
-                    ? "Tente ajustar os filtros ou limpar para ver todas as reservas."
-                    : "Ainda não há reservas cadastradas no sistema."}
-                </p>
-              </CardContent>
-            </Card>
-          ) : (
-            <div className="grid gap-4">
-              {bookings.map((booking) => (
-                <BookingCard key={booking.id} booking={booking} />
-              ))}
-            </div>
-          )}
+          <Tabs defaultValue="all-bookings" className="w-full">
+            <TabsList className="grid w-full grid-cols-2">
+              <TabsTrigger value="all-bookings">Em Curso ({activeBookings.length})</TabsTrigger>
+              <TabsTrigger value="past-bookings">Finalizadas ({pastBookings.length})</TabsTrigger>
+            </TabsList>
+
+            <TabsContent value="all-bookings" className="space-y-4 mt-4">
+              {activeBookings.length === 0 ? (
+                <Card>
+                  <CardContent className="text-center py-12">
+                    <CalendarDays className="h-16 w-16 text-gray-400 mx-auto mb-4" />
+                    <h3 className="text-xl font-semibold text-gray-700 mb-2">Nenhuma reserva em curso</h3>
+                    <p className="text-gray-500">
+                      {hasActiveFilters
+                        ? "Tente ajustar os filtros para ver reservas em curso."
+                        : "Não há reservas ativas no momento."}
+                    </p>
+                  </CardContent>
+                </Card>
+              ) : (
+                <div className="grid gap-4">
+                  {activeBookings.map((booking) => (
+                    <BookingCard key={booking.id} booking={booking} />
+                  ))}
+                </div>
+              )}
+            </TabsContent>
+
+            <TabsContent value="past-bookings" className="space-y-4 mt-4">
+              {pastBookings.length === 0 ? (
+                <Card>
+                  <CardContent className="text-center py-12">
+                    <CalendarDays className="h-16 w-16 text-gray-400 mx-auto mb-4" />
+                    <h3 className="text-xl font-semibold text-gray-700 mb-2">Nenhuma reserva finalizada</h3>
+                    <p className="text-gray-500">
+                      {hasActiveFilters
+                        ? "Tente ajustar os filtros para ver reservas finalizadas."
+                        : "Ainda não há reservas finalizadas."}
+                    </p>
+                  </CardContent>
+                </Card>
+              ) : (
+                <div className="grid gap-4">
+                  {pastBookings.map((booking) => (
+                    <BookingCard key={booking.id} booking={booking} />
+                  ))}
+                </div>
+              )}
+            </TabsContent>
+          </Tabs>
         </TabsContent>
 
         <TabsContent value="by-environment" className="space-y-6">
-          {Object.values(bookingsByEnvironment).map(({ environment, bookings: envBookings }) => (
-            <Card key={environment.id}>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Building className="h-5 w-5" />
-                  {environment.name}
-                </CardTitle>
-                <CardDescription>
-                  Capacidade: {environment.capacity} pessoas • {envBookings.length} reserva(s)
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                {envBookings.length === 0 ? (
-                  <p className="text-gray-500 text-center py-4">Nenhuma reserva para este ambiente</p>
-                ) : (
-                  <div className="space-y-3">
-                    {envBookings.map((booking) => (
-                      <BookingCard key={booking.id} booking={booking} compact />
-                    ))}
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-          ))}
+          <Tabs defaultValue="env-active" className="w-full">
+            <TabsList className="grid w-full grid-cols-2">
+              <TabsTrigger value="env-active">Em Curso ({activeBookings.length})</TabsTrigger>
+              <TabsTrigger value="env-past">Finalizadas ({pastBookings.length})</TabsTrigger>
+            </TabsList>
+
+            <TabsContent value="env-active" className="space-y-6 mt-4">
+              {Object.values(activeBookingsByEnvironment).map(({ environment, bookings: envBookings }) => (
+                <Card key={environment.id}>
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2">
+                      <Building className="h-5 w-5" />
+                      {environment.name}
+                    </CardTitle>
+                    <CardDescription>
+                      Capacidade: {environment.capacity} pessoas • {envBookings.length} reserva(s) em curso
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    {envBookings.length === 0 ? (
+                      <p className="text-gray-500 text-center py-4">Nenhuma reserva em curso para este ambiente</p>
+                    ) : (
+                      <div className="space-y-3">
+                        {envBookings.map((booking) => (
+                          <BookingCard key={booking.id} booking={booking} compact />
+                        ))}
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+              ))}
+            </TabsContent>
+
+            <TabsContent value="env-past" className="space-y-6 mt-4">
+              {Object.values(pastBookingsByEnvironment).map(({ environment, bookings: envBookings }) => (
+                <Card key={environment.id}>
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2">
+                      <Building className="h-5 w-5" />
+                      {environment.name}
+                    </CardTitle>
+                    <CardDescription>
+                      Capacidade: {environment.capacity} pessoas • {envBookings.length} reserva(s) finalizadas
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    {envBookings.length === 0 ? (
+                      <p className="text-gray-500 text-center py-4">Nenhuma reserva finalizada para este ambiente</p>
+                    ) : (
+                      <div className="space-y-3">
+                        {envBookings.map((booking) => (
+                          <BookingCard key={booking.id} booking={booking} compact />
+                        ))}
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+              ))}
+            </TabsContent>
+          </Tabs>
         </TabsContent>
       </Tabs>
     </div>
