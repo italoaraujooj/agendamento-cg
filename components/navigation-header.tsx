@@ -3,13 +3,15 @@
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { Button } from "@/components/ui/button"
-import { Calendar, MapPin, Users, Home } from "lucide-react"
+import { Calendar, MapPin, Users, Home, Shield } from "lucide-react"
 import { ModeToggle } from "@/components/mode-toggle"
 import { AuthButton } from "@/components/auth/auth-button"
 import { CalendarStatusIndicator } from "@/components/calendar-status-indicator"
+import { useAuth } from "@/components/auth/auth-provider"
 
 export default function NavigationHeader() {
   const pathname = usePathname()
+  const { isAdmin, isAuthenticated } = useAuth()
 
   const navItems = [
     {
@@ -38,6 +40,19 @@ export default function NavigationHeader() {
     },
   ]
 
+  // Adicionar link de admin se o usuário for administrador
+  const allNavItems = isAuthenticated && isAdmin
+    ? [
+        ...navItems,
+        {
+          href: "/admin",
+          label: "Admin",
+          icon: Shield,
+          active: pathname === "/admin" || pathname.startsWith("/admin/"),
+        },
+      ]
+    : navItems
+
   return (
     <header className="sticky top-0 z-50 bg-background/80 backdrop-blur supports-[backdrop-filter]:bg-background/60 border-b">
       <div className="container mx-auto px-4">
@@ -48,14 +63,15 @@ export default function NavigationHeader() {
           </Link>
 
           <nav className="hidden md:flex items-center gap-1">
-            {navItems.map((item) => {
+            {allNavItems.map((item) => {
               const Icon = item.icon
+              const isAdminItem = item.href === "/admin"
               return (
                 <Button
                   key={item.href}
                   asChild
                   variant={item.active ? "default" : "ghost"}
-                  className="flex items-center gap-2"
+                  className={`flex items-center gap-2 ${isAdminItem ? "text-amber-600 dark:text-amber-400" : ""}`}
                 >
                   <Link href={item.href}>
                     <Icon className="h-4 w-4" />
@@ -71,10 +87,17 @@ export default function NavigationHeader() {
 
           {/* Mobile Navigation */}
           <nav className="md:hidden flex items-center gap-1">
-            {navItems.map((item) => {
+            {allNavItems.map((item) => {
               const Icon = item.icon
+              const isAdminItem = item.href === "/admin"
               return (
-                <Button key={item.href} asChild variant={item.active ? "default" : "ghost"} size="sm">
+                <Button 
+                  key={item.href} 
+                  asChild 
+                  variant={item.active ? "default" : "ghost"} 
+                  size="sm"
+                  className={isAdminItem ? "text-amber-600 dark:text-amber-400" : ""}
+                >
                   <Link href={item.href}>
                     <Icon className="h-4 w-4" />
                   </Link>
