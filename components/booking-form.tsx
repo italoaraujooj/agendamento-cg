@@ -617,24 +617,30 @@ export default function BookingForm({ environments, preselectedEnvironment }: Bo
       return "Você precisa estar logado para fazer uma reserva"
     }
 
-    const required = [
-      "environmentIds",
-      "name",
-      "email",
-      "phone",
-      "ministryNetwork",
-      "estimatedParticipants",
-      "responsiblePerson",
-      "occasion",
-      "bookingDate",
-      "startTime",
-      "duration",
+    // Campos obrigatórios com seus labels
+    const requiredFields: { field: string; label: string }[] = [
+      { field: "name", label: "Nome Completo" },
+      { field: "email", label: "Email" },
+      { field: "phone", label: "Telefone" },
+      { field: "ministryNetwork", label: "Ministério/Rede" },
+      { field: "estimatedParticipants", label: "Participantes Estimados" },
+      { field: "responsiblePerson", label: "Responsável" },
+      { field: "occasion", label: "Ocasião/Motivo" },
+      { field: "bookingDate", label: "Data" },
+      { field: "startTime", label: "Horário de Início" },
+      { field: "duration", label: "Duração" },
     ]
 
-    for (const field of required) {
-      if (!formData[field as keyof typeof formData]) {
-        return `O campo é obrigatório`
+    for (const { field, label } of requiredFields) {
+      const value = formData[field as keyof typeof formData]
+      if (!value || (typeof value === 'string' && value.trim() === '')) {
+        return `O campo "${label}" é obrigatório`
       }
+    }
+    
+    // Verificar se ao menos um ambiente foi selecionado
+    if (!formData.environmentIds || formData.environmentIds.length === 0) {
+      return "Selecione ao menos um ambiente"
     }
 
     if (!/\S+@\S+\.\S+/.test(formData.email)) {
@@ -646,9 +652,8 @@ export default function BookingForm({ environments, preselectedEnvironment }: Bo
     }
 
     const selectedEnvs = environments.filter((env) => formData.environmentIds.includes(String(env.id)))
-    if (selectedEnvs.length === 0) return "Selecione ao menos um ambiente"
     const overCap = selectedEnvs.find((env) => Number.parseInt(formData.estimatedParticipants || "0") > env.capacity)
-    if (overCap) return `Número de participantes excede a capacidade do ambiente (${overCap.capacity})`
+    if (overCap) return `Número de participantes excede a capacidade do ambiente ${overCap.name} (máx: ${overCap.capacity})`
 
     // Validação do horário de fim
     const endTime = calculateEndTime(formData.startTime, formData.duration)
@@ -1533,7 +1538,7 @@ export default function BookingForm({ environments, preselectedEnvironment }: Bo
               </TooltipTrigger>
               {step === 2 && !canSubmit && !isSubmitting && (
                 <TooltipContent>
-                  Preencha todos os campos obrigatórios para habilitar o envio
+                  {validateForm() || "Preencha todos os campos obrigatórios"}
                 </TooltipContent>
               )}
             </Tooltip>
