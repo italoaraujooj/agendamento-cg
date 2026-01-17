@@ -476,6 +476,13 @@ export function ExternalRentalsManager({ userId }: ExternalRentalsManagerProps) 
       }
 
       // Sem conflitos, prosseguir com o salvamento
+      const participantsValue = parseInt(rentalForm.expected_participants, 10) || 0
+      console.log('DEBUG - expected_participants:', {
+        raw: rentalForm.expected_participants,
+        parsed: participantsValue,
+        type: typeof rentalForm.expected_participants
+      })
+      
       const data = {
         environment_id: envId,
         rental_date: rentalDate,
@@ -487,7 +494,7 @@ export function ExternalRentalsManager({ userId }: ExternalRentalsManagerProps) 
         renter_document: rentalForm.renter_document?.trim() || null,
         renter_address: rentalForm.renter_address?.trim() || null,
         event_description: rentalForm.event_description.trim(),
-        expected_participants: parseInt(rentalForm.expected_participants) || 0,
+        expected_participants: participantsValue,
         total_value: parseFloat(rentalForm.total_value),
         discount: parseFloat(rentalForm.discount) || 0,
         status: rentalForm.status,
@@ -1386,8 +1393,14 @@ export function ExternalRentalsManager({ userId }: ExternalRentalsManagerProps) 
                     <Input
                       id="expected_participants"
                       type="number"
+                      min="0"
+                      step="1"
                       value={rentalForm.expected_participants}
-                      onChange={(e) => setRentalForm({ ...rentalForm, expected_participants: e.target.value })}
+                      onChange={(e) => {
+                        const value = e.target.value
+                        console.log('DEBUG onChange participants:', { value, type: typeof value })
+                        setRentalForm({ ...rentalForm, expected_participants: value })
+                      }}
                     />
                   </div>
                 </div>
