@@ -89,7 +89,15 @@ const isBookingActive = (booking: Booking): boolean => {
   return bookingEndDateTime > now
 }
 
-export default function ReservationsView({ bookings, environments, currentFilters }: ReservationsViewProps) {
+// Helper function to safely get environment data
+const getEnvironmentData = (environments: Booking['environments']) => {
+  if (Array.isArray(environments)) {
+    return environments[0] || { id: '', name: '', capacity: 0 }
+  }
+  return environments || { id: '', name: '', capacity: 0 }
+}
+
+export default function ReservationsView({ bookings, pastBookings, currentBookings, environments, currentFilters }: ReservationsViewProps) {
   const router = useRouter()
   const searchParams = useSearchParams()
   const { user, isAuthenticated } = useAuth()
@@ -134,34 +142,6 @@ export default function ReservationsView({ bookings, environments, currentFilter
     return timeString.slice(0, 5)
   }
 
-  // Separate bookings by time status
-  const activeBookings = bookings.filter((booking) => isBookingActive(booking))
-  const pastBookings = bookings.filter((booking) => !isBookingActive(booking))
-
-  // Group bookings by environment for the "Por Ambiente" tab
-  const bookingsByEnvironment = environments.reduce(
-    (acc, env) => {
-      acc[env.id] = {
-        environment: env,
-        bookings: bookings.filter((booking) => getEnvironmentData(booking.environments).id === env.id),
-      }
-      return acc
-    },
-    {} as Record<string, { environment: Environment; bookings: Booking[] }>,
-  )
-
-  // Group past bookings by environment
-  const pastBookingsByEnvironment = environments.reduce(
-    (acc, env) => {
-      acc[env.id] = {
-        environment: env,
-        bookings: pastBookings.filter((booking) => getEnvironmentData(booking.environments).id === env.id),
-      }
-      return acc
-    },
-    {} as Record<string, { environment: Environment; bookings: Booking[] }>,
-  )
-
   // Group current bookings by environment
   const currentBookingsByEnvironment = environments.reduce(
     (acc, env) => {
@@ -174,24 +154,12 @@ export default function ReservationsView({ bookings, environments, currentFilter
     {} as Record<string, { environment: Environment; bookings: Booking[] }>,
   )
 
-  // Group active bookings by environment
-  const activeBookingsByEnvironment = environments.reduce(
-    (acc, env) => {
-      acc[env.id] = {
-        environment: env,
-        bookings: activeBookings.filter((booking) => booking.environments.id === env.id),
-      }
-      return acc
-    },
-    {} as Record<string, { environment: Environment; bookings: Booking[] }>,
-  )
-
   // Group past bookings by environment
   const pastBookingsByEnvironment = environments.reduce(
     (acc, env) => {
       acc[env.id] = {
         environment: env,
-        bookings: pastBookings.filter((booking) => booking.environments.id === env.id),
+        bookings: pastBookings.filter((booking) => getEnvironmentData(booking.environments).id === env.id),
       }
       return acc
     },
@@ -431,14 +399,6 @@ function BookingCard({ booking, compact = false, isPast = false, user, isAuthent
   // Mostrar controles apenas para o proprietário da reserva
   const isOwner = isAuthenticated && user?.id === booking.user_id
   const canManageBookings = isOwner
-
-  // Helper function to safely get environment data
-  const getEnvironmentData = (environments: Booking['environments']) => {
-    if (Array.isArray(environments)) {
-      return environments[0] || { id: '', name: '', capacity: 0 }
-    }
-    return environments || { id: '', name: '', capacity: 0 }
-  }
 
   const handleDelete = async () => {
     if (!canManageBookings) return
