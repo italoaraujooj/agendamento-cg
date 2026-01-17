@@ -476,6 +476,13 @@ export function ExternalRentalsManager({ userId }: ExternalRentalsManagerProps) 
       }
 
       // Sem conflitos, prosseguir com o salvamento
+      const participantsValue = parseInt(rentalForm.expected_participants, 10) || 0
+      console.log('DEBUG - expected_participants:', {
+        raw: rentalForm.expected_participants,
+        parsed: participantsValue,
+        type: typeof rentalForm.expected_participants
+      })
+      
       const data = {
         environment_id: envId,
         rental_date: rentalDate,
@@ -487,7 +494,7 @@ export function ExternalRentalsManager({ userId }: ExternalRentalsManagerProps) 
         renter_document: rentalForm.renter_document?.trim() || null,
         renter_address: rentalForm.renter_address?.trim() || null,
         event_description: rentalForm.event_description.trim(),
-        expected_participants: parseInt(rentalForm.expected_participants) || 0,
+        expected_participants: participantsValue,
         total_value: parseFloat(rentalForm.total_value),
         discount: parseFloat(rentalForm.discount) || 0,
         status: rentalForm.status,
@@ -497,29 +504,56 @@ export function ExternalRentalsManager({ userId }: ExternalRentalsManagerProps) 
       }
 
       if (editingRental) {
-        const { error } = await supabase
+        const { error, data: updatedData } = await supabase
           .from('external_rentals')
           .update(data)
           .eq('id', editingRental.id)
+          .select()
         
-        if (error) throw error
+        if (error) {
+          console.error('Erro Supabase (update):', error)
+          if (error.code === '42501' || error.message?.includes('permission') || error.message?.includes('policy')) {
+            throw new Error('Você não tem permissão para editar locações. Verifique se você é administrador.')
+          }
+          throw error
+        }
+        
+        if (!updatedData || updatedData.length === 0) {
+          throw new Error('Não foi possível atualizar. Verifique se você tem permissão de administrador.')
+        }
+        
         toast.success('Locação atualizada com sucesso!')
       } else {
-        const { error } = await supabase
+        const { error, data: insertedData } = await supabase
           .from('external_rentals')
           .insert([data])
+          .select()
         
-        if (error) throw error
+        if (error) {
+          console.error('Erro Supabase (insert):', error)
+          if (error.code === '42501' || error.message?.includes('permission') || error.message?.includes('policy')) {
+            throw new Error('Você não tem permissão para criar locações. Verifique se você é administrador.')
+          }
+          if (error.code === '42P01' || error.message?.includes('does not exist')) {
+            throw new Error('As tabelas de locações externas não existem. Execute o script SQL 009-external-rentals.sql no Supabase.')
+          }
+          throw error
+        }
+        
+        if (!insertedData || insertedData.length === 0) {
+          throw new Error('Não foi possível cadastrar. Verifique se você tem permissão de administrador.')
+        }
+        
         toast.success('Locação cadastrada com sucesso!')
       }
 
       setShowRentalForm(false)
       setEditingRental(null)
       resetRentalForm()
-      fetchData()
+      await fetchData()
     } catch (error: any) {
       console.error('Erro ao salvar locação:', error)
-      toast.error(error.message || 'Erro ao salvar locação')
+      toast.error(error.message || 'Erro ao salvar locação. Verifique o console para mais detalhes.')
     } finally {
       setIsSubmitting(false)
     }
@@ -590,7 +624,7 @@ export function ExternalRentalsManager({ userId }: ExternalRentalsManagerProps) 
     setIsSubmitting(true)
     
     try {
-      const { error } = await supabase
+      const { error, data: insertedData } = await supabase
         .from('rental_payments')
         .insert([{
           rental_id: paymentForm.rental_id,
@@ -601,8 +635,19 @@ export function ExternalRentalsManager({ userId }: ExternalRentalsManagerProps) 
           notes: paymentForm.notes?.trim() || null,
           created_by: userId,
         }])
+        .select()
       
-      if (error) throw error
+      if (error) {
+        console.error('Erro Supabase (payment insert):', error)
+        if (error.code === '42501' || error.message?.includes('permission') || error.message?.includes('policy')) {
+          throw new Error('Você não tem permissão para registrar pagamentos. Verifique se você é administrador.')
+        }
+        throw error
+      }
+      
+      if (!insertedData || insertedData.length === 0) {
+        throw new Error('Não foi possível registrar o pagamento. Verifique se você tem permissão de administrador.')
+      }
       
       toast.success('Pagamento registrado com sucesso!')
       setShowPaymentForm(false)
@@ -614,7 +659,7 @@ export function ExternalRentalsManager({ userId }: ExternalRentalsManagerProps) 
         reference: '',
         notes: '',
       })
-      fetchData()
+      await fetchData()
     } catch (error: any) {
       console.error('Erro ao registrar pagamento:', error)
       toast.error(error.message || 'Erro ao registrar pagamento')
@@ -649,7 +694,7 @@ export function ExternalRentalsManager({ userId }: ExternalRentalsManagerProps) 
     setIsSubmitting(true)
     
     try {
-      const { error } = await supabase
+      const { error, data: insertedData } = await supabase
         .from('rental_costs')
         .insert([{
           rental_id: costForm.rental_id || null,
@@ -661,8 +706,19 @@ export function ExternalRentalsManager({ userId }: ExternalRentalsManagerProps) 
           receipt_reference: costForm.receipt_reference?.trim() || null,
           created_by: userId,
         }])
+        .select()
       
-      if (error) throw error
+      if (error) {
+        console.error('Erro Supabase (cost insert):', error)
+        if (error.code === '42501' || error.message?.includes('permission') || error.message?.includes('policy')) {
+          throw new Error('Você não tem permissão para registrar custos. Verifique se você é administrador.')
+        }
+        throw error
+      }
+      
+      if (!insertedData || insertedData.length === 0) {
+        throw new Error('Não foi possível registrar o custo. Verifique se você tem permissão de administrador.')
+      }
       
       toast.success('Custo registrado com sucesso!')
       setShowCostForm(false)
@@ -675,7 +731,7 @@ export function ExternalRentalsManager({ userId }: ExternalRentalsManagerProps) 
         notes: '',
         receipt_reference: '',
       })
-      fetchData()
+      await fetchData()
     } catch (error: any) {
       console.error('Erro ao registrar custo:', error)
       toast.error(error.message || 'Erro ao registrar custo')
@@ -1337,8 +1393,14 @@ export function ExternalRentalsManager({ userId }: ExternalRentalsManagerProps) 
                     <Input
                       id="expected_participants"
                       type="number"
+                      min="0"
+                      step="1"
                       value={rentalForm.expected_participants}
-                      onChange={(e) => setRentalForm({ ...rentalForm, expected_participants: e.target.value })}
+                      onChange={(e) => {
+                        const value = e.target.value
+                        console.log('DEBUG onChange participants:', { value, type: typeof value })
+                        setRentalForm({ ...rentalForm, expected_participants: value })
+                      }}
                     />
                   </div>
                 </div>

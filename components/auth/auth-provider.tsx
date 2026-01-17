@@ -34,6 +34,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
   const [session, setSession] = useState<Session | null>(null)
   const [loading, setLoading] = useState(true)
   const [isAdmin, setIsAdmin] = useState(false)
+  const [initialized, setInitialized] = useState(false)
 
   // Função para verificar se o usuário é admin
   const checkAdminStatus = useCallback(async (userId: string | undefined) => {
@@ -43,21 +44,28 @@ export function AuthProvider({ children }: AuthProviderProps) {
     }
 
     try {
-      const { data, error } = await supabase
+      // Timeout com Promise.race
+      const timeoutPromise = new Promise<{ data: null; error: Error }>((resolve) => {
+        setTimeout(() => resolve({ data: null, error: new Error('Timeout') }), 5000)
+      })
+
+      const queryPromise = supabase
         .from('profiles')
         .select('is_admin')
         .eq('id', userId)
         .single()
 
+      const { data, error } = await Promise.race([queryPromise, timeoutPromise])
+
       if (error) {
-        console.error('Erro ao verificar status de admin:', error)
+        // Silencia erros de perfil não encontrado ou tabela inexistente
         setIsAdmin(false)
         return
       }
 
       setIsAdmin(data?.is_admin || false)
     } catch (err) {
-      console.error('Erro ao verificar status de admin:', err)
+      console.warn('Erro ao verificar admin:', err)
       setIsAdmin(false)
     }
   }, [])
@@ -68,33 +76,98 @@ export function AuthProvider({ children }: AuthProviderProps) {
     }
   }, [user?.id, checkAdminStatus])
 
+  // Inicialização - executar apenas uma vez
   useEffect(() => {
-    // Get initial session
-    const getInitialSession = async () => {
-      const { data: { session } } = await supabase.auth.getSession()
-      setSession(session)
-      setUser(session?.user ?? null)
-      await checkAdminStatus(session?.user?.id)
-      setLoading(false)
+    if (initialized) return
+
+    let isMounted = true
+
+    const initialize = async () => {
+      console.log('🔄 Inicializando autenticação...')
+      
+      try {
+        // Timeout de segurança
+        const timeoutPromise = new Promise<null>((resolve) => {
+          setTimeout(() => {
+            console.warn('⚠️ Timeout na inicialização')
+            resolve(null)
+          }, 8000)
+        })
+
+        const sessionPromise = supabase.auth.getSession().then(({ data }) => data.session)
+
+        const session = await Promise.race([sessionPromise, timeoutPromise])
+
+        if (!isMounted) return
+
+        if (session) {
+          console.log('✅ Sessão encontrada')
+          setSession(session)
+          setUser(session.user)
+          await checkAdminStatus(session.user?.id)
+        } else {
+          console.log('ℹ️ Sem sessão ativa')
+          setSession(null)
+          setUser(null)
+          setIsAdmin(false)
+        }
+      } catch (err) {
+        console.error('❌ Erro na inicialização:', err)
+        if (isMounted) {
+          setSession(null)
+          setUser(null)
+          setIsAdmin(false)
+        }
+      } finally {
+        if (isMounted) {
+          setLoading(false)
+          setInitialized(true)
+        }
+      }
     }
 
-    getInitialSession()
+    initialize()
 
-    // Listen for auth changes
+    // Listener para mudanças de auth
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      async (event: AuthChangeEvent, session: Session | null) => {
-        setSession(session)
-        setUser(session?.user ?? null)
-        await checkAdminStatus(session?.user?.id)
+      async (event: AuthChangeEvent, newSession: Session | null) => {
+        if (!isMounted) return
+
+        console.log('🔄 Auth event:', event)
+
+        // Eventos de logout
+        if (event === 'SIGNED_OUT') {
+          setSession(null)
+          setUser(null)
+          setIsAdmin(false)
+          setLoading(false)
+          return
+        }
+
+        // Atualiza sessão
+        setSession(newSession)
+        setUser(newSession?.user ?? null)
+
+        if (newSession?.user?.id) {
+          // Não bloquear com await para evitar delay
+          checkAdminStatus(newSession.user.id)
+        } else {
+          setIsAdmin(false)
+        }
+
         setLoading(false)
       }
     )
 
-    return () => subscription.unsubscribe()
-  }, [checkAdminStatus])
+    return () => {
+      isMounted = false
+      subscription.unsubscribe()
+    }
+  }, [initialized, checkAdminStatus])
 
   const signInWithGoogle = async () => {
     console.log('🔄 Iniciando login com Google...')
+    
     const { error } = await supabase.auth.signInWithOAuth({
       provider: 'google',
       options: {
@@ -106,13 +179,22 @@ export function AuthProvider({ children }: AuthProviderProps) {
       console.error('❌ Erro no login:', error.message)
       throw error
     }
+    // Não seta loading aqui pois vai redirecionar
   }
 
   const signOut = async () => {
-    const { error } = await supabase.auth.signOut()
-    if (error) {
-      console.error('Error signing out:', error.message)
-      throw error
+    console.log('🔄 Fazendo logout...')
+    
+    // Limpa estado local primeiro para UI responsiva
+    setSession(null)
+    setUser(null)
+    setIsAdmin(false)
+    
+    try {
+      await supabase.auth.signOut()
+    } catch (err) {
+      console.error('Erro no logout:', err)
+      // Estado já foi limpo, então ignora
     }
   }
 
