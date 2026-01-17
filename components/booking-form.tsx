@@ -798,7 +798,7 @@ export default function BookingForm({ environments, preselectedEnvironment }: Bo
         return
       }
 
-      // Pré-checagem de conflitos já existentes por ambiente
+      // Pré-checagem de conflitos já existentes por ambiente (agendamentos internos)
       const queryDates = Array.from(new Set(targetOccurrences.map((o) => o.date)))
       const { data: existing } = await supabase
         .from("bookings")
@@ -834,6 +834,36 @@ export default function BookingForm({ environments, preselectedEnvironment }: Bo
         return
       }
 
+      // Pré-checagem de conflitos com locações externas
+      const { data: externalRentals } = await supabase
+        .from("external_rentals")
+        .select("rental_date,start_time,end_time,environment_id")
+        .in("environment_id", envIds)
+        .in("rental_date", queryDates)
+        .neq("status", "cancelled") // Ignorar locações canceladas
+
+      const externalConflicts: string[] = []
+      for (const rental of externalRentals || []) {
+        const d = (rental as any).rental_date as string
+        const env = Number((rental as any).environment_id)
+        const target = (byEnvByDate[env] || {})[d]
+        if (!target) continue
+        const rS = timeStringToHour((rental as any).start_time)
+        const rE = timeStringToHour((rental as any).end_time)
+        if (overlaps(target.start, target.end, rS, rE)) {
+          externalConflicts.push(`${d} (Ambiente ${env} - Locação externa)`)
+        }
+      }
+      if (externalConflicts.length) {
+        setError(
+          `Conflito com locações externas em: ${externalConflicts
+            .slice(0, 5)
+            .join(", ")} ${externalConflicts.length > 5 ? `+${externalConflicts.length - 5} dia(s)` : ""}. Este horário já está reservado para um evento externo.`,
+        )
+        setIsSubmitting(false)
+        return
+      }
+
       // Inserção em lote para todos os ambientes selecionados
       const rows = envIds.flatMap((envId) =>
         targetOccurrences.map((o) => ({
@@ -862,27 +892,26 @@ export default function BookingForm({ environments, preselectedEnvironment }: Bo
           setError(`Erro ao criar reservas: ${insertError.message}`)
         }
       } else {
+        // Preparar lista de reservas para processar
+        let bookingsToProcess = insertedData
+
+        if (!insertedData || insertedData.length === 0) {
+          // Buscar reservas criadas nos últimos 30 segundos para este usuário
+          const thirtySecondsAgo = new Date(Date.now() - 30000).toISOString()
+          const { data: recentBookings, error: fetchError } = await supabase
+            .from('bookings')
+            .select('*')
+            .eq('email', user?.email)
+            .gte('created_at', thirtySecondsAgo)
+            .order('created_at', { ascending: false })
+
+          if (!fetchError && recentBookings && recentBookings.length > 0) {
+            bookingsToProcess = recentBookings
+          }
+        }
         
         // Tentar criar eventos no Google Calendar
         try {
-          // Se insertedData estiver vazio, tentar buscar as reservas recém-criadas
-          let bookingsToProcess = insertedData
-
-          if (!insertedData || insertedData.length === 0) {
-            // Buscar reservas criadas nos últimos 30 segundos para este usuário
-            const thirtySecondsAgo = new Date(Date.now() - 30000).toISOString()
-            const { data: recentBookings, error: fetchError } = await supabase
-              .from('bookings')
-              .select('*')
-              .eq('email', user?.email)
-              .gte('created_at', thirtySecondsAgo)
-              .order('created_at', { ascending: false })
-
-            if (!fetchError && recentBookings && recentBookings.length > 0) {
-              bookingsToProcess = recentBookings
-            }
-          }
-
           if (user?.email && bookingsToProcess && bookingsToProcess.length > 0) {
 
             const calendarPromises = (bookingsToProcess as any[]).map(async (insertedBooking: any) => {
@@ -962,9 +991,74 @@ export default function BookingForm({ environments, preselectedEnvironment }: Bo
           // Não falhar a criação da reserva por causa do Calendar
         }
 
+        // Enviar notificação por email aos administradores
+        try {
+          console.log('📧 Iniciando envio de notificação por email...')
+          console.log('📧 bookingsToProcess:', bookingsToProcess)
+          
+          if (bookingsToProcess && bookingsToProcess.length > 0) {
+            const firstBooking = bookingsToProcess[0] as any
+            console.log('📧 Primeira reserva:', firstBooking)
+            
+            // Buscar nome do ambiente
+            const { data: envData } = await supabase
+              .from('environments')
+              .select('name')
+              .eq('id', firstBooking.environment_id)
+              .single()
+
+            console.log('📧 Ambiente:', envData)
+
+            const notificationPayload = {
+              type: 'new_booking',
+              booking: {
+                id: firstBooking.id,
+                name: firstBooking.name,
+                email: firstBooking.email,
+                phone: firstBooking.phone,
+                ministry_network: firstBooking.ministry_network,
+                estimated_participants: firstBooking.estimated_participants,
+                responsible_person: firstBooking.responsible_person,
+                occasion: firstBooking.occasion,
+                booking_date: firstBooking.booking_date,
+                start_time: firstBooking.start_time,
+                end_time: firstBooking.end_time,
+                environment_name: envData?.name || 'Ambiente',
+              },
+            }
+
+            console.log('📧 Enviando payload:', notificationPayload)
+
+            const emailResponse = await fetch('/api/send-notification', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify(notificationPayload),
+            })
+
+            const emailResult = await emailResponse.json()
+            console.log('📧 Resposta da API de notificação:', emailResult)
+
+            if (emailResult.success) {
+              console.log('✅ Email de notificação enviado com sucesso!')
+            } else if (emailResult.warning) {
+              console.warn('⚠️ Aviso no envio de email:', emailResult.warning)
+            } else if (emailResult.error) {
+              console.error('❌ Erro no envio de email:', emailResult.error)
+            }
+          } else {
+            console.warn('⚠️ Nenhuma reserva para processar notificação por email')
+          }
+        } catch (emailError) {
+          console.error('❌ Erro ao enviar notificação por email:', emailError)
+          // Não falhar a criação por causa do email
+        }
+
         setSuccess(true)
         toast.success(
-          rows.length > 1 ? `${rows.length} reservas criadas com sucesso` : "Reserva criada com sucesso",
+          rows.length > 1 
+            ? `${rows.length} solicitações enviadas! Aguarde a aprovação.` 
+            : "Solicitação enviada! Aguarde a aprovação da administração.",
+          { duration: 6000 }
         )
         setTimeout(() => {
           router.push("/reservations")

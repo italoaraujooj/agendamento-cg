@@ -9,7 +9,7 @@ import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Badge } from "@/components/ui/badge"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { Calendar as CalendarIcon, Clock, Users, Phone, Mail, Building, User, Filter, X, CalendarDays, History, Calendar, Edit, Trash2 } from "lucide-react"
+import { Calendar as CalendarIcon, Clock, Users, Phone, Mail, Building, User, Filter, X, History, Calendar, Edit, Trash2, Clock3, CheckCircle, XCircle } from "lucide-react"
 import { DatePicker } from "@/components/ui/date-picker"
 import { supabase } from "@/lib/supabase/client"
 import { toast } from "sonner"
@@ -40,6 +40,10 @@ interface Booking {
   created_at: string
   google_event_id?: string
   synced_at?: string
+  status?: 'pending' | 'approved' | 'rejected'
+  reviewed_by?: string
+  reviewed_at?: string
+  review_notes?: string
   environments: {
     id: string
     name: string
@@ -76,17 +80,23 @@ const parseLocalYmd = (ymd: string): Date => {
   return new Date(year, month - 1, day)
 }
 
-const isBookingActive = (booking: Booking): boolean => {
-  const now = new Date()
-  const bookingDate = parseLocalYmd(booking.booking_date)
-  
-  // Adicionar horário de fim para comparação precisa
-  const [endHour, endMinute] = booking.end_time.split(':').map(Number)
-  const bookingEndDateTime = new Date(bookingDate)
-  bookingEndDateTime.setHours(endHour, endMinute, 0, 0)
-  
-  // Reserva é considerada ativa se ainda não passou do horário de fim
-  return bookingEndDateTime > now
+// Configuração de status de reserva
+const STATUS_CONFIG = {
+  pending: {
+    label: 'Pendente',
+    color: 'bg-yellow-100 text-yellow-800 border-yellow-200 dark:bg-yellow-900/30 dark:text-yellow-400 dark:border-yellow-800',
+    icon: Clock3,
+  },
+  approved: {
+    label: 'Aprovada',
+    color: 'bg-green-100 text-green-800 border-green-200 dark:bg-green-900/30 dark:text-green-400 dark:border-green-800',
+    icon: CheckCircle,
+  },
+  rejected: {
+    label: 'Rejeitada',
+    color: 'bg-red-100 text-red-800 border-red-200 dark:bg-red-900/30 dark:text-red-400 dark:border-red-800',
+    icon: XCircle,
+  },
 }
 
 // Helper function to safely get environment data
@@ -136,10 +146,6 @@ export default function ReservationsView({ bookings, pastBookings, currentBookin
       month: "long",
       day: "numeric",
     })
-  }
-
-  const formatTime = (timeString: string) => {
-    return timeString.slice(0, 5)
   }
 
   // Group current bookings by environment
@@ -396,9 +402,14 @@ function BookingCard({ booking, compact = false, isPast = false, user, isAuthent
   const [showDeleteDialog, setShowDeleteDialog] = useState(false)
   const [isDeleting, setIsDeleting] = useState(false)
 
-  // Mostrar controles apenas para o proprietário da reserva
+  // Mostrar controles apenas para o proprietário da reserva e se não estiver rejeitada
   const isOwner = isAuthenticated && user?.id === booking.user_id
-  const canManageBookings = isOwner
+  const canManageBookings = isOwner && booking.status !== 'rejected'
+
+  // Configuração do status
+  const status = booking.status || 'pending'
+  const statusConfig = STATUS_CONFIG[status]
+  const StatusIcon = statusConfig.icon
 
   const handleDelete = async () => {
     if (!canManageBookings) return
@@ -460,13 +471,18 @@ function BookingCard({ booking, compact = false, isPast = false, user, isAuthent
             <CardTitle className={titleClassName}>
               {booking.name}
               <div className="flex gap-2 ml-2">
+                {/* Badge de Status */}
+                <Badge variant="outline" className={`text-xs ${statusConfig.color}`}>
+                  <StatusIcon className="h-3 w-3 mr-1" />
+                  {statusConfig.label}
+                </Badge>
                 {isPast && (
                   <Badge variant="secondary" className="text-xs">
                     Passada
                   </Badge>
                 )}
                 {booking.google_event_id && (
-                  <Badge variant="outline" className="text-xs bg-green-50 text-green-700 border-green-200">
+                  <Badge variant="outline" className="text-xs bg-green-50 text-green-700 border-green-200 dark:bg-green-900/30 dark:text-green-400 dark:border-green-800">
                     📅 Calendar
                   </Badge>
                 )}
@@ -526,6 +542,47 @@ function BookingCard({ booking, compact = false, isPast = false, user, isAuthent
             <strong>Ocasião:</strong> {booking.occasion}
           </p>
         </div>
+
+        {/* Exibir observações de revisão se houver */}
+        {booking.review_notes && (
+          <div className={`mt-3 p-3 rounded-lg border ${
+            status === 'approved' 
+              ? 'bg-green-50 border-green-200 dark:bg-green-900/20 dark:border-green-800' 
+              : status === 'rejected'
+              ? 'bg-red-50 border-red-200 dark:bg-red-900/20 dark:border-red-800'
+              : 'bg-yellow-50 border-yellow-200 dark:bg-yellow-900/20 dark:border-yellow-800'
+          }`}>
+            <p className={`text-sm ${
+              status === 'approved' 
+                ? 'text-green-800 dark:text-green-300' 
+                : status === 'rejected'
+                ? 'text-red-800 dark:text-red-300'
+                : 'text-yellow-800 dark:text-yellow-300'
+            }`}>
+              <strong>Observações:</strong> {booking.review_notes}
+            </p>
+          </div>
+        )}
+
+        {/* Aviso para reservas pendentes */}
+        {status === 'pending' && !isPast && (
+          <div className="mt-3 p-3 bg-yellow-50 dark:bg-yellow-900/20 rounded-lg border border-yellow-200 dark:border-yellow-800">
+            <p className="text-sm text-yellow-800 dark:text-yellow-300 flex items-center gap-2">
+              <Clock3 className="h-4 w-4" />
+              <span>Aguardando aprovação da administração</span>
+            </p>
+          </div>
+        )}
+
+        {/* Aviso para reservas rejeitadas */}
+        {status === 'rejected' && (
+          <div className="mt-3 p-3 bg-red-50 dark:bg-red-900/20 rounded-lg border border-red-200 dark:border-red-800">
+            <p className="text-sm text-red-800 dark:text-red-300 flex items-center gap-2">
+              <XCircle className="h-4 w-4" />
+              <span>Esta reserva foi rejeitada pela administração</span>
+            </p>
+          </div>
+        )}
 
         {/* Controles de edição/cancelamento apenas para o proprietário da reserva */}
         {canManageBookings && (

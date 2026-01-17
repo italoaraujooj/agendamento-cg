@@ -18,6 +18,10 @@ interface Booking {
   start_time: string
   end_time: string
   created_at: string
+  status?: 'pending' | 'approved' | 'rejected'
+  reviewed_by?: string
+  reviewed_at?: string
+  review_notes?: string
   environments: {
     id: string
     name: string
@@ -82,6 +86,10 @@ export default async function ReservationsPage({
       created_at,
       google_event_id,
       synced_at,
+      status,
+      reviewed_by,
+      reviewed_at,
+      review_notes,
       environments!inner (
         id,
         name,

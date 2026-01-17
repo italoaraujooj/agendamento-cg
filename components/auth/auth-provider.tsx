@@ -1,17 +1,18 @@
 "use client"
 
-import { createContext, useContext, useEffect, useState } from 'react'
+import { createContext, useContext, useEffect, useState, useCallback } from 'react'
 import { User, Session, AuthChangeEvent } from '@supabase/supabase-js'
 import { supabase } from '@/lib/supabase/client'
-import { OAUTH_CONFIG } from '@/lib/google-oauth'
 
 interface AuthContextType {
   user: User | null
   session: Session | null
   loading: boolean
+  isAdmin: boolean
   signInWithGoogle: () => Promise<void>
   signOut: () => Promise<void>
   isAuthenticated: boolean
+  refreshAdminStatus: () => Promise<void>
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined)
@@ -32,6 +33,40 @@ export function AuthProvider({ children }: AuthProviderProps) {
   const [user, setUser] = useState<User | null>(null)
   const [session, setSession] = useState<Session | null>(null)
   const [loading, setLoading] = useState(true)
+  const [isAdmin, setIsAdmin] = useState(false)
+
+  // Função para verificar se o usuário é admin
+  const checkAdminStatus = useCallback(async (userId: string | undefined) => {
+    if (!userId) {
+      setIsAdmin(false)
+      return
+    }
+
+    try {
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('is_admin')
+        .eq('id', userId)
+        .single()
+
+      if (error) {
+        console.error('Erro ao verificar status de admin:', error)
+        setIsAdmin(false)
+        return
+      }
+
+      setIsAdmin(data?.is_admin || false)
+    } catch (err) {
+      console.error('Erro ao verificar status de admin:', err)
+      setIsAdmin(false)
+    }
+  }, [])
+
+  const refreshAdminStatus = useCallback(async () => {
+    if (user?.id) {
+      await checkAdminStatus(user.id)
+    }
+  }, [user?.id, checkAdminStatus])
 
   useEffect(() => {
     // Get initial session
@@ -39,6 +74,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
       const { data: { session } } = await supabase.auth.getSession()
       setSession(session)
       setUser(session?.user ?? null)
+      await checkAdminStatus(session?.user?.id)
       setLoading(false)
     }
 
@@ -49,12 +85,13 @@ export function AuthProvider({ children }: AuthProviderProps) {
       async (event: AuthChangeEvent, session: Session | null) => {
         setSession(session)
         setUser(session?.user ?? null)
+        await checkAdminStatus(session?.user?.id)
         setLoading(false)
       }
     )
 
     return () => subscription.unsubscribe()
-  }, [])
+  }, [checkAdminStatus])
 
   const signInWithGoogle = async () => {
     console.log('🔄 Iniciando login com Google...')
@@ -83,9 +120,11 @@ export function AuthProvider({ children }: AuthProviderProps) {
     user,
     session,
     loading,
+    isAdmin,
     signInWithGoogle,
     signOut,
-    isAuthenticated: !!user
+    isAuthenticated: !!user,
+    refreshAdminStatus
   }
 
   return (
