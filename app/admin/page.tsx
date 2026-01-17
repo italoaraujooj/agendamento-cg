@@ -297,8 +297,23 @@ export default function AdminPage() {
 
   // Filtrar reservas por status
   const pendingBookings = bookings.filter(b => b.status === 'pending')
-  const approvedBookings = bookings.filter(b => b.status === 'approved')
   const rejectedBookings = bookings.filter(b => b.status === 'rejected')
+  
+  // Separar aprovadas em vigentes (futuras) e finalizadas (passadas)
+  const todayDate = new Date()
+  todayDate.setHours(0, 0, 0, 0)
+  
+  const approvedBookings = bookings.filter(b => {
+    if (b.status !== 'approved') return false
+    const bookingDate = parseLocalYmd(b.booking_date)
+    return bookingDate >= todayDate // Data de hoje ou futuras
+  })
+  
+  const completedBookings = bookings.filter(b => {
+    if (b.status !== 'approved') return false
+    const bookingDate = parseLocalYmd(b.booking_date)
+    return bookingDate < todayDate // Datas passadas
+  }).sort((a, b) => b.booking_date.localeCompare(a.booking_date)) // Mais recentes primeiro
 
   const MONTH_NAMES = [
     'Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho',
@@ -860,7 +875,7 @@ export default function AdminPage() {
           <TabsContent value="bookings">
             {/* Tabs de status de reservas */}
             <Tabs defaultValue="pending" className="w-full">
-              <TabsList className="grid w-full grid-cols-3">
+              <TabsList className="grid w-full grid-cols-4">
                 <TabsTrigger value="pending" className="flex items-center gap-2">
                   <Clock3 className="h-4 w-4" />
                   Pendentes ({pendingBookings.length})
@@ -868,6 +883,10 @@ export default function AdminPage() {
                 <TabsTrigger value="approved" className="flex items-center gap-2">
                   <CheckCircle className="h-4 w-4" />
                   Aprovadas ({approvedBookings.length})
+                </TabsTrigger>
+                <TabsTrigger value="completed" className="flex items-center gap-2">
+                  <CalendarIcon className="h-4 w-4" />
+                  Finalizadas ({completedBookings.length})
                 </TabsTrigger>
                 <TabsTrigger value="rejected" className="flex items-center gap-2">
                   <XCircle className="h-4 w-4" />
@@ -909,9 +928,9 @@ export default function AdminPage() {
                   <Card>
                     <CardContent className="text-center py-12">
                       <CalendarIcon className="h-16 w-16 text-gray-400 mx-auto mb-4" />
-                      <h3 className="text-xl font-semibold mb-2">Nenhuma reserva aprovada</h3>
+                      <h3 className="text-xl font-semibold mb-2">Nenhuma reserva vigente</h3>
                       <p className="text-muted-foreground">
-                        Ainda não há reservas aprovadas no sistema.
+                        Não há reservas aprovadas para datas futuras.
                       </p>
                     </CardContent>
                   </Card>
@@ -922,6 +941,33 @@ export default function AdminPage() {
                         key={booking.id}
                         booking={booking}
                         onCancel={() => handleCancelBooking(booking)}
+                        processing={processingId === booking.id}
+                        formatDate={formatDate}
+                        formatTime={formatTime}
+                        showActions={false}
+                      />
+                    ))}
+                  </div>
+                )}
+              </TabsContent>
+
+              <TabsContent value="completed" className="space-y-4 mt-4">
+                {completedBookings.length === 0 ? (
+                  <Card>
+                    <CardContent className="text-center py-12">
+                      <CheckCircle className="h-16 w-16 text-green-400 mx-auto mb-4" />
+                      <h3 className="text-xl font-semibold mb-2">Nenhuma reserva finalizada</h3>
+                      <p className="text-muted-foreground">
+                        Ainda não há reservas que já aconteceram.
+                      </p>
+                    </CardContent>
+                  </Card>
+                ) : (
+                  <div className="grid gap-4">
+                    {completedBookings.map((booking) => (
+                      <BookingAdminCard
+                        key={booking.id}
+                        booking={booking}
                         processing={processingId === booking.id}
                         formatDate={formatDate}
                         formatTime={formatTime}
