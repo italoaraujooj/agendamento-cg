@@ -2,17 +2,31 @@
 
 import { useState } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
+import { useAuth } from "@/components/auth/auth-provider"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Badge } from "@/components/ui/badge"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { Calendar as CalendarIcon, Clock, Users, Phone, Mail, Building, User, Filter, X, CalendarDays } from "lucide-react"
+import { Calendar as CalendarIcon, Clock, Users, Phone, Mail, Building, User, Filter, X, CalendarDays, History, Calendar, Edit, Trash2 } from "lucide-react"
 import { DatePicker } from "@/components/ui/date-picker"
+import { supabase } from "@/lib/supabase/client"
+import { toast } from "sonner"
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog"
 
 interface Booking {
   id: string
+  user_id: string
   name: string
   email: string
   phone: string
@@ -24,11 +38,17 @@ interface Booking {
   start_time: string
   end_time: string
   created_at: string
+  google_event_id?: string
+  synced_at?: string
   environments: {
     id: string
     name: string
     capacity: number
-  }
+  } | {
+    id: string
+    name: string
+    capacity: number
+  }[]
 }
 
 interface Environment {
@@ -39,6 +59,8 @@ interface Environment {
 
 interface ReservationsViewProps {
   bookings: Booking[]
+  pastBookings: Booking[]
+  currentBookings: Booking[]
   environments: Environment[]
   currentFilters: {
     environment?: string
@@ -70,6 +92,7 @@ const isBookingActive = (booking: Booking): boolean => {
 export default function ReservationsView({ bookings, environments, currentFilters }: ReservationsViewProps) {
   const router = useRouter()
   const searchParams = useSearchParams()
+  const { user, isAuthenticated } = useAuth()
   const [filterDate, setFilterDate] = useState(currentFilters.date || "")
   const [filterEnvironment, setFilterEnvironment] = useState(currentFilters.environment || "")
 
@@ -120,7 +143,31 @@ export default function ReservationsView({ bookings, environments, currentFilter
     (acc, env) => {
       acc[env.id] = {
         environment: env,
-        bookings: bookings.filter((booking) => booking.environments.id === env.id),
+        bookings: bookings.filter((booking) => getEnvironmentData(booking.environments).id === env.id),
+      }
+      return acc
+    },
+    {} as Record<string, { environment: Environment; bookings: Booking[] }>,
+  )
+
+  // Group past bookings by environment
+  const pastBookingsByEnvironment = environments.reduce(
+    (acc, env) => {
+      acc[env.id] = {
+        environment: env,
+        bookings: pastBookings.filter((booking) => getEnvironmentData(booking.environments).id === env.id),
+      }
+      return acc
+    },
+    {} as Record<string, { environment: Environment; bookings: Booking[] }>,
+  )
+
+  // Group current bookings by environment
+  const currentBookingsByEnvironment = environments.reduce(
+    (acc, env) => {
+      acc[env.id] = {
+        environment: env,
+        bookings: currentBookings.filter((booking) => getEnvironmentData(booking.environments).id === env.id),
       }
       return acc
     },
@@ -220,51 +267,69 @@ export default function ReservationsView({ bookings, environments, currentFilter
         </TabsList>
 
         <TabsContent value="all" className="space-y-4">
-          <Tabs defaultValue="all-bookings" className="w-full">
+          {/* Sistema de abas aninhadas para separar por status temporal */}
+          <Tabs defaultValue="current" className="w-full">
             <TabsList className="grid w-full grid-cols-2">
-              <TabsTrigger value="all-bookings">Em Curso ({activeBookings.length})</TabsTrigger>
-              <TabsTrigger value="past-bookings">Finalizadas ({pastBookings.length})</TabsTrigger>
+              <TabsTrigger value="current" className="flex items-center gap-2">
+                <Calendar className="h-4 w-4" />
+                Atuais/Futuras ({currentBookings.length})
+              </TabsTrigger>
+              <TabsTrigger value="past" className="flex items-center gap-2">
+                <History className="h-4 w-4" />
+                Passadas ({pastBookings.length})
+              </TabsTrigger>
             </TabsList>
 
-            <TabsContent value="all-bookings" className="space-y-4 mt-4">
-              {activeBookings.length === 0 ? (
+            <TabsContent value="current" className="space-y-4">
+              {currentBookings.length === 0 ? (
                 <Card>
                   <CardContent className="text-center py-12">
-                    <CalendarDays className="h-16 w-16 text-gray-400 mx-auto mb-4" />
-                    <h3 className="text-xl font-semibold text-gray-700 mb-2">Nenhuma reserva em curso</h3>
+                    <Calendar className="h-16 w-16 text-gray-400 mx-auto mb-4" />
+                    <h3 className="text-xl font-semibold text-gray-700 mb-2">Nenhuma reserva atual/futura</h3>
                     <p className="text-gray-500">
                       {hasActiveFilters
-                        ? "Tente ajustar os filtros para ver reservas em curso."
-                        : "Não há reservas ativas no momento."}
+                        ? "Tente ajustar os filtros ou limpar para ver todas as reservas."
+                        : "Não há reservas atuais ou futuras no sistema."}
                     </p>
                   </CardContent>
                 </Card>
               ) : (
                 <div className="grid gap-4">
-                  {activeBookings.map((booking) => (
-                    <BookingCard key={booking.id} booking={booking} />
+                  {currentBookings.map((booking) => (
+                    <BookingCard
+                      key={booking.id}
+                      booking={booking}
+                      user={user}
+                      isAuthenticated={isAuthenticated}
+                    />
                   ))}
                 </div>
               )}
             </TabsContent>
 
-            <TabsContent value="past-bookings" className="space-y-4 mt-4">
+            <TabsContent value="past" className="space-y-4">
               {pastBookings.length === 0 ? (
                 <Card>
                   <CardContent className="text-center py-12">
-                    <CalendarDays className="h-16 w-16 text-gray-400 mx-auto mb-4" />
-                    <h3 className="text-xl font-semibold text-gray-700 mb-2">Nenhuma reserva finalizada</h3>
+                    <History className="h-16 w-16 text-gray-400 mx-auto mb-4" />
+                    <h3 className="text-xl font-semibold text-gray-700 mb-2">Nenhuma reserva passada</h3>
                     <p className="text-gray-500">
                       {hasActiveFilters
-                        ? "Tente ajustar os filtros para ver reservas finalizadas."
-                        : "Ainda não há reservas finalizadas."}
+                        ? "Tente ajustar os filtros ou limpar para ver todas as reservas."
+                        : "Não há reservas passadas no sistema."}
                     </p>
                   </CardContent>
                 </Card>
               ) : (
                 <div className="grid gap-4">
                   {pastBookings.map((booking) => (
-                    <BookingCard key={booking.id} booking={booking} />
+                    <BookingCard
+                      key={booking.id}
+                      booking={booking}
+                      isPast
+                      user={user}
+                      isAuthenticated={isAuthenticated}
+                    />
                   ))}
                 </div>
               )}
@@ -273,14 +338,21 @@ export default function ReservationsView({ bookings, environments, currentFilter
         </TabsContent>
 
         <TabsContent value="by-environment" className="space-y-6">
-          <Tabs defaultValue="env-active" className="w-full">
+          {/* Sistema de abas aninhadas para separar por status temporal */}
+          <Tabs defaultValue="current" className="w-full">
             <TabsList className="grid w-full grid-cols-2">
-              <TabsTrigger value="env-active">Em Curso ({activeBookings.length})</TabsTrigger>
-              <TabsTrigger value="env-past">Finalizadas ({pastBookings.length})</TabsTrigger>
+              <TabsTrigger value="current" className="flex items-center gap-2">
+                <Calendar className="h-4 w-4" />
+                Atuais/Futuras ({currentBookings.length})
+              </TabsTrigger>
+              <TabsTrigger value="past" className="flex items-center gap-2">
+                <History className="h-4 w-4" />
+                Passadas ({pastBookings.length})
+              </TabsTrigger>
             </TabsList>
 
-            <TabsContent value="env-active" className="space-y-6 mt-4">
-              {Object.values(activeBookingsByEnvironment).map(({ environment, bookings: envBookings }) => (
+            <TabsContent value="current" className="space-y-6">
+              {Object.values(currentBookingsByEnvironment).map(({ environment, bookings: envBookings }) => (
                 <Card key={environment.id}>
                   <CardHeader>
                     <CardTitle className="flex items-center gap-2">
@@ -288,16 +360,22 @@ export default function ReservationsView({ bookings, environments, currentFilter
                       {environment.name}
                     </CardTitle>
                     <CardDescription>
-                      Capacidade: {environment.capacity} pessoas • {envBookings.length} reserva(s) em curso
+                      Capacidade: {environment.capacity} pessoas • {envBookings.length} reserva(s) atual(is)/futura(s)
                     </CardDescription>
                   </CardHeader>
                   <CardContent>
                     {envBookings.length === 0 ? (
-                      <p className="text-gray-500 text-center py-4">Nenhuma reserva em curso para este ambiente</p>
+                      <p className="text-gray-500 text-center py-4">Nenhuma reserva atual/futura para este ambiente</p>
                     ) : (
                       <div className="space-y-3">
                         {envBookings.map((booking) => (
-                          <BookingCard key={booking.id} booking={booking} compact />
+                          <BookingCard
+                            key={booking.id}
+                            booking={booking}
+                            compact
+                            user={user}
+                            isAuthenticated={isAuthenticated}
+                          />
                         ))}
                       </div>
                     )}
@@ -306,7 +384,7 @@ export default function ReservationsView({ bookings, environments, currentFilter
               ))}
             </TabsContent>
 
-            <TabsContent value="env-past" className="space-y-6 mt-4">
+            <TabsContent value="past" className="space-y-6">
               {Object.values(pastBookingsByEnvironment).map(({ environment, bookings: envBookings }) => (
                 <Card key={environment.id}>
                   <CardHeader>
@@ -315,16 +393,23 @@ export default function ReservationsView({ bookings, environments, currentFilter
                       {environment.name}
                     </CardTitle>
                     <CardDescription>
-                      Capacidade: {environment.capacity} pessoas • {envBookings.length} reserva(s) finalizadas
+                      Capacidade: {environment.capacity} pessoas • {envBookings.length} reserva(s) passada(s)
                     </CardDescription>
                   </CardHeader>
                   <CardContent>
                     {envBookings.length === 0 ? (
-                      <p className="text-gray-500 text-center py-4">Nenhuma reserva finalizada para este ambiente</p>
+                      <p className="text-gray-500 text-center py-4">Nenhuma reserva passada para este ambiente</p>
                     ) : (
                       <div className="space-y-3">
                         {envBookings.map((booking) => (
-                          <BookingCard key={booking.id} booking={booking} compact />
+                          <BookingCard
+                            key={booking.id}
+                            booking={booking}
+                            compact
+                            isPast
+                            user={user}
+                            isAuthenticated={isAuthenticated}
+                          />
                         ))}
                       </div>
                     )}
@@ -339,7 +424,52 @@ export default function ReservationsView({ bookings, environments, currentFilter
   )
 }
 
-function BookingCard({ booking, compact = false }: { booking: Booking; compact?: boolean }) {
+function BookingCard({ booking, compact = false, isPast = false, user, isAuthenticated }: { booking: Booking; compact?: boolean; isPast?: boolean; user?: any; isAuthenticated?: boolean }) {
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false)
+  const [isDeleting, setIsDeleting] = useState(false)
+
+  // Mostrar controles apenas para o proprietário da reserva
+  const isOwner = isAuthenticated && user?.id === booking.user_id
+  const canManageBookings = isOwner
+
+  // Helper function to safely get environment data
+  const getEnvironmentData = (environments: Booking['environments']) => {
+    if (Array.isArray(environments)) {
+      return environments[0] || { id: '', name: '', capacity: 0 }
+    }
+    return environments || { id: '', name: '', capacity: 0 }
+  }
+
+  const handleDelete = async () => {
+    if (!canManageBookings) return
+
+    setIsDeleting(true)
+    try {
+      const { error } = await supabase
+        .from('bookings')
+        .delete()
+        .eq('id', booking.id)
+
+      if (error) throw error
+
+      toast.success('Reserva cancelada com sucesso!')
+      // Recarregar a página para atualizar a lista
+      window.location.reload()
+    } catch (error) {
+      console.error('Erro ao cancelar reserva:', error)
+      toast.error('Erro ao cancelar reserva. Tente novamente.')
+    } finally {
+      setIsDeleting(false)
+      setShowDeleteDialog(false)
+    }
+  }
+
+  const handleEdit = () => {
+    if (!canManageBookings) return
+    // Por enquanto, apenas mostrar uma mensagem
+    toast.info('Funcionalidade de edição será implementada em breve')
+  }
+
   const formatDateShort = (dateString: string) => {
     const date = parseLocalYmd(dateString)
     return date.toLocaleDateString("pt-BR", {
@@ -354,13 +484,35 @@ function BookingCard({ booking, compact = false }: { booking: Booking; compact?:
     return timeString.slice(0, 5)
   }
 
+  // Estilos condicionais baseados no status da reserva
+  const cardClassName = compact 
+    ? `border-l-4 ${isPast ? "border-l-muted-foreground bg-muted/30" : "border-l-blue-500"}` 
+    : isPast ? "bg-muted/30 opacity-90" : ""
+
+  const titleClassName = isPast ? "text-muted-foreground" : "text-lg"
+  const descriptionClassName = isPast ? "text-muted-foreground/80" : ""
+
   return (
-    <Card className={compact ? "border-l-4 border-l-blue-500" : ""}>
+    <Card className={cardClassName}>
       <CardHeader className={compact ? "pb-3" : ""}>
         <div className="flex justify-between items-start">
           <div>
-            <CardTitle className="text-lg">{booking.name}</CardTitle>
-            <CardDescription className="flex items-center gap-4 mt-1">
+            <CardTitle className={titleClassName}>
+              {booking.name}
+              <div className="flex gap-2 ml-2">
+                {isPast && (
+                  <Badge variant="secondary" className="text-xs">
+                    Passada
+                  </Badge>
+                )}
+                {booking.google_event_id && (
+                  <Badge variant="outline" className="text-xs bg-green-50 text-green-700 border-green-200">
+                    📅 Calendar
+                  </Badge>
+                )}
+              </div>
+            </CardTitle>
+            <CardDescription className={`flex items-center gap-4 mt-1 ${descriptionClassName}`}>
               <span className="flex items-center gap-1">
                  <CalendarIcon className="h-3 w-3" />
                 {formatDateShort(booking.booking_date)}
@@ -371,7 +523,7 @@ function BookingCard({ booking, compact = false }: { booking: Booking; compact?:
               </span>
             </CardDescription>
           </div>
-          <Badge variant="outline" className="flex items-center gap-1">
+          <Badge variant={isPast ? "secondary" : "outline"} className="flex items-center gap-1">
             <Users className="h-3 w-3" />
             {booking.estimated_participants}
           </Badge>
@@ -383,38 +535,81 @@ function BookingCard({ booking, compact = false }: { booking: Booking; compact?:
           <div className="space-y-2">
             {!compact && (
               <div className="flex items-center gap-2">
-                <Building className="h-4 w-4 text-gray-500" />
-                <span className="font-medium">{booking.environments.name}</span>
+                <Building className={`h-4 w-4 ${isPast ? "text-muted-foreground/60" : "text-muted-foreground"}`} />
+                <span className={`font-medium ${isPast ? "text-muted-foreground" : ""}`}>{getEnvironmentData(booking.environments).name}</span>
               </div>
             )}
             <div className="flex items-center gap-2">
-              <Mail className="h-4 w-4 text-gray-500" />
-              <span>{booking.email}</span>
+              <Mail className={`h-4 w-4 ${isPast ? "text-muted-foreground/60" : "text-muted-foreground"}`} />
+              <span className={isPast ? "text-muted-foreground" : ""}>{booking.email}</span>
             </div>
             <div className="flex items-center gap-2">
-              <Phone className="h-4 w-4 text-gray-500" />
-              <span>{booking.phone}</span>
+              <Phone className={`h-4 w-4 ${isPast ? "text-muted-foreground/60" : "text-muted-foreground"}`} />
+              <span className={isPast ? "text-muted-foreground" : ""}>{booking.phone}</span>
             </div>
           </div>
 
           <div className="space-y-2">
             <div className="flex items-center gap-2">
-              <Users className="h-4 w-4 text-gray-500" />
-              <span>{booking.ministry_network}</span>
+              <Users className={`h-4 w-4 ${isPast ? "text-muted-foreground/60" : "text-muted-foreground"}`} />
+              <span className={isPast ? "text-muted-foreground" : ""}>{booking.ministry_network}</span>
             </div>
             <div className="flex items-center gap-2">
-              <User className="h-4 w-4 text-gray-500" />
-              <span>{booking.responsible_person}</span>
+              <User className={`h-4 w-4 ${isPast ? "text-muted-foreground/60" : "text-muted-foreground"}`} />
+              <span className={isPast ? "text-muted-foreground" : ""}>{booking.responsible_person}</span>
             </div>
           </div>
         </div>
 
-        <div className="mt-4 p-3 bg-muted rounded-lg">
-          <p className="text-sm">
+        <div className={`mt-4 p-3 rounded-lg ${isPast ? "bg-muted/50" : "bg-muted"}`}>
+          <p className={`text-sm ${isPast ? "text-muted-foreground" : ""}`}>
             <strong>Ocasião:</strong> {booking.occasion}
           </p>
         </div>
+
+        {/* Controles de edição/cancelamento apenas para o proprietário da reserva */}
+        {canManageBookings && (
+          <div className="flex gap-2 mt-4 pt-4 border-t">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleEdit}
+              className="flex items-center gap-2"
+            >
+              <Edit className="h-4 w-4" />
+              Editar
+            </Button>
+            <Button
+              variant="destructive"
+              size="sm"
+              onClick={() => setShowDeleteDialog(true)}
+              disabled={isDeleting}
+              className="flex items-center gap-2"
+            >
+              <Trash2 className="h-4 w-4" />
+              {isDeleting ? 'Cancelando...' : 'Cancelar'}
+            </Button>
+          </div>
+        )}
       </CardContent>
+
+      {/* Dialog de confirmação para cancelamento */}
+      <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Cancelar Reserva</AlertDialogTitle>
+            <AlertDialogDescription>
+              Tem certeza que deseja cancelar esta reserva? Esta ação não pode ser desfeita.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction onClick={handleDelete} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+              Confirmar Cancelamento
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </Card>
   )
 }

@@ -32,7 +32,7 @@ const WEEKDAY_LABELS_PT_BR: readonly string[] = [
 ] as const
 
 export default async function EnvironmentsPage() {
-  const supabase = createServerClient()
+  const supabase = await createServerClient()
 
   if (!supabase) {
     return (

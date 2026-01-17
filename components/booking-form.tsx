@@ -14,10 +14,12 @@ import { Calendar as CalendarIcon, Clock, Users, Phone, Mail, Building, User, Ch
 import { cn } from "@/lib/utils"
 import { supabase } from "@/lib/supabase/client"
 import { DatePicker } from "@/components/ui/date-picker"
+import { useAuth } from "@/components/auth/auth-provider"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { format } from "date-fns"
 import { toast } from "sonner"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
+import { Info } from "lucide-react"
 
 interface Environment {
   id: string
@@ -41,6 +43,7 @@ interface EnvironmentAvailability {
 
 export default function BookingForm({ environments, preselectedEnvironment }: BookingFormProps) {
   const router = useRouter()
+  const { user, isAuthenticated } = useAuth()
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [success, setSuccess] = useState(false)
@@ -68,6 +71,20 @@ export default function BookingForm({ environments, preselectedEnvironment }: Bo
     recurrenceNth: [] as Array<"1" | "2" | "3" | "4" | "last">,
     recurrenceWeekdays: [] as number[],
   })
+
+  // Preencher automaticamente campos quando usuário estiver logado
+  useEffect(() => {
+    if (isAuthenticated && user && formData.name === "" && formData.email === "") {
+      const fullName = user.user_metadata?.full_name || user.user_metadata?.name || ""
+      const email = user.email || ""
+
+      setFormData(prev => ({
+        ...prev,
+        name: fullName,
+        email: email
+      }))
+    }
+  }, [isAuthenticated, user, formData.name, formData.email])
 
   // Disponibilidades e reservas do dia (para calcular horários e ambientes disponíveis)
   const [availability, setAvailability] = useState<EnvironmentAvailability[]>([])
@@ -595,6 +612,11 @@ export default function BookingForm({ environments, preselectedEnvironment }: Bo
   }
 
   const validateForm = () => {
+    // Verificar se usuário está autenticado
+    if (!isAuthenticated || !user) {
+      return "Você precisa estar logado para fazer uma reserva"
+    }
+
     const required = [
       "environmentIds",
       "name",
@@ -816,6 +838,7 @@ export default function BookingForm({ environments, preselectedEnvironment }: Bo
       const rows = envIds.flatMap((envId) =>
         targetOccurrences.map((o) => ({
           environment_id: envId,
+          user_id: user?.id,
           name: formData.name,
           email: formData.email,
           phone: formData.phone,
@@ -829,7 +852,9 @@ export default function BookingForm({ environments, preselectedEnvironment }: Bo
         }))
       )
 
-      const { error: insertError } = await supabase.from("bookings").insert(rows)
+      const { data: insertedData, error: insertError } = await supabase.from("bookings").insert(rows).select()
+
+
       if (insertError) {
         if ((insertError as any).code === "23P01") {
           setError("Já existe uma reserva para este horário em uma das datas selecionadas.")
@@ -837,6 +862,106 @@ export default function BookingForm({ environments, preselectedEnvironment }: Bo
           setError(`Erro ao criar reservas: ${insertError.message}`)
         }
       } else {
+        
+        // Tentar criar eventos no Google Calendar
+        try {
+          // Se insertedData estiver vazio, tentar buscar as reservas recém-criadas
+          let bookingsToProcess = insertedData
+
+          if (!insertedData || insertedData.length === 0) {
+            // Buscar reservas criadas nos últimos 30 segundos para este usuário
+            const thirtySecondsAgo = new Date(Date.now() - 30000).toISOString()
+            const { data: recentBookings, error: fetchError } = await supabase
+              .from('bookings')
+              .select('*')
+              .eq('email', user?.email)
+              .gte('created_at', thirtySecondsAgo)
+              .order('created_at', { ascending: false })
+
+            if (!fetchError && recentBookings && recentBookings.length > 0) {
+              bookingsToProcess = recentBookings
+            }
+          }
+
+          if (user?.email && bookingsToProcess && bookingsToProcess.length > 0) {
+
+            const calendarPromises = (bookingsToProcess as any[]).map(async (insertedBooking: any) => {
+              // Buscar dados do ambiente para o título do evento
+              const { data: environmentData } = await supabase
+                .from('environments')
+                .select('name')
+                .eq('id', insertedBooking.environment_id)
+                .single()
+
+              const environmentName = environmentData?.name || 'Ambiente'
+              
+              // Construir as datas ISO para o evento
+              const startDateTime = new Date(`${insertedBooking.booking_date}T${insertedBooking.start_time}`)
+              const endDateTime = new Date(`${insertedBooking.booking_date}T${insertedBooking.end_time}`)
+
+
+              return fetch('/api/create-calendar-event', {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                  eventTitle: `${insertedBooking.name} - ${environmentName}`,
+                  eventDescription: `Reserva: ${insertedBooking.name}\nLocal: ${environmentName}\nParticipantes: ${insertedBooking.estimated_participants}\nOcasião: ${insertedBooking.occasion}\n\nCriado via Sistema de Agendamento - Cidade Viva CG`,
+                  startTime: startDateTime.toISOString(),
+                  endTime: endDateTime.toISOString()
+                })
+              }).then(response => response.json())
+            })
+
+            const calendarResults = await Promise.allSettled(calendarPromises)
+            const successfulCalendarEvents = calendarResults.filter((result: any) =>
+              result.status === 'fulfilled' &&
+              result.value.success === true
+            ).length
+
+            if (successfulCalendarEvents > 0) {
+              // Extrair links dos eventos criados para mostrar ao usuário
+              const eventLinks = calendarResults
+                .filter((result: any) => result.status === 'fulfilled' && result.value.success)
+                .map((result: any) => result.value.event?.htmlLink)
+                .filter(Boolean)
+
+              toast.success(
+                `✅ Reserva criada e sincronizada!`,
+                { 
+                  duration: 8000,
+                  description: `${successfulCalendarEvents} evento(s) adicionado(s) ao seu Google Calendar`,
+                  action: eventLinks.length > 0 ? {
+                    label: 'Ver no Google Calendar',
+                    onClick: () => window.open(eventLinks[0], '_blank')
+                  } : undefined
+                }
+              )
+              
+            } else if (calendarResults.length > 0) {
+              // Se houve tentativas mas nenhuma teve sucesso, mostrar aviso
+              const firstError = calendarResults.find((result: any) => 
+                result.status === 'fulfilled' && result.value.error
+              )
+              
+              if (firstError && firstError.status === 'fulfilled') {
+                toast.warning(
+                  'Reserva criada, mas não foi possível sincronizar com Google Calendar. Verifique suas permissões.',
+                  { duration: 6000 }
+                )
+              }
+            }
+
+          }
+        } catch (calendarError) {
+          toast.warning(
+            'Reserva criada com sucesso, mas houve um problema ao sincronizar com Google Calendar.',
+            { duration: 5000 }
+          )
+          // Não falhar a criação da reserva por causa do Calendar
+        }
+
         setSuccess(true)
         toast.success(
           rows.length > 1 ? `${rows.length} reservas criadas com sucesso` : "Reserva criada com sucesso",
@@ -912,12 +1037,25 @@ export default function BookingForm({ environments, preselectedEnvironment }: Bo
               <Label htmlFor="name" className="flex items-center gap-2">
                 <User className="h-4 w-4" />
                 Nome Completo
+                {isAuthenticated && formData.name && (
+                  <TooltipProvider>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Info className="h-3 w-3 text-muted-foreground cursor-help" />
+                      </TooltipTrigger>
+                      <TooltipContent>
+                        <p>Preenchido automaticamente com seus dados do Google</p>
+                      </TooltipContent>
+                    </Tooltip>
+                  </TooltipProvider>
+                )}
               </Label>
               <Input
                 id="name"
                 value={formData.name}
                 onChange={(e) => handleInputChange("name", e.target.value)}
                 placeholder="Seu nome completo"
+                className={isAuthenticated && formData.name ? "bg-muted/30" : ""}
               />
             </div>
 
@@ -925,6 +1063,18 @@ export default function BookingForm({ environments, preselectedEnvironment }: Bo
               <Label htmlFor="email" className="flex items-center gap-2">
                 <Mail className="h-4 w-4" />
                 Email
+                {isAuthenticated && formData.email && (
+                  <TooltipProvider>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Info className="h-3 w-3 text-muted-foreground cursor-help" />
+                      </TooltipTrigger>
+                      <TooltipContent>
+                        <p>Preenchido automaticamente com seu email do Google</p>
+                      </TooltipContent>
+                    </Tooltip>
+                  </TooltipProvider>
+                )}
               </Label>
               <Input
                 id="email"
@@ -932,6 +1082,7 @@ export default function BookingForm({ environments, preselectedEnvironment }: Bo
                 value={formData.email}
                 onChange={(e) => handleInputChange("email", e.target.value)}
                 placeholder="seu@email.com"
+                className={isAuthenticated && formData.email ? "bg-muted/30" : ""}
               />
             </div>
               </div>
