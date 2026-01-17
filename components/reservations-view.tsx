@@ -76,7 +76,20 @@ const parseLocalYmd = (ymd: string): Date => {
   return new Date(year, month - 1, day)
 }
 
-export default function ReservationsView({ bookings, pastBookings, currentBookings, environments, currentFilters }: ReservationsViewProps) {
+const isBookingActive = (booking: Booking): boolean => {
+  const now = new Date()
+  const bookingDate = parseLocalYmd(booking.booking_date)
+  
+  // Adicionar horário de fim para comparação precisa
+  const [endHour, endMinute] = booking.end_time.split(':').map(Number)
+  const bookingEndDateTime = new Date(bookingDate)
+  bookingEndDateTime.setHours(endHour, endMinute, 0, 0)
+  
+  // Reserva é considerada ativa se ainda não passou do horário de fim
+  return bookingEndDateTime > now
+}
+
+export default function ReservationsView({ bookings, environments, currentFilters }: ReservationsViewProps) {
   const router = useRouter()
   const searchParams = useSearchParams()
   const { user, isAuthenticated } = useAuth()
@@ -121,13 +134,9 @@ export default function ReservationsView({ bookings, pastBookings, currentBookin
     return timeString.slice(0, 5)
   }
 
-  // Helper function to safely get environment data
-  const getEnvironmentData = (environments: Booking['environments']) => {
-    if (Array.isArray(environments)) {
-      return environments[0] || { id: '', name: '', capacity: 0 }
-    }
-    return environments || { id: '', name: '', capacity: 0 }
-  }
+  // Separate bookings by time status
+  const activeBookings = bookings.filter((booking) => isBookingActive(booking))
+  const pastBookings = bookings.filter((booking) => !isBookingActive(booking))
 
   // Group bookings by environment for the "Por Ambiente" tab
   const bookingsByEnvironment = environments.reduce(
@@ -159,6 +168,30 @@ export default function ReservationsView({ bookings, pastBookings, currentBookin
       acc[env.id] = {
         environment: env,
         bookings: currentBookings.filter((booking) => getEnvironmentData(booking.environments).id === env.id),
+      }
+      return acc
+    },
+    {} as Record<string, { environment: Environment; bookings: Booking[] }>,
+  )
+
+  // Group active bookings by environment
+  const activeBookingsByEnvironment = environments.reduce(
+    (acc, env) => {
+      acc[env.id] = {
+        environment: env,
+        bookings: activeBookings.filter((booking) => booking.environments.id === env.id),
+      }
+      return acc
+    },
+    {} as Record<string, { environment: Environment; bookings: Booking[] }>,
+  )
+
+  // Group past bookings by environment
+  const pastBookingsByEnvironment = environments.reduce(
+    (acc, env) => {
+      acc[env.id] = {
+        environment: env,
+        bookings: pastBookings.filter((booking) => booking.environments.id === env.id),
       }
       return acc
     },
