@@ -117,6 +117,16 @@ export default function HomePage() {
           </div>
         </div>
 
+        {/* Link visível para Política de Privacidade - exigido pelo Google */}
+        <div className="max-w-4xl mx-auto mt-12 text-center">
+          <p className="text-sm text-muted-foreground">
+            Ao utilizar este sistema, você concorda com nossa{" "}
+            <Link href="/privacy" className="text-primary hover:underline font-medium">
+              Política de Privacidade
+            </Link>
+          </p>
+        </div>
+
       </div>
     </div>
   )
