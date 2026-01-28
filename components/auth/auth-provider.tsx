@@ -9,6 +9,7 @@ interface AuthContextType {
   session: Session | null
   loading: boolean
   isAdmin: boolean
+  adminChecked: boolean // Indica se a verificação de admin foi concluída
   signInWithGoogle: () => Promise<void>
   signOut: () => Promise<void>
   isAuthenticated: boolean
@@ -34,12 +35,16 @@ export function AuthProvider({ children }: AuthProviderProps) {
   const [session, setSession] = useState<Session | null>(null)
   const [loading, setLoading] = useState(true)
   const [isAdmin, setIsAdmin] = useState(false)
+  const [adminChecked, setAdminChecked] = useState(false)
   const [initialized, setInitialized] = useState(false)
 
   // Função para verificar se o usuário é admin
   const checkAdminStatus = useCallback(async (userId: string | undefined) => {
+    setAdminChecked(false)
+    
     if (!userId) {
       setIsAdmin(false)
+      setAdminChecked(true)
       return
     }
 
@@ -60,6 +65,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
       if (error) {
         // Silencia erros de perfil não encontrado ou tabela inexistente
         setIsAdmin(false)
+        setAdminChecked(true)
         return
       }
 
@@ -67,6 +73,8 @@ export function AuthProvider({ children }: AuthProviderProps) {
     } catch (err) {
       console.warn('Erro ao verificar admin:', err)
       setIsAdmin(false)
+    } finally {
+      setAdminChecked(true)
     }
   }, [])
 
@@ -110,6 +118,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
           setSession(null)
           setUser(null)
           setIsAdmin(false)
+          setAdminChecked(true)
         }
       } catch (err) {
         console.error('❌ Erro na inicialização:', err)
@@ -140,6 +149,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
           setSession(null)
           setUser(null)
           setIsAdmin(false)
+          setAdminChecked(true)
           setLoading(false)
           return
         }
@@ -149,10 +159,11 @@ export function AuthProvider({ children }: AuthProviderProps) {
         setUser(newSession?.user ?? null)
 
         if (newSession?.user?.id) {
-          // Não bloquear com await para evitar delay
-          checkAdminStatus(newSession.user.id)
+          // Aguardar verificação de admin para evitar race condition
+          await checkAdminStatus(newSession.user.id)
         } else {
           setIsAdmin(false)
+          setAdminChecked(true)
         }
 
         setLoading(false)
@@ -203,6 +214,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
     session,
     loading,
     isAdmin,
+    adminChecked,
     signInWithGoogle,
     signOut,
     isAuthenticated: !!user,

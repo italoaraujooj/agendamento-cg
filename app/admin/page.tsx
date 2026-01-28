@@ -106,7 +106,7 @@ const parseLocalYmd = (ymd: string): Date => {
 
 export default function AdminPage() {
   const router = useRouter()
-  const { user, isAuthenticated, isAdmin, loading: authLoading } = useAuth()
+  const { user, isAuthenticated, isAdmin, adminChecked, loading: authLoading } = useAuth()
   const [bookings, setBookings] = useState<Booking[]>([])
   const [environments, setEnvironments] = useState<Environment[]>([])
   const [loading, setLoading] = useState(true)
@@ -128,17 +128,25 @@ export default function AdminPage() {
 
   // Verificar acesso admin
   useEffect(() => {
-    if (!authLoading && !isAuthenticated) {
+    // Aguardar carregamento da autenticação
+    if (authLoading) return
+    
+    // Se não está autenticado, redirecionar
+    if (!isAuthenticated) {
       router.push('/')
       return
     }
     
-    if (!authLoading && isAuthenticated && !isAdmin) {
+    // Aguardar verificação de admin ser concluída
+    if (!adminChecked) return
+    
+    // Se não é admin, mostrar erro e redirecionar
+    if (!isAdmin) {
       toast.error('Acesso negado. Você não tem permissão de administrador.')
       router.push('/')
       return
     }
-  }, [authLoading, isAuthenticated, isAdmin, router])
+  }, [authLoading, isAuthenticated, isAdmin, adminChecked, router])
 
   // Carregar dados
   useEffect(() => {
@@ -303,11 +311,18 @@ export default function AdminPage() {
   const todayDate = new Date()
   todayDate.setHours(0, 0, 0, 0)
   
-  const approvedBookings = bookings.filter(b => {
-    if (b.status !== 'approved') return false
-    const bookingDate = parseLocalYmd(b.booking_date)
-    return bookingDate >= todayDate // Data de hoje ou futuras
-  })
+  const approvedBookings = bookings
+    .filter(b => {
+      if (b.status !== 'approved') return false
+      const bookingDate = parseLocalYmd(b.booking_date)
+      return bookingDate >= todayDate // Data de hoje ou futuras
+    })
+    .sort((a, b) => {
+      // Ordenar por data e hora crescente (mais próxima primeiro)
+      const dateCompare = a.booking_date.localeCompare(b.booking_date)
+      if (dateCompare !== 0) return dateCompare
+      return a.start_time.localeCompare(b.start_time)
+    })
   
   const completedBookings = bookings.filter(b => {
     if (b.status !== 'approved') return false
@@ -749,8 +764,8 @@ export default function AdminPage() {
     toast.success(`${reportTitle} exportado com sucesso!`)
   }
 
-  // Loading state
-  if (authLoading || loading) {
+  // Loading state - aguardar auth e verificação de admin
+  if (authLoading || loading || (isAuthenticated && !adminChecked)) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div className="flex items-center gap-3">
