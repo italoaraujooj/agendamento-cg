@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { Resend } from 'resend'
-import { createServerClient } from '@/lib/supabase/server'
+import { createAdminClient } from '@/lib/supabase/server'
 
 const resend = new Resend(process.env.RESEND_API_KEY)
 
@@ -366,11 +366,12 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    const supabase = await createServerClient()
+    // Usar cliente administrativo para buscar admins (bypassa RLS)
+    const supabase = createAdminClient()
     if (!supabase) {
-      console.error('❌ Erro ao criar cliente Supabase')
+      console.error('❌ SUPABASE_SERVICE_ROLE_KEY não está configurada')
       return NextResponse.json(
-        { error: 'Erro ao conectar com o banco de dados' },
+        { error: 'Configuração do servidor incompleta (service role key)' },
         { status: 500 }
       )
     }
@@ -385,7 +386,7 @@ export async function POST(request: NextRequest) {
           .select('id, email, full_name')
           .eq('is_admin', true)
 
-        console.log('👥 Administradores encontrados:', admins)
+        console.log(`👥 Administradores encontrados: ${admins?.length || 0}`)
 
         if (adminError) {
           console.error('❌ Erro ao buscar administradores:', adminError)
@@ -407,17 +408,14 @@ export async function POST(request: NextRequest) {
           .map(a => a.email)
           .filter((email): email is string => Boolean(email && email.includes('@')))
         
-        console.log('📬 Emails dos administradores:', adminEmails)
-
         if (adminEmails.length === 0) {
           console.warn('⚠️ Nenhum administrador com email válido encontrado')
           return NextResponse.json(
-            { warning: 'Nenhum administrador com email válido', sent: 0, adminsWithoutEmail: admins.length }
+            { warning: 'Nenhum administrador com email válido', sent: 0 }
           )
         }
         
-        console.log('📤 Enviando email via Resend para:', adminEmails)
-        console.log('📤 From:', FROM_EMAIL)
+        console.log(`📤 Enviando email para ${adminEmails.length} administrador(es)`)
         
         const { data, error } = await resend.emails.send({
           from: FROM_EMAIL,
@@ -439,8 +437,7 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({ 
           success: true, 
           sent: adminEmails.length,
-          messageId: data?.id,
-          recipients: adminEmails
+          messageId: data?.id
         })
       }
 

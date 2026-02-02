@@ -10,6 +10,12 @@ export const isSupabaseConfigured =
   typeof process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY === "string" &&
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY.length > 0
 
+// Check if service role key is available (for admin operations)
+export const isServiceRoleConfigured =
+  isSupabaseConfigured &&
+  typeof process.env.SUPABASE_SERVICE_ROLE_KEY === "string" &&
+  process.env.SUPABASE_SERVICE_ROLE_KEY.length > 0
+
 // Create a Supabase client for Server Components with cookie support
 export const createServerClient = cache(async () => {
   if (!isSupabaseConfigured) {
@@ -48,4 +54,27 @@ export const createServerClient = cache(async () => {
     }
   )
 })
+
+/**
+ * Cliente administrativo com service role key (bypassa RLS)
+ * Use apenas para operações que requerem acesso completo ao banco
+ * como buscar emails de todos os administradores para notificações
+ */
+export function createAdminClient() {
+  if (!isServiceRoleConfigured) {
+    console.warn("SUPABASE_SERVICE_ROLE_KEY não está configurada")
+    return null
+  }
+
+  return createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!,
+    {
+      auth: {
+        autoRefreshToken: false,
+        persistSession: false,
+      },
+    }
+  )
+}
 

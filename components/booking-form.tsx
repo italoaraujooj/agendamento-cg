@@ -889,6 +889,13 @@ export default function BookingForm({ environments, preselectedEnvironment }: Bo
 
       const { data: insertedData, error: insertError } = await supabase.from("bookings").insert(rows).select()
 
+      console.log('📝 Resultado do insert:', { 
+        insertedData, 
+        insertError, 
+        rowsCount: rows.length,
+        hasData: !!insertedData,
+        dataLength: insertedData?.length 
+      })
 
       if (insertError) {
         if ((insertError as any).code === "23P01") {
