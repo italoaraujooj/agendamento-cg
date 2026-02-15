@@ -1636,14 +1636,14 @@ export function ExternalRentalsManager({ userId }: ExternalRentalsManagerProps) 
               <div className="space-y-2">
                 <Label htmlFor="cost_rental">Vincular a Locação (opcional)</Label>
                 <Select
-                  value={costForm.rental_id}
-                  onValueChange={(value) => setCostForm({ ...costForm, rental_id: value })}
+                  value={costForm.rental_id || "none"}
+                  onValueChange={(value) => setCostForm({ ...costForm, rental_id: value === "none" ? "" : value })}
                 >
                   <SelectTrigger>
                     <SelectValue placeholder="Custo geral (não vinculado)" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="">Custo geral (não vinculado)</SelectItem>
+                    <SelectItem value="none">Custo geral (não vinculado)</SelectItem>
                     {rentals.map((rental) => (
                       <SelectItem key={rental.id} value={rental.id}>
                         {rental.renter_name} - {formatDate(rental.rental_date)}

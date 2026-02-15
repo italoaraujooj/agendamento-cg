@@ -4,12 +4,19 @@ import { createContext, useContext, useEffect, useState, useCallback } from 'rea
 import { User, Session, AuthChangeEvent } from '@supabase/supabase-js'
 import { supabase } from '@/lib/supabase/client'
 
+interface MinistryRole {
+  ministry_id: string
+  role: string
+}
+
 interface AuthContextType {
   user: User | null
   session: Session | null
   loading: boolean
   isAdmin: boolean
   adminChecked: boolean // Indica se a verificação de admin foi concluída
+  ministryRoles: MinistryRole[]
+  isMinistryLeader: (ministryId: string) => boolean
   signInWithGoogle: () => Promise<void>
   signOut: () => Promise<void>
   isAuthenticated: boolean
@@ -36,43 +43,68 @@ export function AuthProvider({ children }: AuthProviderProps) {
   const [loading, setLoading] = useState(true)
   const [isAdmin, setIsAdmin] = useState(false)
   const [adminChecked, setAdminChecked] = useState(false)
+  const [ministryRoles, setMinistryRoles] = useState<MinistryRole[]>([])
   const [initialized, setInitialized] = useState(false)
 
-  // Função para verificar se o usuário é admin
+  // Função para verificar se o usuário é admin e buscar roles de ministério
   const checkAdminStatus = useCallback(async (userId: string | undefined) => {
     setAdminChecked(false)
-    
+
     if (!userId) {
       setIsAdmin(false)
+      setMinistryRoles([])
       setAdminChecked(true)
       return
     }
 
     try {
       // Timeout com Promise.race
-      const timeoutPromise = new Promise<{ data: null; error: Error }>((resolve) => {
-        setTimeout(() => resolve({ data: null, error: new Error('Timeout') }), 5000)
+      const timeoutPromise = new Promise<null>((resolve) => {
+        setTimeout(() => resolve(null), 5000)
       })
 
-      const queryPromise = supabase
-        .from('profiles')
-        .select('is_admin')
-        .eq('id', userId)
-        .single()
+      const fetchAll = async () => {
+        const [profileResult, rolesResult] = await Promise.all([
+          supabase
+            .from('profiles')
+            .select('is_admin')
+            .eq('id', userId)
+            .single(),
+          supabase
+            .from('user_ministry_roles')
+            .select('ministry_id, role')
+            .eq('user_id', userId),
+        ])
+        return { profileResult, rolesResult }
+      }
 
-      const { data, error } = await Promise.race([queryPromise, timeoutPromise])
+      const result = await Promise.race([fetchAll(), timeoutPromise])
 
-      if (error) {
-        // Silencia erros de perfil não encontrado ou tabela inexistente
+      if (!result) {
+        // Timeout
         setIsAdmin(false)
+        setMinistryRoles([])
         setAdminChecked(true)
         return
       }
 
-      setIsAdmin(data?.is_admin || false)
+      const { profileResult, rolesResult } = result
+
+      if (profileResult.error) {
+        setIsAdmin(false)
+      } else {
+        setIsAdmin(profileResult.data?.is_admin || false)
+      }
+
+      if (rolesResult.error) {
+        setMinistryRoles([])
+      } else {
+        setMinistryRoles(rolesResult.data || [])
+      }
     } catch (err) {
       console.warn('Erro ao verificar admin:', err)
       setIsAdmin(false)
+      setMinistryRoles([])
     } finally {
       setAdminChecked(true)
     }
@@ -83,6 +115,10 @@ export function AuthProvider({ children }: AuthProviderProps) {
       await checkAdminStatus(user.id)
     }
   }, [user?.id, checkAdminStatus])
+
+  const isMinistryLeader = useCallback((ministryId: string) => {
+    return ministryRoles.some(r => r.ministry_id === ministryId)
+  }, [ministryRoles])
 
   // Inicialização - executar apenas uma vez
   useEffect(() => {
@@ -118,6 +154,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
           setSession(null)
           setUser(null)
           setIsAdmin(false)
+          setMinistryRoles([])
           setAdminChecked(true)
         }
       } catch (err) {
@@ -149,6 +186,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
           setSession(null)
           setUser(null)
           setIsAdmin(false)
+          setMinistryRoles([])
           setAdminChecked(true)
           setLoading(false)
           return
@@ -178,11 +216,16 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
   const signInWithGoogle = async () => {
     console.log('🔄 Iniciando login com Google...')
-    
+
     const { error } = await supabase.auth.signInWithOAuth({
       provider: 'google',
       options: {
-        redirectTo: `${window.location.origin}/auth/callback`
+        scopes: 'openid email profile https://www.googleapis.com/auth/calendar.events https://www.googleapis.com/auth/calendar.readonly https://www.googleapis.com/auth/calendar.calendarlist',
+        redirectTo: `${window.location.origin}/auth/callback`,
+        queryParams: {
+          access_type: 'offline',
+          prompt: 'consent'
+        }
       }
     })
 
@@ -200,6 +243,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
     setSession(null)
     setUser(null)
     setIsAdmin(false)
+    setMinistryRoles([])
     
     try {
       await supabase.auth.signOut()
@@ -215,6 +259,8 @@ export function AuthProvider({ children }: AuthProviderProps) {
     loading,
     isAdmin,
     adminChecked,
+    ministryRoles,
+    isMinistryLeader,
     signInWithGoogle,
     signOut,
     isAuthenticated: !!user,

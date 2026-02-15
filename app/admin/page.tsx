@@ -29,8 +29,10 @@ import {
   X,
   DollarSign,
   ClipboardList,
+  UserCog,
 } from "lucide-react"
 import { ExternalRentalsManager } from "@/components/admin/external-rentals"
+import { UsersManager } from "@/components/admin/users-manager"
 import { supabase } from "@/lib/supabase/client"
 import { toast } from "sonner"
 import Link from "next/link"
@@ -783,111 +785,125 @@ export default function AdminPage() {
 
   return (
     <div className="min-h-screen bg-background">
-      <div className="container mx-auto px-4 py-8">
-        {/* Header */}
-        <div className="mb-8">
-          <Button asChild variant="ghost" className="mb-4">
-            <Link href="/" className="flex items-center gap-2">
-              <ArrowLeft className="h-4 w-4" />
-              Voltar ao Início
-            </Link>
-          </Button>
-
-          <div className="flex items-center justify-between mb-4 flex-wrap gap-4">
+      {/* Subheader fixo */}
+      <div className="sticky top-16 z-40 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 border-b">
+        <div className="container mx-auto px-4">
+          <div className="flex items-center justify-between py-4">
             <div className="flex items-center gap-3">
-              <Shield className="h-8 w-8 text-primary" />
-              <h1 className="text-4xl font-bold">Painel de Administração</h1>
+              <Shield className="h-6 w-6 text-primary" />
+              <h1 className="text-2xl font-bold">Painel de Administração</h1>
             </div>
-            <div className="flex items-center gap-2">
-              <Button
-                onClick={openHistoryModal}
-                variant="outline"
-                className="flex items-center gap-2 border-gray-300 hover:bg-gray-50 dark:border-gray-700 dark:hover:bg-gray-900"
-              >
-                <Clock className="h-4 w-4" />
-                Histórico
-                {historyBookings.length > 0 && (
-                  <Badge variant="secondary" className="ml-1">{historyBookings.length}</Badge>
-                )}
-              </Button>
-              <Button
-                onClick={openUpcomingModal}
-                variant="outline"
-                className="flex items-center gap-2 border-blue-300 hover:bg-blue-50 dark:border-blue-700 dark:hover:bg-blue-950"
-              >
-                <CalendarIcon className="h-4 w-4" />
-                Relatório Mensal
-                {upcomingBookings.length > 0 && (
-                  <Badge variant="secondary" className="ml-1">{upcomingBookings.length}</Badge>
-                )}
-              </Button>
-            </div>
+            <Button asChild variant="ghost" size="sm">
+              <Link href="/" className="flex items-center gap-2">
+                <ArrowLeft className="h-4 w-4" />
+                Voltar
+              </Link>
+            </Button>
           </div>
-          <p className="text-xl text-muted-foreground">
-            Gerencie solicitações de reserva e aprove ou rejeite pedidos
-          </p>
         </div>
+      </div>
 
-        {/* Stats Cards */}
-        <div className="grid md:grid-cols-3 gap-4 mb-8">
-          <Card>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium text-muted-foreground">
-                Pendentes
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="flex items-center gap-2">
-                <Clock3 className="h-8 w-8 text-yellow-500" />
-                <span className="text-3xl font-bold">{pendingBookings.length}</span>
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium text-muted-foreground">
-                Aprovadas
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="flex items-center gap-2">
-                <CheckCircle className="h-8 w-8 text-green-500" />
-                <span className="text-3xl font-bold">{approvedBookings.length}</span>
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium text-muted-foreground">
-                Rejeitadas
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="flex items-center gap-2">
-                <XCircle className="h-8 w-8 text-red-500" />
-                <span className="text-3xl font-bold">{rejectedBookings.length}</span>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-
-        {/* Tabs Principais */}
+      <div className="container mx-auto px-4 py-6">
+        {/* Tabs Principais no Subheader */}
         <Tabs defaultValue="bookings" className="w-full">
-          <TabsList className="grid w-full grid-cols-2 mb-6">
-            <TabsTrigger value="bookings" className="flex items-center gap-2 text-base py-3">
-              <ClipboardList className="h-5 w-5" />
-              Agendamentos Internos
+          <TabsList className="grid w-full grid-cols-3 mb-6 h-auto">
+            <TabsTrigger value="bookings" className="flex items-center gap-2 text-sm md:text-base py-3">
+              <ClipboardList className="h-4 w-4 md:h-5 md:w-5" />
+              <span className="hidden sm:inline">Agendamentos Internos</span>
+              <span className="sm:hidden">Agendamentos</span>
             </TabsTrigger>
-            <TabsTrigger value="rentals" className="flex items-center gap-2 text-base py-3">
-              <DollarSign className="h-5 w-5" />
-              Locações Externas
+            <TabsTrigger value="rentals" className="flex items-center gap-2 text-sm md:text-base py-3">
+              <DollarSign className="h-4 w-4 md:h-5 md:w-5" />
+              <span className="hidden sm:inline">Locações Externas</span>
+              <span className="sm:hidden">Locações</span>
+            </TabsTrigger>
+            <TabsTrigger value="users" className="flex items-center gap-2 text-sm md:text-base py-3">
+              <UserCog className="h-4 w-4 md:h-5 md:w-5" />
+              <span className="hidden sm:inline">Gerenciar Usuários</span>
+              <span className="sm:hidden">Usuários</span>
             </TabsTrigger>
           </TabsList>
 
           {/* Conteúdo de Agendamentos Internos */}
           <TabsContent value="bookings">
+            {/* Header da seção com botões de relatório */}
+            <div className="flex items-center justify-between mb-6 flex-wrap gap-4">
+              <p className="text-muted-foreground">
+                Gerencie solicitações de reserva e aprove ou rejeite pedidos
+              </p>
+              <div className="flex items-center gap-2">
+                <Button
+                  onClick={openHistoryModal}
+                  variant="outline"
+                  size="sm"
+                  className="flex items-center gap-2 border-gray-300 hover:bg-gray-50 dark:border-gray-700 dark:hover:bg-gray-900"
+                >
+                  <Clock className="h-4 w-4" />
+                  <span className="hidden sm:inline">Histórico</span>
+                  {historyBookings.length > 0 && (
+                    <Badge variant="secondary" className="ml-1">{historyBookings.length}</Badge>
+                  )}
+                </Button>
+                <Button
+                  onClick={openUpcomingModal}
+                  variant="outline"
+                  size="sm"
+                  className="flex items-center gap-2 border-blue-300 hover:bg-blue-50 dark:border-blue-700 dark:hover:bg-blue-950"
+                >
+                  <CalendarIcon className="h-4 w-4" />
+                  <span className="hidden sm:inline">Relatório Mensal</span>
+                  {upcomingBookings.length > 0 && (
+                    <Badge variant="secondary" className="ml-1">{upcomingBookings.length}</Badge>
+                  )}
+                </Button>
+              </div>
+            </div>
+
+            {/* Stats Cards */}
+            <div className="grid md:grid-cols-3 gap-4 mb-6">
+              <Card>
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-sm font-medium text-muted-foreground">
+                    Pendentes
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="flex items-center gap-2">
+                    <Clock3 className="h-8 w-8 text-yellow-500" />
+                    <span className="text-3xl font-bold">{pendingBookings.length}</span>
+                  </div>
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-sm font-medium text-muted-foreground">
+                    Aprovadas
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="flex items-center gap-2">
+                    <CheckCircle className="h-8 w-8 text-green-500" />
+                    <span className="text-3xl font-bold">{approvedBookings.length}</span>
+                  </div>
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-sm font-medium text-muted-foreground">
+                    Rejeitadas
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="flex items-center gap-2">
+                    <XCircle className="h-8 w-8 text-red-500" />
+                    <span className="text-3xl font-bold">{rejectedBookings.length}</span>
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+
             {/* Tabs de status de reservas */}
             <Tabs defaultValue="pending" className="w-full">
               <TabsList className="grid w-full grid-cols-4">
@@ -1025,6 +1041,16 @@ export default function AdminPage() {
           {/* Conteúdo de Locações Externas */}
           <TabsContent value="rentals">
             <ExternalRentalsManager userId={user?.id || ''} />
+          </TabsContent>
+
+          {/* Conteúdo de Gerenciamento de Usuários */}
+          <TabsContent value="users">
+            <div className="mb-6">
+              <p className="text-muted-foreground">
+                Gerencie usuários do sistema, defina roles e vincule líderes aos ministérios
+              </p>
+            </div>
+            <UsersManager />
           </TabsContent>
         </Tabs>
       </div>
