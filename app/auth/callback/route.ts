@@ -54,12 +54,76 @@ export async function GET(request: NextRequest) {
 
     console.log('✅ Login realizado com sucesso!')
 
+    const user = data.session.user
+
+    // Sincronizar dados do Google com o perfil
+    try {
+      const fullName = user.user_metadata?.full_name || user.user_metadata?.name
+      const avatarUrl = user.user_metadata?.avatar_url
+
+      if (fullName || avatarUrl) {
+        console.log('🔄 Sincronizando dados do perfil...')
+
+        // Primeiro, verificar se o perfil existe
+        const { data: existingProfile } = await supabase
+          .from('profiles')
+          .select('id, full_name, avatar_url')
+          .eq('id', user.id)
+          .single()
+
+        if (existingProfile) {
+          // Atualizar apenas campos que estão vazios
+          const updates: Record<string, string> = {}
+          if (!existingProfile.full_name && fullName) {
+            updates.full_name = fullName
+          }
+          if (!existingProfile.avatar_url && avatarUrl) {
+            updates.avatar_url = avatarUrl
+          }
+
+          if (Object.keys(updates).length > 0) {
+            updates.updated_at = new Date().toISOString()
+            const { error: updateError } = await supabase
+              .from('profiles')
+              .update(updates)
+              .eq('id', user.id)
+
+            if (!updateError) {
+              console.log('💾 Perfil sincronizado com dados do Google!')
+            } else {
+              console.error('❌ Erro ao sincronizar perfil:', updateError)
+            }
+          }
+        } else {
+          // Criar perfil se não existir
+          const { error: insertError } = await supabase
+            .from('profiles')
+            .insert({
+              id: user.id,
+              email: user.email,
+              full_name: fullName,
+              avatar_url: avatarUrl,
+              profile_completed: false,
+              first_login_at: new Date().toISOString(),
+            })
+
+          if (!insertError) {
+            console.log('💾 Perfil criado com dados do Google!')
+          } else if (insertError.code !== '23505') { // Ignorar erro de duplicata
+            console.error('❌ Erro ao criar perfil:', insertError)
+          }
+        }
+      }
+    } catch (error) {
+      console.error('❌ Erro ao sincronizar perfil:', error)
+    }
+
     // Se há provider_token, armazenar no banco para Google Calendar
     if (data.session?.provider_token) {
       console.log('🔄 Armazenando tokens do Google Calendar...')
       try {
         const { error: storeError } = await supabase.rpc('store_google_oauth_token', {
-          p_user_id: data.session.user.id,
+          p_user_id: user.id,
           p_access_token: data.session.provider_token,
           p_refresh_token: data.session.provider_refresh_token || null,
           p_expires_in: 3600,
