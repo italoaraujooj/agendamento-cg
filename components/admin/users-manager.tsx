@@ -133,21 +133,14 @@ export function UsersManager() {
   const fetchData = async () => {
     setLoading(true)
     try {
-      // Buscar usuários com seus ministry roles
-      const { data: usersData, error: usersError } = await supabase
-        .from('profiles')
-        .select('*')
-        .order('created_at', { ascending: false })
-
-      if (usersError) throw usersError
-
-      // Buscar ministry roles
-      const { data: rolesData, error: rolesError } = await supabase
-        .from('user_ministry_roles')
-        .select(`
-          *,
-          ministry:ministries(id, name, color)
-        `)
+      // Buscar usuários via API admin (inclui nomes do auth.users)
+      const res = await fetch('/api/admin/users')
+      if (!res.ok) {
+        const err = await res.json()
+        throw new Error(err.error || 'Erro ao buscar usuários')
+      }
+      const usersData: UserProfile[] = await res.json()
+      setUsers(usersData)
 
       // Buscar ministérios
       const { data: ministriesData, error: ministriesError } = await supabase
@@ -161,15 +154,6 @@ export function UsersManager() {
       } else {
         setMinistries(ministriesData || [])
       }
-
-      // Combinar usuários com seus roles
-      const usersWithRoles = (usersData || []).map(user => ({
-        ...user,
-        role: user.role || 'user',
-        ministry_roles: rolesError ? [] : (rolesData || []).filter(r => r.user_id === user.id),
-      }))
-
-      setUsers(usersWithRoles)
     } catch (error) {
       console.error('Erro ao carregar dados:', error)
       toast.error('Erro ao carregar usuários')
