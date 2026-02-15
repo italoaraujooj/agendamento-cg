@@ -7,7 +7,9 @@ import NavigationHeader from "@/components/navigation-header"
 import Footer from "@/components/footer"
 import { ThemeProvider } from "@/components/theme-provider"
 import { AuthProvider } from "@/components/auth/auth-provider"
+import { SystemModeProvider } from "@/components/system-mode-provider"
 import { AutoMigrateBookings } from "@/components/auth/auto-migrate"
+import { CompleteProfileModal } from "@/components/auth/complete-profile-modal"
 import { Toaster } from "@/components/ui/sonner"
 
 export const metadata: Metadata = {
@@ -35,13 +37,16 @@ html {
       <body className="bg-background min-h-screen flex flex-col">
         <ThemeProvider>
           <AuthProvider>
-            <AutoMigrateBookings />
-            <NavigationHeader />
-            <main className="flex-1">
-              {children}
-            </main>
-            <Footer />
-            <Toaster />
+            <SystemModeProvider>
+              <AutoMigrateBookings />
+              <CompleteProfileModal />
+              <NavigationHeader />
+              <main className="flex-1">
+                {children}
+              </main>
+              <Footer />
+              <Toaster />
+            </SystemModeProvider>
           </AuthProvider>
         </ThemeProvider>
       </body>
