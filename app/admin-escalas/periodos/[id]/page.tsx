@@ -50,7 +50,7 @@ import { useAuth } from "@/components/auth/auth-provider"
 import { useSystemMode } from "@/components/system-mode-provider"
 import { toast } from "sonner"
 import Link from "next/link"
-import type { SchedulePeriod, ScheduleEvent, Ministry } from "@/types/escalas"
+import type { SchedulePeriod, ScheduleEvent, Ministry, ServantAvailability } from "@/types/escalas"
 import { PERIOD_STATUS_LABELS, PERIOD_STATUS_COLORS, EVENT_SOURCE_LABELS } from "@/types/escalas"
 import { format } from "date-fns"
 import { ptBR } from "date-fns/locale"
@@ -58,6 +58,20 @@ import { ptBR } from "date-fns/locale"
 interface PeriodWithDetails extends SchedulePeriod {
   ministry: Ministry
   events: ScheduleEvent[]
+}
+
+interface AvailabilityRecord {
+  id: string
+  servant_id: string
+  event_id: string
+  is_available: boolean
+  notes: string | null
+  submitted_at: string
+  servant: {
+    id: string
+    name: string
+    area: { id: string; name: string } | null
+  } | null
 }
 
 interface BookingToImport {
@@ -70,6 +84,168 @@ interface BookingToImport {
   name: string
   environments: { id: string | number; name: string } | null
   already_imported: boolean
+}
+
+function AvailabilityTab({
+  availabilityData,
+  events,
+  onRefresh,
+}: {
+  availabilityData: AvailabilityRecord[]
+  events: ScheduleEvent[]
+  onRefresh: () => void
+}) {
+  // Get unique servants who responded
+  const servantsMap = new Map<string, { name: string; area: string; submittedAt: string }>()
+  for (const record of availabilityData) {
+    if (!record.servant) continue
+    const existing = servantsMap.get(record.servant_id)
+    if (!existing || record.submitted_at > existing.submittedAt) {
+      servantsMap.set(record.servant_id, {
+        name: record.servant.name,
+        area: record.servant.area?.name || "",
+        submittedAt: record.submitted_at,
+      })
+    }
+  }
+
+  // Group availability by event
+  const availByEvent = new Map<string, { available: AvailabilityRecord[]; unavailable: AvailabilityRecord[] }>()
+  for (const record of availabilityData) {
+    if (!record.event_id) continue
+    if (!availByEvent.has(record.event_id)) {
+      availByEvent.set(record.event_id, { available: [], unavailable: [] })
+    }
+    const group = availByEvent.get(record.event_id)!
+    if (record.is_available) {
+      group.available.push(record)
+    } else {
+      group.unavailable.push(record)
+    }
+  }
+
+  // Group events by date
+  const eventsByDate = events.reduce((acc, event) => {
+    if (!acc[event.event_date]) acc[event.event_date] = []
+    acc[event.event_date].push(event)
+    return acc
+  }, {} as Record<string, ScheduleEvent[]>)
+
+  const totalServants = servantsMap.size
+
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center justify-between">
+        <p className="text-sm text-muted-foreground">
+          {totalServants} servo(s) responderam até o momento
+        </p>
+        <Button variant="ghost" size="sm" onClick={onRefresh}>
+          <RefreshCw className="mr-2 h-4 w-4" />
+          Atualizar
+        </Button>
+      </div>
+
+      {/* Who responded */}
+      <Card>
+        <CardHeader className="pb-2">
+          <CardTitle className="text-base">Quem respondeu</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="flex flex-wrap gap-2">
+            {Array.from(servantsMap.entries())
+              .sort(([, a], [, b]) => a.name.localeCompare(b.name))
+              .map(([id, servant]) => (
+                <Badge key={id} variant="secondary" className="text-xs">
+                  {servant.name}
+                  {servant.area && (
+                    <span className="text-muted-foreground ml-1">({servant.area})</span>
+                  )}
+                </Badge>
+              ))}
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Availability per event grouped by date */}
+      {Object.entries(eventsByDate)
+        .sort(([a], [b]) => a.localeCompare(b))
+        .map(([date, dateEvents]) => (
+          <Card key={date}>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-base">
+                {format(new Date(date + "T12:00:00"), "EEEE, dd 'de' MMMM", { locale: ptBR })}
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-4">
+                {dateEvents
+                  .sort((a, b) => a.event_time.localeCompare(b.event_time))
+                  .map((event) => {
+                    const data = availByEvent.get(event.id)
+                    const availableCount = data?.available.length || 0
+                    const unavailableCount = data?.unavailable.length || 0
+
+                    return (
+                      <div key={event.id} className="space-y-2">
+                        <div className="flex items-center gap-3">
+                          <span className="font-mono text-sm">{event.event_time.slice(0, 5)}</span>
+                          <span className="font-medium">{event.title}</span>
+                          <Badge variant="outline" className="ml-auto text-xs">
+                            {availableCount}/{totalServants}
+                          </Badge>
+                        </div>
+
+                        {availableCount > 0 && (
+                          <div className="ml-16 space-y-1">
+                            <p className="text-xs font-medium text-green-600">Disponíveis:</p>
+                            <div className="flex flex-wrap gap-1">
+                              {data!.available
+                                .sort((a, b) => (a.servant?.name || "").localeCompare(b.servant?.name || ""))
+                                .map((r) => (
+                                  <Badge key={r.id} variant="outline" className="text-xs border-green-200 bg-green-50 text-green-700">
+                                    {r.servant?.name}
+                                  </Badge>
+                                ))}
+                            </div>
+                          </div>
+                        )}
+
+                        {unavailableCount > 0 && (
+                          <div className="ml-16 space-y-1">
+                            <p className="text-xs font-medium text-red-600">Indisponíveis:</p>
+                            <div className="flex flex-wrap gap-1">
+                              {data!.unavailable
+                                .sort((a, b) => (a.servant?.name || "").localeCompare(b.servant?.name || ""))
+                                .map((r) => (
+                                  <span key={r.id} className="inline-flex items-center gap-1">
+                                    <Badge variant="outline" className="text-xs border-red-200 bg-red-50 text-red-700">
+                                      {r.servant?.name}
+                                    </Badge>
+                                    {r.notes && (
+                                      <span className="text-xs text-muted-foreground italic">
+                                        ({r.notes})
+                                      </span>
+                                    )}
+                                  </span>
+                                ))}
+                            </div>
+                          </div>
+                        )}
+
+                        {availableCount === 0 && unavailableCount === 0 && (
+                          <p className="ml-16 text-xs text-muted-foreground italic">
+                            Sem respostas para este evento
+                          </p>
+                        )}
+                      </div>
+                    )
+                  })}
+              </div>
+            </CardContent>
+          </Card>
+        ))}
+    </div>
+  )
 }
 
 export default function PeriodoDetalhePage() {
@@ -99,6 +275,10 @@ export default function PeriodoDetalhePage() {
   const [availableBookings, setAvailableBookings] = useState<BookingToImport[]>([])
   const [selectedBookingIds, setSelectedBookingIds] = useState<Set<string>>(new Set())
   const [importSubmitting, setImportSubmitting] = useState(false)
+
+  // Availability state
+  const [availabilityData, setAvailabilityData] = useState<AvailabilityRecord[]>([])
+  const [availabilityLoading, setAvailabilityLoading] = useState(false)
 
   // Delete event state
   const [deleteEventId, setDeleteEventId] = useState<string | null>(null)
@@ -138,11 +318,33 @@ export default function PeriodoDetalhePage() {
     }
   }, [periodId, router])
 
+  const fetchAvailability = useCallback(async () => {
+    setAvailabilityLoading(true)
+    try {
+      const response = await fetch(`/api/escalas/schedule-periods/${periodId}/availability`)
+      if (response.ok) {
+        const data = await response.json()
+        setAvailabilityData(data)
+      }
+    } catch (error) {
+      console.error("Erro ao buscar disponibilidades:", error)
+    } finally {
+      setAvailabilityLoading(false)
+    }
+  }, [periodId])
+
   useEffect(() => {
     if (isAdmin) {
       fetchPeriod()
     }
   }, [isAdmin, fetchPeriod])
+
+  // Fetch availability when period is loaded and status is collecting or beyond
+  useEffect(() => {
+    if (period && period.status !== "draft") {
+      fetchAvailability()
+    }
+  }, [period?.status, fetchAvailability]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleGenerateEvents = async () => {
     setActionLoading("generate")
@@ -527,6 +729,12 @@ export default function PeriodoDetalhePage() {
             <Calendar className="mr-2 h-4 w-4" />
             Eventos ({period.events?.length || 0})
           </TabsTrigger>
+          {period.status !== "draft" && (
+            <TabsTrigger value="availability">
+              <Users className="mr-2 h-4 w-4" />
+              Disponibilidade
+            </TabsTrigger>
+          )}
           <TabsTrigger value="info">
             <Clock className="mr-2 h-4 w-4" />
             Informações
@@ -604,6 +812,32 @@ export default function PeriodoDetalhePage() {
             </div>
           )}
         </TabsContent>
+
+        {period.status !== "draft" && (
+          <TabsContent value="availability" className="mt-4">
+            {availabilityLoading ? (
+              <div className="flex items-center justify-center py-12">
+                <Loader2 className="h-8 w-8 animate-spin text-primary" />
+              </div>
+            ) : availabilityData.length === 0 ? (
+              <Card className="border-dashed">
+                <CardContent className="flex flex-col items-center justify-center py-12">
+                  <Users className="h-12 w-12 text-muted-foreground mb-4" />
+                  <h3 className="text-lg font-semibold mb-2">Nenhuma resposta</h3>
+                  <p className="text-muted-foreground text-center">
+                    Ainda ninguém respondeu à coleta de disponibilidade.
+                  </p>
+                </CardContent>
+              </Card>
+            ) : (
+              <AvailabilityTab
+                availabilityData={availabilityData}
+                events={period.events || []}
+                onRefresh={fetchAvailability}
+              />
+            )}
+          </TabsContent>
+        )}
 
         <TabsContent value="info" className="mt-4">
           <Card>
