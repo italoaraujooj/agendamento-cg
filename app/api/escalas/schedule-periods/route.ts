@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from "next/server"
 import { createAdminClient, createServerClient } from "@/lib/supabase/server"
-import { buildChurchFixedEvents } from "@/lib/escalas"
 import { z } from "zod"
 
 const schedulePeriodSchema = z.object({
@@ -107,20 +106,14 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: error.message }, { status: 500 })
     }
 
-    // Gerar automaticamente os eventos da programação fixa da igreja
-    const startDateStr = startDate.toISOString().split("T")[0]
-    const endDateStr = endDate.toISOString().split("T")[0]
-    const fixedEvents = buildChurchFixedEvents(data.id, startDateStr, endDateStr)
+    // Gerar automaticamente os eventos a partir do calendário regular
+    const { error: rpcError } = await supabase.rpc("generate_regular_events_for_period", {
+      p_period_id: data.id,
+    })
 
-    if (fixedEvents.length > 0) {
-      const { error: eventsError } = await supabase
-        .from("schedule_events")
-        .insert(fixedEvents)
-
-      if (eventsError) {
-        console.error("Erro ao gerar eventos fixos (período já criado):", eventsError)
-        // Não falha a criação do período; os eventos podem ser gerados depois manualmente
-      }
+    if (rpcError) {
+      console.error("Erro ao gerar eventos regulares (período já criado):", rpcError)
+      // Não falha a criação do período; os eventos podem ser gerados depois manualmente
     }
 
     return NextResponse.json(data, { status: 201 })

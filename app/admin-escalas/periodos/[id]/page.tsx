@@ -16,9 +16,9 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
-import { 
-  ArrowLeft, 
-  Loader2, 
+import {
+  ArrowLeft,
+  Loader2,
   Calendar,
   Clock,
   Users,
@@ -31,7 +31,8 @@ import {
   Copy,
   Trash2,
   RefreshCw,
-  Plus
+  Plus,
+  X
 } from "lucide-react"
 import {
   Dialog,
@@ -43,6 +44,8 @@ import {
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
 import { Label } from "@/components/ui/label"
+import { Checkbox } from "@/components/ui/checkbox"
+import { ScrollArea } from "@/components/ui/scroll-area"
 import { useAuth } from "@/components/auth/auth-provider"
 import { useSystemMode } from "@/components/system-mode-provider"
 import { toast } from "sonner"
@@ -57,14 +60,26 @@ interface PeriodWithDetails extends SchedulePeriod {
   events: ScheduleEvent[]
 }
 
+interface BookingToImport {
+  id: string | number
+  booking_date: string
+  start_time: string
+  end_time: string
+  occasion: string
+  responsible_person: string
+  name: string
+  environments: { id: string | number; name: string } | null
+  already_imported: boolean
+}
+
 export default function PeriodoDetalhePage() {
   const router = useRouter()
   const params = useParams()
   const periodId = params.id as string
-  
+
   const { isAuthenticated, isAdmin, adminChecked, loading: authLoading } = useAuth()
   const { setMode } = useSystemMode()
-  
+
   const [period, setPeriod] = useState<PeriodWithDetails | null>(null)
   const [loading, setLoading] = useState(true)
   const [actionLoading, setActionLoading] = useState<string | null>(null)
@@ -77,6 +92,17 @@ export default function PeriodoDetalhePage() {
     title: "",
     description: "",
   })
+
+  // Import bookings state
+  const [importDialogOpen, setImportDialogOpen] = useState(false)
+  const [importLoading, setImportLoading] = useState(false)
+  const [availableBookings, setAvailableBookings] = useState<BookingToImport[]>([])
+  const [selectedBookingIds, setSelectedBookingIds] = useState<Set<string>>(new Set())
+  const [importSubmitting, setImportSubmitting] = useState(false)
+
+  // Delete event state
+  const [deleteEventId, setDeleteEventId] = useState<string | null>(null)
+  const [deleteEventLoading, setDeleteEventLoading] = useState(false)
 
   useEffect(() => {
     setMode("escalas")
@@ -125,11 +151,11 @@ export default function PeriodoDetalhePage() {
         method: "POST",
       })
       const data = await response.json()
-      
+
       if (!response.ok) {
         throw new Error(data.error || "Erro ao gerar eventos")
       }
-      
+
       toast.success(data.message)
       fetchPeriod()
     } catch (error) {
@@ -140,25 +166,99 @@ export default function PeriodoDetalhePage() {
     }
   }
 
-  const handleImportBookings = async () => {
-    setActionLoading("import")
+  const handleOpenImportDialog = async () => {
+    setImportDialogOpen(true)
+    setImportLoading(true)
+    setSelectedBookingIds(new Set())
+    try {
+      const response = await fetch(`/api/escalas/schedule-periods/${periodId}/import-bookings`)
+      const data = await response.json()
+
+      if (!response.ok) {
+        throw new Error(data.error || "Erro ao buscar agendamentos")
+      }
+
+      setAvailableBookings(data)
+    } catch (error) {
+      console.error("Erro:", error)
+      toast.error(error instanceof Error ? error.message : "Erro ao buscar agendamentos")
+      setImportDialogOpen(false)
+    } finally {
+      setImportLoading(false)
+    }
+  }
+
+  const toggleBookingSelection = (bookingId: string) => {
+    setSelectedBookingIds((prev) => {
+      const next = new Set(prev)
+      if (next.has(bookingId)) {
+        next.delete(bookingId)
+      } else {
+        next.add(bookingId)
+      }
+      return next
+    })
+  }
+
+  const toggleAllBookings = () => {
+    const importable = availableBookings.filter((b) => !b.already_imported)
+    if (selectedBookingIds.size === importable.length) {
+      setSelectedBookingIds(new Set())
+    } else {
+      setSelectedBookingIds(new Set(importable.map((b) => String(b.id))))
+    }
+  }
+
+  const handleImportSelected = async () => {
+    if (selectedBookingIds.size === 0) {
+      toast.error("Selecione pelo menos um agendamento")
+      return
+    }
+    setImportSubmitting(true)
     try {
       const response = await fetch(`/api/escalas/schedule-periods/${periodId}/import-bookings`, {
         method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ booking_ids: Array.from(selectedBookingIds) }),
       })
       const data = await response.json()
-      
+
       if (!response.ok) {
         throw new Error(data.error || "Erro ao importar")
       }
-      
+
       toast.success(data.message)
+      setImportDialogOpen(false)
       fetchPeriod()
     } catch (error) {
       console.error("Erro:", error)
       toast.error(error instanceof Error ? error.message : "Erro ao importar")
     } finally {
-      setActionLoading(null)
+      setImportSubmitting(false)
+    }
+  }
+
+  const handleDeleteEvent = async () => {
+    if (!deleteEventId) return
+    setDeleteEventLoading(true)
+    try {
+      const response = await fetch(`/api/escalas/schedule-events/${deleteEventId}`, {
+        method: "DELETE",
+      })
+
+      if (!response.ok) {
+        const data = await response.json()
+        throw new Error(data.error || "Erro ao remover evento")
+      }
+
+      toast.success("Evento removido")
+      setDeleteEventId(null)
+      fetchPeriod()
+    } catch (error) {
+      console.error("Erro:", error)
+      toast.error(error instanceof Error ? error.message : "Erro ao remover evento")
+    } finally {
+      setDeleteEventLoading(false)
     }
   }
 
@@ -171,11 +271,11 @@ export default function PeriodoDetalhePage() {
         body: JSON.stringify({ status: newStatus }),
       })
       const data = await response.json()
-      
+
       if (!response.ok) {
         throw new Error(data.error || "Erro ao alterar status")
       }
-      
+
       toast.success(`Status alterado para ${PERIOD_STATUS_LABELS[newStatus as keyof typeof PERIOD_STATUS_LABELS]}`)
       fetchPeriod()
     } catch (error) {
@@ -192,12 +292,12 @@ export default function PeriodoDetalhePage() {
       const response = await fetch(`/api/escalas/schedule-periods/${periodId}`, {
         method: "DELETE",
       })
-      
+
       if (!response.ok) {
         const data = await response.json()
         throw new Error(data.error || "Erro ao excluir")
       }
-      
+
       toast.success("Período excluído!")
       router.push("/admin-escalas/periodos")
     } catch (error) {
@@ -283,6 +383,8 @@ export default function PeriodoDetalhePage() {
     return acc
   }, {} as Record<string, ScheduleEvent[]>) || {}
 
+  const importableBookings = availableBookings.filter((b) => !b.already_imported)
+
   return (
     <div className="container mx-auto p-6 space-y-6">
       {/* Header */}
@@ -293,10 +395,10 @@ export default function PeriodoDetalhePage() {
             Voltar para Períodos
           </Link>
         </Button>
-        
+
         <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-4">
           <div className="flex items-start gap-4">
-            <div 
+            <div
               className="w-2 h-16 rounded-full"
               style={{ backgroundColor: period.ministry?.color || '#888' }}
             />
@@ -305,7 +407,7 @@ export default function PeriodoDetalhePage() {
                 {format(new Date(period.year, period.month - 1), "MMMM 'de' yyyy", { locale: ptBR })}
               </h1>
               <p className="text-muted-foreground">{period.ministry?.name}</p>
-              <Badge 
+              <Badge
                 variant="secondary"
                 className={`mt-2 ${PERIOD_STATUS_COLORS[period.status]} text-white`}
               >
@@ -313,7 +415,7 @@ export default function PeriodoDetalhePage() {
               </Badge>
             </div>
           </div>
-          
+
           <div className="flex flex-wrap gap-2">
             {period.status === "draft" && (
               <>
@@ -325,7 +427,7 @@ export default function PeriodoDetalhePage() {
                   )}
                   Gerar Eventos
                 </Button>
-                <Button variant="outline" onClick={handleImportBookings} disabled={!!actionLoading}>
+                <Button variant="outline" onClick={handleOpenImportDialog} disabled={!!actionLoading}>
                   {actionLoading === "import" ? (
                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                   ) : (
@@ -343,7 +445,7 @@ export default function PeriodoDetalhePage() {
                 </Button>
               </>
             )}
-            
+
             {period.status === "collecting" && (
               <>
                 <Button variant="outline" onClick={copyAvailabilityLink}>
@@ -356,7 +458,7 @@ export default function PeriodoDetalhePage() {
                 </Button>
               </>
             )}
-            
+
             {period.status === "scheduling" && (
               <>
                 <Button variant="outline" asChild>
@@ -367,10 +469,10 @@ export default function PeriodoDetalhePage() {
                 </Button>
               </>
             )}
-            
+
             {period.status !== "published" && period.status !== "closed" && (
-              <Button 
-                variant="destructive" 
+              <Button
+                variant="destructive"
                 size="icon"
                 onClick={() => setDeleteDialog(true)}
                 disabled={!!actionLoading}
@@ -398,7 +500,7 @@ export default function PeriodoDetalhePage() {
           </CardHeader>
           <CardContent>
             <div className="text-sm font-medium">
-              {period.availability_deadline 
+              {period.availability_deadline
                 ? format(new Date(period.availability_deadline), "dd/MM/yyyy 'às' HH:mm")
                 : "Não definido"
               }
@@ -445,7 +547,7 @@ export default function PeriodoDetalhePage() {
                     <RefreshCw className="mr-2 h-4 w-4" />
                     Gerar do Calendário
                   </Button>
-                  <Button variant="outline" onClick={handleImportBookings} disabled={!!actionLoading}>
+                  <Button variant="outline" onClick={handleOpenImportDialog} disabled={!!actionLoading}>
                     <Download className="mr-2 h-4 w-4" />
                     Importar Agendamentos
                   </Button>
@@ -468,7 +570,7 @@ export default function PeriodoDetalhePage() {
                         {events
                           .sort((a, b) => a.event_time.localeCompare(b.event_time))
                           .map((event) => (
-                            <div 
+                            <div
                               key={event.id}
                               className="flex items-center justify-between p-2 rounded-md bg-muted/50"
                             >
@@ -478,9 +580,21 @@ export default function PeriodoDetalhePage() {
                                 </span>
                                 <span>{event.title}</span>
                               </div>
-                              <Badge variant="outline" className="text-xs">
-                                {EVENT_SOURCE_LABELS[event.source]}
-                              </Badge>
+                              <div className="flex items-center gap-2">
+                                <Badge variant="outline" className="text-xs">
+                                  {EVENT_SOURCE_LABELS[event.source]}
+                                </Badge>
+                                {period.status === "draft" && (
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    className="h-7 w-7 text-muted-foreground hover:text-destructive"
+                                    onClick={() => setDeleteEventId(event.id)}
+                                  >
+                                    <X className="h-4 w-4" />
+                                  </Button>
+                                )}
+                              </div>
                             </div>
                           ))}
                       </div>
@@ -526,7 +640,7 @@ export default function PeriodoDetalhePage() {
         </TabsContent>
       </Tabs>
 
-      {/* Delete Confirmation */}
+      {/* Delete Period Confirmation */}
       <AlertDialog open={deleteDialog} onOpenChange={setDeleteDialog}>
         <AlertDialogContent>
           <AlertDialogHeader>
@@ -539,12 +653,34 @@ export default function PeriodoDetalhePage() {
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancelar</AlertDialogCancel>
-            <AlertDialogAction 
+            <AlertDialogAction
               onClick={handleDelete}
               className="bg-destructive hover:bg-destructive/90"
             >
               {actionLoading === "delete" && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
               Excluir
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Delete Event Confirmation */}
+      <AlertDialog open={!!deleteEventId} onOpenChange={(open) => !open && setDeleteEventId(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Remover Evento</AlertDialogTitle>
+            <AlertDialogDescription>
+              Tem certeza que deseja remover este evento do período?
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDeleteEvent}
+              className="bg-destructive hover:bg-destructive/90"
+            >
+              {deleteEventLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              Remover
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
@@ -610,6 +746,99 @@ export default function PeriodoDetalhePage() {
             <Button onClick={handleCreateEvent} disabled={createEventLoading}>
               {createEventLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
               Criar Evento
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Import Bookings Dialog */}
+      <Dialog open={importDialogOpen} onOpenChange={setImportDialogOpen}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Importar Agendamentos</DialogTitle>
+          </DialogHeader>
+
+          {importLoading ? (
+            <div className="flex items-center justify-center py-12">
+              <Loader2 className="h-8 w-8 animate-spin text-primary" />
+            </div>
+          ) : availableBookings.length === 0 ? (
+            <div className="text-center py-8 text-muted-foreground">
+              Nenhum agendamento aprovado encontrado para este período.
+            </div>
+          ) : (
+            <>
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-sm text-muted-foreground">
+                  {availableBookings.length} agendamento(s) encontrado(s)
+                  {availableBookings.some((b) => b.already_imported) &&
+                    ` (${availableBookings.filter((b) => b.already_imported).length} já importado(s))`}
+                </span>
+                {importableBookings.length > 0 && (
+                  <Button variant="ghost" size="sm" onClick={toggleAllBookings}>
+                    {selectedBookingIds.size === importableBookings.length
+                      ? "Desmarcar todos"
+                      : "Selecionar todos"}
+                  </Button>
+                )}
+              </div>
+              <ScrollArea className="max-h-[400px] pr-3">
+                <div className="space-y-2">
+                  {availableBookings.map((booking) => {
+                    const id = String(booking.id)
+                    const isSelected = selectedBookingIds.has(id)
+                    return (
+                      <label
+                        key={id}
+                        className={`flex items-start gap-3 p-3 rounded-md border cursor-pointer transition-colors ${
+                          booking.already_imported
+                            ? "opacity-50 cursor-not-allowed bg-muted"
+                            : isSelected
+                              ? "border-primary bg-primary/5"
+                              : "hover:bg-muted/50"
+                        }`}
+                      >
+                        <Checkbox
+                          checked={booking.already_imported || isSelected}
+                          disabled={booking.already_imported}
+                          onCheckedChange={() => toggleBookingSelection(id)}
+                          className="mt-0.5"
+                        />
+                        <div className="flex-1 min-w-0">
+                          <div className="font-medium text-sm truncate">
+                            {booking.occasion || "Sem ocasião"}
+                          </div>
+                          <div className="text-xs text-muted-foreground mt-0.5">
+                            {format(new Date(booking.booking_date + "T12:00:00"), "dd/MM (EEE)", { locale: ptBR })}
+                            {" "}
+                            {booking.start_time?.slice(0, 5)}–{booking.end_time?.slice(0, 5)}
+                          </div>
+                          <div className="text-xs text-muted-foreground">
+                            {booking.responsible_person}
+                            {booking.environments?.name && ` — ${booking.environments.name}`}
+                          </div>
+                          {booking.already_imported && (
+                            <span className="text-xs text-amber-600 font-medium">Já importado</span>
+                          )}
+                        </div>
+                      </label>
+                    )
+                  })}
+                </div>
+              </ScrollArea>
+            </>
+          )}
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setImportDialogOpen(false)}>
+              Cancelar
+            </Button>
+            <Button
+              onClick={handleImportSelected}
+              disabled={importSubmitting || selectedBookingIds.size === 0}
+            >
+              {importSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              Importar {selectedBookingIds.size > 0 ? `(${selectedBookingIds.size})` : ""}
             </Button>
           </DialogFooter>
         </DialogContent>
