@@ -11,8 +11,8 @@ export function SystemModeSwitch() {
   const pathname = usePathname()
 
   // Não mostrar o switch em páginas públicas específicas
-  const publicPaths = ["/disponibilidade/", "/escala/"]
-  const isPublicPage = publicPaths.some(path => pathname.includes(path))
+  const publicPaths = ["/disponibilidade", "/escala"]
+  const isPublicPage = publicPaths.some(path => pathname.startsWith(path))
 
   if (isPublicPage) {
     return null

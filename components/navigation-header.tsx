@@ -124,7 +124,7 @@ export default function NavigationHeader() {
                 <SheetTrigger asChild>
                   <Button variant="ghost" size="icon" className="md:hidden">
                     <Menu className="h-5 w-5" />
-                    <span className="sr-only">Menu</span>
+                    <span className="sr-only">Status do Google Calendar</span>
                   </Button>
                 </SheetTrigger>
                 <SheetContent side="right" className="w-72">
