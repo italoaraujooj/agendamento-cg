@@ -13,8 +13,11 @@ export function SystemModeSwitch() {
   const pathname = usePathname()
 
   // Não mostrar o switch em páginas públicas específicas
-  const publicPaths = ["/disponibilidade", "/escala"]
-  const isPublicPage = publicPaths.some(path => pathname.startsWith(path))
+  // Usa trailing slash para não casar /escala com /escalas
+  const isPublicPage =
+    pathname.startsWith("/disponibilidade") ||
+    pathname === "/escala" ||
+    pathname.startsWith("/escala/")
 
   // Esconder switch em páginas públicas ou para usuários não autenticados
   if (isPublicPage || !isAuthenticated) {
