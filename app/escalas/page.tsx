@@ -5,14 +5,12 @@ import { useRouter } from "next/navigation"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
-import { 
-  Users2, 
-  CalendarDays, 
-  ClipboardList, 
+import {
+  Users2,
+  CalendarDays,
+  ClipboardList,
   Clock,
-  ArrowRight,
-  Plus,
-  Settings
+  ArrowRight
 } from "lucide-react"
 import { useAuth } from "@/components/auth/auth-provider"
 import { useSystemMode } from "@/components/system-mode-provider"
@@ -28,7 +26,14 @@ export default function EscalasDashboardPage() {
     setMode("escalas")
   }, [setMode])
 
-  if (loading) {
+  // Redirecionar usuários não autenticados para a home
+  useEffect(() => {
+    if (!loading && !isAuthenticated) {
+      router.replace("/")
+    }
+  }, [loading, isAuthenticated, router])
+
+  if (loading || !isAuthenticated) {
     return (
       <div className="container mx-auto p-6">
         <div className="flex items-center justify-center min-h-[400px]">
@@ -103,7 +108,7 @@ export default function EscalasDashboardPage() {
         </Card>
 
         {/* Admin Escalas */}
-        {isAuthenticated && isAdmin && (
+        {isAdmin && (
           <Card className="hover:shadow-lg transition-shadow">
             <CardHeader>
               <div className="flex items-center gap-3">
@@ -173,18 +178,6 @@ export default function EscalasDashboardPage() {
         </CardContent>
       </Card>
 
-      {/* Mensagem para não autenticados */}
-      {!isAuthenticated && (
-        <Card className="border-dashed">
-          <CardContent className="flex flex-col items-center justify-center py-8">
-            <Settings className="h-12 w-12 text-muted-foreground mb-4" />
-            <h3 className="text-lg font-semibold mb-2">Faça login para gerenciar</h3>
-            <p className="text-muted-foreground text-center mb-4">
-              Você precisa estar logado como administrador para gerenciar ministérios e escalas.
-            </p>
-          </CardContent>
-        </Card>
-      )}
     </div>
   )
 }

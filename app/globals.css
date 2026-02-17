@@ -140,4 +140,13 @@
     background-color: var(--popover);
     color: var(--popover-foreground);
   }
+
+  /* Hide scrollbar for horizontal nav */
+  .scrollbar-hide {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+  .scrollbar-hide::-webkit-scrollbar {
+    display: none;
+  }
 }
