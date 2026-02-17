@@ -1,7 +1,7 @@
 import { GoogleCalendarSetup } from '@/components/auth/google-calendar-setup'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
-import { User, Mail, Calendar, Shield } from 'lucide-react'
+import { User, Mail, Calendar, Shield, Info } from 'lucide-react'
 import { createServerClient } from '@/lib/supabase/server'
 
 export default async function ProfilePage() {
@@ -175,7 +175,31 @@ export default async function ProfilePage() {
 
         {/* Google Calendar Integration */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-          <GoogleCalendarSetup />
+          {session.user.app_metadata?.provider === 'google' ? (
+            <GoogleCalendarSetup />
+          ) : (
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Calendar className="h-5 w-5" />
+                  Google Calendar
+                </CardTitle>
+                <CardDescription>
+                  Sincronize suas reservas com o Google Calendar
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="flex items-start gap-3 p-4 rounded-lg bg-muted/50">
+                  <Info className="h-5 w-5 text-muted-foreground mt-0.5 shrink-0" />
+                  <p className="text-sm text-muted-foreground">
+                    A integração com o Google Calendar está disponível apenas para contas
+                    que fizeram login via Google. Para usar esta funcionalidade, faça logout
+                    e entre novamente com sua conta Google.
+                  </p>
+                </div>
+              </CardContent>
+            </Card>
+          )}
 
           {/* Account Stats */}
           <Card>
