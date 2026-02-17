@@ -806,7 +806,7 @@ export default function AdminPage() {
       <div className="container mx-auto px-4 py-6">
         {/* Tabs Principais no Subheader */}
         <Tabs defaultValue="bookings" className="w-full">
-          <TabsList className="grid w-full grid-cols-3 mb-6 h-auto">
+          <TabsList className="flex w-full mb-6 h-auto overflow-x-auto">
             <TabsTrigger value="bookings" className="flex items-center gap-2 text-sm md:text-base py-3">
               <ClipboardList className="h-4 w-4 md:h-5 md:w-5" />
               <span className="hidden sm:inline">Agendamentos Internos</span>
@@ -860,7 +860,7 @@ export default function AdminPage() {
             </div>
 
             {/* Stats Cards */}
-            <div className="grid md:grid-cols-3 gap-4 mb-6">
+            <div className="grid grid-cols-3 gap-4 mb-6">
               <Card>
                 <CardHeader className="pb-2">
                   <CardTitle className="text-sm font-medium text-muted-foreground">
@@ -906,22 +906,22 @@ export default function AdminPage() {
 
             {/* Tabs de status de reservas */}
             <Tabs defaultValue="pending" className="w-full">
-              <TabsList className="grid w-full grid-cols-4">
-                <TabsTrigger value="pending" className="flex items-center gap-2">
+              <TabsList className="flex w-full overflow-x-auto">
+                <TabsTrigger value="pending" className="flex items-center gap-1.5">
                   <Clock3 className="h-4 w-4" />
-                  Pendentes ({pendingBookings.length})
+                  <span className="hidden sm:inline">Pendentes</span> ({pendingBookings.length})
                 </TabsTrigger>
-                <TabsTrigger value="approved" className="flex items-center gap-2">
+                <TabsTrigger value="approved" className="flex items-center gap-1.5">
                   <CheckCircle className="h-4 w-4" />
-                  Aprovadas ({approvedBookings.length})
+                  <span className="hidden sm:inline">Aprovadas</span> ({approvedBookings.length})
                 </TabsTrigger>
-                <TabsTrigger value="completed" className="flex items-center gap-2">
+                <TabsTrigger value="completed" className="flex items-center gap-1.5">
                   <CalendarIcon className="h-4 w-4" />
-                  Finalizadas ({completedBookings.length})
+                  <span className="hidden sm:inline">Finalizadas</span> ({completedBookings.length})
                 </TabsTrigger>
-                <TabsTrigger value="rejected" className="flex items-center gap-2">
+                <TabsTrigger value="rejected" className="flex items-center gap-1.5">
                   <XCircle className="h-4 w-4" />
-                  Rejeitadas ({rejectedBookings.length})
+                  <span className="hidden sm:inline">Rejeitadas</span> ({rejectedBookings.length})
                 </TabsTrigger>
               </TabsList>
 
@@ -1570,16 +1570,16 @@ function BookingAdminCard({
       'border-l-red-500'
     }`}>
       <CardHeader>
-        <div className="flex justify-between items-start">
+        <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-2">
           <div>
-            <CardTitle className="flex items-center gap-2 text-lg">
+            <CardTitle className="flex flex-wrap items-center gap-2 text-lg">
               {booking.name}
               <Badge variant="outline" className={statusConfig.color}>
                 <StatusIcon className="h-3 w-3 mr-1" />
                 {statusConfig.label}
               </Badge>
             </CardTitle>
-            <CardDescription className="flex items-center gap-4 mt-1">
+            <CardDescription className="flex flex-wrap items-center gap-x-4 gap-y-1 mt-1">
               <span className="flex items-center gap-1">
                 <CalendarIcon className="h-3 w-3" />
                 {formatDate(booking.booking_date)}
@@ -1590,7 +1590,7 @@ function BookingAdminCard({
               </span>
             </CardDescription>
           </div>
-          <Badge variant="outline" className="flex items-center gap-1">
+          <Badge variant="outline" className="flex items-center gap-1 w-fit">
             <Users className="h-3 w-3" />
             {booking.estimated_participants}
           </Badge>

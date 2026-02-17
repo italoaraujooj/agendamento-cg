@@ -17,8 +17,8 @@ export default function HomePage() {
         </div>
 
         <div className="text-center mb-12">
-          <h1 className="text-4xl font-bold mb-4">Sistema de Agendamento de Espaços</h1>
-          <p className="text-xl text-muted-foreground max-w-2xl mx-auto">
+          <h1 className="text-2xl sm:text-4xl font-bold mb-4">Sistema de Agendamento de Espaços</h1>
+          <p className="text-base sm:text-xl text-muted-foreground max-w-2xl mx-auto">
             Reserve os espaços da igreja de forma simples e organizada. Sistema completo para gerenciar reservas dos
             ambientes da igreja.
           </p>

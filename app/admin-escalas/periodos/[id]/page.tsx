@@ -588,7 +588,7 @@ export default function PeriodoDetalhePage() {
   const importableBookings = availableBookings.filter((b) => !b.already_imported)
 
   return (
-    <div className="container mx-auto p-6 space-y-6">
+    <div className="container mx-auto p-4 sm:p-6 space-y-6">
       {/* Header */}
       <div className="flex flex-col gap-4">
         <Button variant="ghost" asChild className="w-fit">
@@ -605,7 +605,7 @@ export default function PeriodoDetalhePage() {
               style={{ backgroundColor: period.ministry?.color || '#888' }}
             />
             <div>
-              <h1 className="text-3xl font-bold">
+              <h1 className="text-2xl sm:text-3xl font-bold">
                 {format(new Date(period.year, period.month - 1), "MMMM 'de' yyyy", { locale: ptBR })}
               </h1>
               <p className="text-muted-foreground">{period.ministry?.name}</p>
@@ -618,10 +618,10 @@ export default function PeriodoDetalhePage() {
             </div>
           </div>
 
-          <div className="flex flex-wrap gap-2">
+          <div className="flex flex-col sm:flex-row sm:flex-wrap gap-2">
             {period.status === "draft" && (
               <>
-                <Button variant="outline" onClick={handleGenerateEvents} disabled={!!actionLoading}>
+                <Button variant="outline" onClick={handleGenerateEvents} disabled={!!actionLoading} className="w-full sm:w-auto">
                   {actionLoading === "generate" ? (
                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                   ) : (
@@ -629,7 +629,7 @@ export default function PeriodoDetalhePage() {
                   )}
                   Gerar Eventos
                 </Button>
-                <Button variant="outline" onClick={handleOpenImportDialog} disabled={!!actionLoading}>
+                <Button variant="outline" onClick={handleOpenImportDialog} disabled={!!actionLoading} className="w-full sm:w-auto">
                   {actionLoading === "import" ? (
                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                   ) : (
@@ -637,11 +637,11 @@ export default function PeriodoDetalhePage() {
                   )}
                   Importar Agendamentos
                 </Button>
-                <Button variant="outline" onClick={openCreateEvent} disabled={!!actionLoading}>
+                <Button variant="outline" onClick={openCreateEvent} disabled={!!actionLoading} className="w-full sm:w-auto">
                   <Plus className="mr-2 h-4 w-4" />
                   Novo Evento
                 </Button>
-                <Button onClick={() => handleChangeStatus("collecting")} disabled={!!actionLoading}>
+                <Button onClick={() => handleChangeStatus("collecting")} disabled={!!actionLoading} className="w-full sm:w-auto">
                   <Play className="mr-2 h-4 w-4" />
                   Iniciar Coleta
                 </Button>
@@ -650,11 +650,11 @@ export default function PeriodoDetalhePage() {
 
             {period.status === "collecting" && (
               <>
-                <Button variant="outline" onClick={copyAvailabilityLink}>
+                <Button variant="outline" onClick={copyAvailabilityLink} className="w-full sm:w-auto">
                   <Copy className="mr-2 h-4 w-4" />
                   Copiar Link
                 </Button>
-                <Button onClick={() => handleChangeStatus("scheduling")} disabled={!!actionLoading}>
+                <Button onClick={() => handleChangeStatus("scheduling")} disabled={!!actionLoading} className="w-full sm:w-auto">
                   <ClipboardList className="mr-2 h-4 w-4" />
                   Montar Escala
                 </Button>
@@ -663,7 +663,7 @@ export default function PeriodoDetalhePage() {
 
             {period.status === "scheduling" && (
               <>
-                <Button variant="outline" asChild>
+                <Button variant="outline" asChild className="w-full sm:w-auto">
                   <Link href={`/admin-escalas/montar/${period.id}`}>
                     <ClipboardList className="mr-2 h-4 w-4" />
                     Montar Escala

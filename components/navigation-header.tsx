@@ -1,20 +1,29 @@
 "use client"
 
+import { useState } from "react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { Button } from "@/components/ui/button"
-import { Calendar, MapPin, Users, Home, Shield, Users2, CalendarDays, ClipboardList } from "lucide-react"
+import { Calendar, MapPin, Users, Home, Shield, Users2, CalendarDays, ClipboardList, Menu } from "lucide-react"
 import { ModeToggle } from "@/components/mode-toggle"
 import { AuthButton } from "@/components/auth/auth-button"
 import { CalendarStatusIndicator } from "@/components/calendar-status-indicator"
 import { SystemModeSwitch } from "@/components/system-mode-switch"
 import { useAuth } from "@/components/auth/auth-provider"
 import { useSystemMode } from "@/components/system-mode-provider"
+import {
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+  SheetTrigger,
+} from "@/components/ui/sheet"
 
 export default function NavigationHeader() {
   const pathname = usePathname()
   const { isAdmin, isAuthenticated } = useAuth()
   const { isEscalas } = useSystemMode()
+  const [open, setOpen] = useState(false)
 
   // Menu do módulo de Agendamentos
   const agendamentosNavItems = [
@@ -127,26 +136,48 @@ export default function NavigationHeader() {
           </nav>
 
           {/* Mobile Navigation */}
-          <nav className="md:hidden flex items-center gap-1">
-            {allNavItems.map((item) => {
-              const Icon = item.icon
-              return (
-                <Button 
-                  key={item.href} 
-                  asChild 
-                  variant={item.active ? "default" : "ghost"} 
-                  size="sm"
-                >
-                  <Link href={item.href}>
-                    <Icon className="h-4 w-4" />
-                  </Link>
-                </Button>
-              )
-            })}
-            <SystemModeSwitch />
+          <div className="md:hidden flex items-center gap-1">
             <AuthButton />
             <ModeToggle />
-          </nav>
+            <Sheet open={open} onOpenChange={setOpen}>
+              <SheetTrigger asChild>
+                <Button variant="ghost" size="icon">
+                  <Menu className="h-5 w-5" />
+                  <span className="sr-only">Menu</span>
+                </Button>
+              </SheetTrigger>
+              <SheetContent side="right" className="w-72">
+                <SheetHeader>
+                  <SheetTitle className="flex items-center gap-2">
+                    <HeaderIcon className="h-5 w-5 text-primary" />
+                    {isEscalas ? "Escalas" : "Agendamento"}
+                  </SheetTitle>
+                </SheetHeader>
+                <nav className="flex flex-col gap-1 mt-4">
+                  {allNavItems.map((item) => {
+                    const Icon = item.icon
+                    return (
+                      <Button
+                        key={item.href}
+                        asChild
+                        variant={item.active ? "default" : "ghost"}
+                        className="justify-start gap-3 h-11"
+                        onClick={() => setOpen(false)}
+                      >
+                        <Link href={item.href}>
+                          <Icon className="h-5 w-5" />
+                          {item.label}
+                        </Link>
+                      </Button>
+                    )
+                  })}
+                  <div className="border-t my-2" />
+                  {!isEscalas && <CalendarStatusIndicator />}
+                  <SystemModeSwitch />
+                </nav>
+              </SheetContent>
+            </Sheet>
+          </div>
         </div>
       </div>
     </header>

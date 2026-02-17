@@ -149,9 +149,9 @@ export default function PeriodosPage() {
           {periods.map((period) => (
             <Card key={period.id} className="hover:shadow-md transition-shadow">
               <CardContent className="p-4">
-                <div className="flex items-center justify-between">
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
                   <div className="flex items-center gap-4">
-                    <div 
+                    <div
                       className="w-2 h-16 rounded-full"
                       style={{ backgroundColor: period.ministry?.color || '#888' }}
                     />
@@ -169,8 +169,8 @@ export default function PeriodosPage() {
                       )}
                     </div>
                   </div>
-                  <div className="flex items-center gap-4">
-                    <Badge 
+                  <div className="flex items-center gap-3">
+                    <Badge
                       variant="secondary"
                       className={`${PERIOD_STATUS_COLORS[period.status]} text-white`}
                     >
