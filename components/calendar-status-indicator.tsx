@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
@@ -24,7 +24,7 @@ export function CalendarStatusIndicator({ className }: CalendarStatusIndicatorPr
   const [status, setStatus] = useState<CalendarStatus>({ isConnected: false, isExpired: false })
   const [isChecking, setIsChecking] = useState(false)
 
-  const checkStatus = async () => {
+  const checkStatus = useCallback(async () => {
     if (!isAuthenticated) return
 
     setIsChecking(true)
@@ -43,11 +43,11 @@ export function CalendarStatusIndicator({ className }: CalendarStatusIndicatorPr
     } finally {
       setIsChecking(false)
     }
-  }
+  }, [isAuthenticated])
 
   useEffect(() => {
     checkStatus()
-  }, [isAuthenticated])
+  }, [checkStatus])
 
   if (!isAuthenticated) {
     return null

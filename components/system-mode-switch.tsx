@@ -34,6 +34,7 @@ export function SystemModeSwitch() {
     <div className="flex bg-muted rounded-lg p-0.5">
       <button
         onClick={() => handleSwitch("agendamentos")}
+        aria-label="Agendamentos"
         className={cn(
           "flex items-center gap-1.5 rounded-md px-2.5 py-1 text-sm font-medium transition-all",
           mode === "agendamentos"
@@ -46,6 +47,7 @@ export function SystemModeSwitch() {
       </button>
       <button
         onClick={() => handleSwitch("escalas")}
+        aria-label="Escalas"
         className={cn(
           "flex items-center gap-1.5 rounded-md px-2.5 py-1 text-sm font-medium transition-all",
           mode === "escalas"

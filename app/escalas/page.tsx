@@ -108,7 +108,7 @@ export default function EscalasDashboardPage() {
         </Card>
 
         {/* Admin Escalas */}
-        {isAuthenticated && isAdmin && (
+        {isAdmin && (
           <Card className="hover:shadow-lg transition-shadow">
             <CardHeader>
               <div className="flex items-center gap-3">
