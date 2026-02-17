@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { Suspense, useState, useEffect } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
 import Link from "next/link"
 import { useAuth } from "@/components/auth/auth-provider"
@@ -12,6 +12,18 @@ import { Loader2, LogIn, Mail, Lock } from "lucide-react"
 import { toast } from "sonner"
 
 export default function LoginPage() {
+  return (
+    <Suspense fallback={
+      <div className="flex items-center justify-center min-h-[60vh]">
+        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+      </div>
+    }>
+      <LoginContent />
+    </Suspense>
+  )
+}
+
+function LoginContent() {
   const { signInWithEmail, signInWithGoogle, isAuthenticated, loading } = useAuth()
   const router = useRouter()
   const searchParams = useSearchParams()
