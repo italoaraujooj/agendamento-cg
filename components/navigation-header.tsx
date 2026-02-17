@@ -11,6 +11,7 @@ import { CalendarStatusIndicator } from "@/components/calendar-status-indicator"
 import { SystemModeSwitch } from "@/components/system-mode-switch"
 import { useAuth } from "@/components/auth/auth-provider"
 import { useSystemMode } from "@/components/system-mode-provider"
+import { cn } from "@/lib/utils"
 import {
   Sheet,
   SheetContent,
@@ -106,78 +107,66 @@ export default function NavigationHeader() {
   return (
     <header className="sticky top-0 z-50 bg-background/80 backdrop-blur supports-[backdrop-filter]:bg-background/60 border-b">
       <div className="container mx-auto px-4">
-        <div className="flex items-center justify-between h-16">
+        {/* Top bar */}
+        <div className="flex items-center justify-between h-14">
           <Link href={headerHref} className="flex items-center gap-2">
             <HeaderIcon className="h-6 w-6 text-primary" />
             <span className="font-bold text-sm sm:text-base md:text-xl">{headerTitle}</span>
           </Link>
 
-          <nav className="hidden md:flex items-center gap-1">
+          <div className="flex items-center gap-1">
+            {!isEscalas && <CalendarStatusIndicator className="hidden md:flex" />}
+            <AuthButton />
+            <ModeToggle />
+            {/* Mobile: Sheet para CalendarStatus */}
+            {!isEscalas && (
+              <Sheet open={open} onOpenChange={setOpen}>
+                <SheetTrigger asChild>
+                  <Button variant="ghost" size="icon" className="md:hidden">
+                    <Menu className="h-5 w-5" />
+                    <span className="sr-only">Menu</span>
+                  </Button>
+                </SheetTrigger>
+                <SheetContent side="right" className="w-72">
+                  <SheetHeader>
+                    <SheetTitle className="flex items-center gap-2">
+                      <Calendar className="h-5 w-5 text-primary" />
+                      Google Calendar
+                    </SheetTitle>
+                  </SheetHeader>
+                  <div className="mt-4">
+                    <CalendarStatusIndicator />
+                  </div>
+                </SheetContent>
+              </Sheet>
+            )}
+          </div>
+        </div>
+
+        {/* Nav bar */}
+        <div className="flex items-center gap-3 h-10 border-t border-border/50 overflow-x-auto scrollbar-hide">
+          <SystemModeSwitch />
+          <div className="w-px h-5 bg-border shrink-0" />
+          <nav className="flex items-center gap-1">
             {allNavItems.map((item) => {
               const Icon = item.icon
               return (
-                <Button
+                <Link
                   key={item.href}
-                  asChild
-                  variant={item.active ? "default" : "ghost"}
-                  className="flex items-center gap-2"
+                  href={item.href}
+                  className={cn(
+                    "flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium whitespace-nowrap transition-colors",
+                    item.active
+                      ? "bg-primary/10 text-primary"
+                      : "text-muted-foreground hover:text-foreground hover:bg-muted"
+                  )}
                 >
-                  <Link href={item.href}>
-                    <Icon className="h-4 w-4" />
-                    {item.label}
-                  </Link>
-                </Button>
+                  <Icon className="h-4 w-4" />
+                  {item.label}
+                </Link>
               )
             })}
-            {!isEscalas && <CalendarStatusIndicator />}
-            <SystemModeSwitch />
-            <AuthButton />
-            <ModeToggle />
           </nav>
-
-          {/* Mobile Navigation */}
-          <div className="md:hidden flex items-center gap-1">
-            <AuthButton />
-            <ModeToggle />
-            <Sheet open={open} onOpenChange={setOpen}>
-              <SheetTrigger asChild>
-                <Button variant="ghost" size="icon">
-                  <Menu className="h-5 w-5" />
-                  <span className="sr-only">Menu</span>
-                </Button>
-              </SheetTrigger>
-              <SheetContent side="right" className="w-72">
-                <SheetHeader>
-                  <SheetTitle className="flex items-center gap-2">
-                    <HeaderIcon className="h-5 w-5 text-primary" />
-                    {isEscalas ? "Escalas" : "Agendamento"}
-                  </SheetTitle>
-                </SheetHeader>
-                <nav className="flex flex-col gap-1 mt-4">
-                  {allNavItems.map((item) => {
-                    const Icon = item.icon
-                    return (
-                      <Button
-                        key={item.href}
-                        asChild
-                        variant={item.active ? "default" : "ghost"}
-                        className="justify-start gap-3 h-11"
-                        onClick={() => setOpen(false)}
-                      >
-                        <Link href={item.href}>
-                          <Icon className="h-5 w-5" />
-                          {item.label}
-                        </Link>
-                      </Button>
-                    )
-                  })}
-                  <div className="border-t my-2" />
-                  {!isEscalas && <CalendarStatusIndicator />}
-                  <SystemModeSwitch />
-                </nav>
-              </SheetContent>
-            </Sheet>
-          </div>
         </div>
       </div>
     </header>

@@ -7,6 +7,7 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { Calendar, CheckCircle, AlertTriangle, Settings, RefreshCw } from 'lucide-react'
 import { useAuth } from './auth/auth-provider'
 import { toast } from 'sonner'
+import { cn } from '@/lib/utils'
 
 interface CalendarStatus {
   isConnected: boolean
@@ -14,7 +15,11 @@ interface CalendarStatus {
   expiresAt?: string
 }
 
-export function CalendarStatusIndicator() {
+interface CalendarStatusIndicatorProps {
+  className?: string
+}
+
+export function CalendarStatusIndicator({ className }: CalendarStatusIndicatorProps) {
   const { isAuthenticated, user } = useAuth()
   const [status, setStatus] = useState<CalendarStatus>({ isConnected: false, isExpired: false })
   const [isChecking, setIsChecking] = useState(false)
@@ -81,7 +86,7 @@ export function CalendarStatusIndicator() {
   return (
     <Popover>
       <PopoverTrigger asChild>
-        <Button variant="ghost" size="sm" className="h-8 px-2">
+        <Button variant="ghost" size="sm" className={cn("h-8 px-2", className)}>
           <Calendar className="h-4 w-4 mr-1" />
           <Badge variant={statusInfo.variant} className="text-xs">
             {status.isConnected ? (status.isExpired ? 'Expirado' : 'Conectado') : 'Desconectado'}

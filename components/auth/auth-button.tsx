@@ -63,6 +63,7 @@ export function AuthButton() {
             <AvatarImage
               src={user.user_metadata?.avatar_url}
               alt={user.user_metadata?.full_name || user.email || 'User'}
+              referrerPolicy="no-referrer"
             />
             <AvatarFallback>{userInitials}</AvatarFallback>
           </Avatar>
