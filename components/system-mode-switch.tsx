@@ -2,11 +2,13 @@
 
 import { Calendar, Users2 } from "lucide-react"
 import { useSystemMode } from "@/components/system-mode-provider"
+import { useAuth } from "@/components/auth/auth-provider"
 import { useRouter, usePathname } from "next/navigation"
 import { cn } from "@/lib/utils"
 
 export function SystemModeSwitch() {
   const { mode } = useSystemMode()
+  const { isAuthenticated } = useAuth()
   const router = useRouter()
   const pathname = usePathname()
 
@@ -14,7 +16,8 @@ export function SystemModeSwitch() {
   const publicPaths = ["/disponibilidade", "/escala"]
   const isPublicPage = publicPaths.some(path => pathname.startsWith(path))
 
-  if (isPublicPage) {
+  // Esconder switch em páginas públicas ou para usuários não autenticados
+  if (isPublicPage || !isAuthenticated) {
     return null
   }
 
