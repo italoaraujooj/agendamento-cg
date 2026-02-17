@@ -1,8 +1,22 @@
 "use client"
 
 import { createContext, useContext, useEffect, useState, useCallback } from 'react'
-import { User, Session, AuthChangeEvent } from '@supabase/supabase-js'
+import { User, Session, AuthChangeEvent, AuthError } from '@supabase/supabase-js'
 import { supabase } from '@/lib/supabase/client'
+
+const AUTH_ERROR_MESSAGES: Record<string, string> = {
+  'Invalid login credentials': 'Email ou senha incorretos',
+  'Email not confirmed': 'Email ainda não foi confirmado. Verifique sua caixa de entrada.',
+  'User already registered': 'Este email já está cadastrado',
+  'Password should be at least 6 characters': 'A senha deve ter pelo menos 6 caracteres',
+  'Unable to validate email address: invalid format': 'Formato de email inválido',
+  'Email rate limit exceeded': 'Muitas tentativas. Aguarde alguns minutos.',
+  'For security purposes, you can only request this once every 60 seconds': 'Por segurança, aguarde 60 segundos antes de tentar novamente.',
+}
+
+function translateAuthError(error: AuthError): string {
+  return AUTH_ERROR_MESSAGES[error.message] || error.message
+}
 
 interface MinistryRole {
   ministry_id: string
@@ -18,6 +32,9 @@ interface AuthContextType {
   ministryRoles: MinistryRole[]
   isMinistryLeader: (ministryId: string) => boolean
   signInWithGoogle: () => Promise<void>
+  signInWithEmail: (email: string, password: string) => Promise<void>
+  signUp: (email: string, password: string, fullName: string) => Promise<void>
+  resetPassword: (email: string) => Promise<void>
   signOut: () => Promise<void>
   isAuthenticated: boolean
   refreshAdminStatus: () => Promise<void>
@@ -236,6 +253,36 @@ export function AuthProvider({ children }: AuthProviderProps) {
     // Não seta loading aqui pois vai redirecionar
   }
 
+  const signInWithEmail = async (email: string, password: string) => {
+    const { error } = await supabase.auth.signInWithPassword({ email, password })
+    if (error) {
+      throw new Error(translateAuthError(error))
+    }
+  }
+
+  const signUp = async (email: string, password: string, fullName: string) => {
+    const { error } = await supabase.auth.signUp({
+      email,
+      password,
+      options: {
+        data: { full_name: fullName },
+        emailRedirectTo: `${window.location.origin}/auth/callback`,
+      },
+    })
+    if (error) {
+      throw new Error(translateAuthError(error))
+    }
+  }
+
+  const resetPassword = async (email: string) => {
+    const { error } = await supabase.auth.resetPasswordForEmail(email, {
+      redirectTo: `${window.location.origin}/resetar-senha`,
+    })
+    if (error) {
+      throw new Error(translateAuthError(error))
+    }
+  }
+
   const signOut = async () => {
     console.log('🔄 Fazendo logout...')
     
@@ -262,6 +309,9 @@ export function AuthProvider({ children }: AuthProviderProps) {
     ministryRoles,
     isMinistryLeader,
     signInWithGoogle,
+    signInWithEmail,
+    signUp,
+    resetPassword,
     signOut,
     isAuthenticated: !!user,
     refreshAdminStatus
