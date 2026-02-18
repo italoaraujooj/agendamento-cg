@@ -38,8 +38,9 @@ export default function RecuperarSenhaPage() {
     try {
       await resetPassword(email)
       setEmailSent(true)
-    } catch (error: any) {
-      toast.error(error.message)
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : "Não foi possível enviar o email de recuperação"
+      toast.error(message)
     } finally {
       setIsSubmitting(false)
     }
