@@ -159,7 +159,7 @@ export function CompleteProfileModal() {
               className="bg-muted"
             />
             <p className="text-xs text-muted-foreground">
-              Email vinculado à sua conta Google
+              Email da sua conta
             </p>
           </div>
 

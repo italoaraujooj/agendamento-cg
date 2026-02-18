@@ -2,6 +2,7 @@
 
 import { useAuth } from './auth-provider'
 import { useEffect, useState } from 'react'
+import Link from 'next/link'
 import { Button } from '@/components/ui/button'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import {
@@ -44,9 +45,11 @@ export function AuthButton() {
 
   if (!user) {
     return (
-      <Button onClick={signInWithGoogle} variant="default">
-        <LogIn className="w-4 h-4 mr-2" />
-        Entrar com Google
+      <Button asChild variant="default">
+        <Link href="/login">
+          <LogIn className="w-4 h-4 mr-2" />
+          Entrar
+        </Link>
       </Button>
     )
   }
