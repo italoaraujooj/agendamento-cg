@@ -51,8 +51,9 @@ export default function CadastroPage() {
     try {
       await signUp(email, password, fullName)
       setEmailSent(true)
-    } catch (error: any) {
-      toast.error(error.message)
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : "Erro ao criar conta"
+      toast.error(message)
     } finally {
       setIsSubmitting(false)
     }
@@ -61,7 +62,7 @@ export default function CadastroPage() {
   const handleGoogleSignUp = async () => {
     try {
       await signInWithGoogle()
-    } catch (error: any) {
+    } catch {
       toast.error("Erro ao cadastrar com Google")
     }
   }

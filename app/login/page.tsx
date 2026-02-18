@@ -32,6 +32,11 @@ function LoginContent() {
   const [password, setPassword] = useState("")
   const [isSubmitting, setIsSubmitting] = useState(false)
 
+  const getSafeNext = () => {
+    const next = searchParams.get("next") || "/"
+    return next.startsWith("/") && !next.startsWith("//") ? next : "/"
+  }
+
   // Mostrar toast de confirmação de email
   useEffect(() => {
     if (searchParams.get("confirmed") === "true") {
@@ -42,8 +47,7 @@ function LoginContent() {
   // Redirecionar se já autenticado
   useEffect(() => {
     if (!loading && isAuthenticated) {
-      const next = searchParams.get("next") || "/"
-      router.replace(next)
+      router.replace(getSafeNext())
     }
   }, [loading, isAuthenticated, router, searchParams])
 
@@ -58,10 +62,10 @@ function LoginContent() {
     setIsSubmitting(true)
     try {
       await signInWithEmail(email, password)
-      const next = searchParams.get("next") || "/"
-      router.push(next)
-    } catch (error: any) {
-      toast.error(error.message)
+      router.push(getSafeNext())
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : "Erro ao fazer login"
+      toast.error(message)
     } finally {
       setIsSubmitting(false)
     }
@@ -70,7 +74,7 @@ function LoginContent() {
   const handleGoogleLogin = async () => {
     try {
       await signInWithGoogle()
-    } catch (error: any) {
+    } catch {
       toast.error("Erro ao entrar com Google")
     }
   }
