@@ -64,8 +64,8 @@ function LoginContent() {
     setIsSubmitting(true)
     try {
       await signInWithEmail(email, password)
-      // Aguardar o onAuthStateChange atualizar o estado antes de redirecionar
-      // O useEffect que observa isAuthenticated fará o redirect
+      // Cookies já foram setados pelo Supabase, full reload para o servidor ler a sessão
+      window.location.href = getSafeNext()
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : "Erro ao fazer login"
       toast.error(message)
