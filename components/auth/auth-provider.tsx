@@ -306,19 +306,15 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
   const signOut = async () => {
     console.log('🔄 Fazendo logout...')
-    
-    // Limpa estado local primeiro para UI responsiva
-    setSession(null)
-    setUser(null)
-    setIsAdmin(false)
-    setMinistryRoles([])
-    
+
     try {
       await supabase.auth.signOut()
     } catch (err) {
       console.error('Erro no logout:', err)
-      // Estado já foi limpo, então ignora
     }
+
+    // Full reload para limpar cookies e estado do servidor
+    window.location.href = '/login'
   }
 
   const value: AuthContextType = {
