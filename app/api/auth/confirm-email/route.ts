@@ -38,14 +38,18 @@ export async function GET(request: NextRequest) {
   }
 
   // Confirmar email do usuário via admin API
-  const { error: updateError } = await supabase.auth.admin.updateUserById(
+  const { data: updateData, error: updateError } = await supabase.auth.admin.updateUserById(
     confirmation.user_id,
     { email_confirm: true }
   )
 
   if (updateError) {
     console.error('Erro ao confirmar email do usuário:', updateError)
-    return NextResponse.redirect(`${APP_URL}/login?error=Erro ao confirmar email`)
+    console.error('user_id usado:', confirmation.user_id)
+    console.error('Detalhes do erro:', JSON.stringify(updateError, null, 2))
+    return NextResponse.redirect(
+      `${APP_URL}/login?error=${encodeURIComponent(`Erro ao confirmar email: ${updateError.message}`)}`
+    )
   }
 
   // Buscar dados do usuário para criar perfil
