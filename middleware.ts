@@ -5,7 +5,7 @@ import { createServerClient } from '@supabase/ssr'
 const PROTECTED_ROUTES = ['/booking', '/profile', '/admin', '/admin-escalas', '/escalas']
 
 // Rotas de auth (redirecionar se já logado)
-const AUTH_ROUTES = ['/login', '/cadastro', '/recuperar-senha', '/resetar-senha']
+const AUTH_ROUTES = ['/login', '/cadastro', '/recuperar-senha']
 
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl
