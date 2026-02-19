@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Loader2, LogIn, Mail, Lock } from "lucide-react"
+import { Loader2, LogIn, Mail, Lock, CheckCircle } from "lucide-react"
 import { toast } from "sonner"
 
 export default function LoginPage() {
@@ -31,18 +31,20 @@ function LoginContent() {
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const confirmed = searchParams.get("confirmed") === "true"
+  const errorParam = searchParams.get("error")
 
   const getSafeNext = () => {
     const next = searchParams.get("next") || "/"
     return next.startsWith("/") && !next.startsWith("//") ? next : "/"
   }
 
-  // Mostrar toast de confirmação de email
+  // Mostrar toast de erro vindo da URL
   useEffect(() => {
-    if (searchParams.get("confirmed") === "true") {
-      toast.success("Email confirmado com sucesso! Faça login para continuar.")
+    if (errorParam) {
+      toast.error(errorParam)
     }
-  }, [searchParams])
+  }, [errorParam])
 
   // Redirecionar se já autenticado
   useEffect(() => {
@@ -62,11 +64,11 @@ function LoginContent() {
     setIsSubmitting(true)
     try {
       await signInWithEmail(email, password)
-      router.push(getSafeNext())
+      // O redirect é feito pelo useEffect que observa isAuthenticated
+      // Não chamar router.push aqui para evitar race condition
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : "Erro ao fazer login"
       toast.error(message)
-    } finally {
       setIsSubmitting(false)
     }
   }
@@ -98,6 +100,13 @@ function LoginContent() {
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">
+          {confirmed && (
+            <div className="flex items-center gap-3 rounded-lg border border-green-200 bg-green-50 p-4 text-green-800 dark:border-green-800 dark:bg-green-950 dark:text-green-200">
+              <CheckCircle className="h-5 w-5 flex-shrink-0" />
+              <p className="text-sm font-medium">Email confirmado com sucesso! Faça login para continuar.</p>
+            </div>
+          )}
+
           <form onSubmit={handleEmailLogin} className="space-y-4">
             <div className="space-y-2">
               <Label htmlFor="email" className="flex items-center gap-2">
