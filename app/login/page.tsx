@@ -64,11 +64,11 @@ function LoginContent() {
     setIsSubmitting(true)
     try {
       await signInWithEmail(email, password)
-      // O redirect é feito pelo useEffect que observa isAuthenticated
-      // Não chamar router.push aqui para evitar race condition
+      router.push(getSafeNext())
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : "Erro ao fazer login"
       toast.error(message)
+    } finally {
       setIsSubmitting(false)
     }
   }
