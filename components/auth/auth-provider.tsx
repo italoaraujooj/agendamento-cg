@@ -261,16 +261,32 @@ export function AuthProvider({ children }: AuthProviderProps) {
   }
 
   const signUp = async (email: string, password: string, fullName: string) => {
-    const { error } = await supabase.auth.signUp({
+    const { data, error } = await supabase.auth.signUp({
       email,
       password,
       options: {
         data: { full_name: fullName },
-        emailRedirectTo: `${window.location.origin}/auth/callback`,
       },
     })
     if (error) {
       throw new Error(translateAuthError(error))
+    }
+
+    // Enviar email de confirmação manualmente via Resend
+    if (data.user) {
+      try {
+        await fetch('/api/send-confirmation-email', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            email,
+            fullName,
+            userId: data.user.id,
+          }),
+        })
+      } catch (err) {
+        console.error('Erro ao enviar email de confirmação:', err)
+      }
     }
   }
 
