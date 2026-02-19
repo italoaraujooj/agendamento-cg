@@ -272,6 +272,11 @@ export function AuthProvider({ children }: AuthProviderProps) {
       throw new Error(translateAuthError(error))
     }
 
+    // Supabase retorna identities vazio quando o email já existe (com confirm email habilitado)
+    if (data.user && (!data.user.identities || data.user.identities.length === 0)) {
+      throw new Error('EMAIL_ALREADY_EXISTS')
+    }
+
     // Enviar email de confirmação manualmente via Resend
     if (data.user) {
       try {
