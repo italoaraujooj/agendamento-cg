@@ -46,12 +46,12 @@ function LoginContent() {
     }
   }, [errorParam])
 
-  // Redirecionar se já autenticado
+  // Redirecionar se já autenticado (full reload para garantir que cookies são lidos)
   useEffect(() => {
     if (!loading && isAuthenticated) {
-      router.replace(getSafeNext())
+      window.location.href = getSafeNext()
     }
-  }, [loading, isAuthenticated, router, searchParams])
+  }, [loading, isAuthenticated])
 
   const handleEmailLogin = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -64,11 +64,11 @@ function LoginContent() {
     setIsSubmitting(true)
     try {
       await signInWithEmail(email, password)
-      router.push(getSafeNext())
+      // Aguardar o onAuthStateChange atualizar o estado antes de redirecionar
+      // O useEffect que observa isAuthenticated fará o redirect
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : "Erro ao fazer login"
       toast.error(message)
-    } finally {
       setIsSubmitting(false)
     }
   }
