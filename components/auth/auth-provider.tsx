@@ -272,6 +272,11 @@ export function AuthProvider({ children }: AuthProviderProps) {
       throw new Error(translateAuthError(error))
     }
 
+    // Supabase retorna identities vazio quando o email já existe (com confirm email habilitado)
+    if (data.user && (!data.user.identities || data.user.identities.length === 0)) {
+      throw new Error('EMAIL_ALREADY_EXISTS')
+    }
+
     // Enviar email de confirmação manualmente via Resend
     if (data.user) {
       try {
@@ -301,19 +306,15 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
   const signOut = async () => {
     console.log('🔄 Fazendo logout...')
-    
-    // Limpa estado local primeiro para UI responsiva
-    setSession(null)
-    setUser(null)
-    setIsAdmin(false)
-    setMinistryRoles([])
-    
+
     try {
       await supabase.auth.signOut()
     } catch (err) {
       console.error('Erro no logout:', err)
-      // Estado já foi limpo, então ignora
     }
+
+    // Full reload para limpar cookies e estado do servidor
+    window.location.href = '/login'
   }
 
   const value: AuthContextType = {

@@ -21,6 +21,7 @@ export default function CadastroPage() {
   const [confirmPassword, setConfirmPassword] = useState("")
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [emailSent, setEmailSent] = useState(false)
+  const [emailAlreadyExists, setEmailAlreadyExists] = useState(false)
 
   // Redirecionar se já autenticado
   useEffect(() => {
@@ -53,7 +54,11 @@ export default function CadastroPage() {
       setEmailSent(true)
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : "Erro ao criar conta"
-      toast.error(message)
+      if (message === 'EMAIL_ALREADY_EXISTS') {
+        setEmailAlreadyExists(true)
+      } else {
+        toast.error(message)
+      }
     } finally {
       setIsSubmitting(false)
     }
@@ -72,6 +77,38 @@ export default function CadastroPage() {
     return (
       <div className="flex items-center justify-center min-h-[60vh]">
         <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+      </div>
+    )
+  }
+
+  // Tela de email já cadastrado
+  if (emailAlreadyExists) {
+    return (
+      <div className="flex items-center justify-center min-h-[60vh] px-4">
+        <Card className="w-full max-w-md">
+          <CardHeader className="text-center">
+            <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-yellow-100">
+              <Mail className="h-6 w-6 text-yellow-600" />
+            </div>
+            <CardTitle className="text-2xl">Email já cadastrado</CardTitle>
+            <CardDescription>
+              O email <strong>{email}</strong> já possui uma conta.
+              Se você esqueceu sua senha, pode recuperá-la abaixo.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            <Button asChild className="w-full">
+              <Link href={`/recuperar-senha?email=${encodeURIComponent(email)}`}>
+                Recuperar senha
+              </Link>
+            </Button>
+            <Button asChild variant="outline" className="w-full">
+              <Link href="/login">
+                Ir para login
+              </Link>
+            </Button>
+          </CardContent>
+        </Card>
       </div>
     )
   }

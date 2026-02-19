@@ -1,7 +1,7 @@
 "use client"
 
-import { useState, useEffect } from "react"
-import { useRouter } from "next/navigation"
+import { useState, useEffect, Suspense } from "react"
+import { useRouter, useSearchParams } from "next/navigation"
 import Link from "next/link"
 import { useAuth } from "@/components/auth/auth-provider"
 import { Button } from "@/components/ui/button"
@@ -11,11 +11,12 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Loader2, Mail, ArrowLeft } from "lucide-react"
 import { toast } from "sonner"
 
-export default function RecuperarSenhaPage() {
+function RecuperarSenhaContent() {
   const { resetPassword, isAuthenticated, loading } = useAuth()
   const router = useRouter()
+  const searchParams = useSearchParams()
 
-  const [email, setEmail] = useState("")
+  const [email, setEmail] = useState(searchParams.get('email') || "")
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [emailSent, setEmailSent] = useState(false)
 
@@ -129,5 +130,17 @@ export default function RecuperarSenhaPage() {
         </CardContent>
       </Card>
     </div>
+  )
+}
+
+export default function RecuperarSenhaPage() {
+  return (
+    <Suspense fallback={
+      <div className="flex items-center justify-center min-h-[60vh]">
+        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+      </div>
+    }>
+      <RecuperarSenhaContent />
+    </Suspense>
   )
 }
