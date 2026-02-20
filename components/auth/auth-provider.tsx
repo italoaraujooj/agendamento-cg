@@ -296,11 +296,14 @@ export function AuthProvider({ children }: AuthProviderProps) {
   }
 
   const resetPassword = async (email: string) => {
-    const { error } = await supabase.auth.resetPasswordForEmail(email, {
-      redirectTo: `${window.location.origin}/auth/callback`,
+    const response = await fetch('/api/send-reset-password-email', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email }),
     })
-    if (error) {
-      throw new Error(translateAuthError(error))
+    if (!response.ok) {
+      const data = await response.json()
+      throw new Error(data.error || 'Erro ao enviar email de recuperação')
     }
   }
 
