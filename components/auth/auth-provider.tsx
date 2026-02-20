@@ -305,10 +305,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
     const response = await fetch('/api/send-reset-password-email', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        email,
-        origin: window.location.origin,
-      }),
+      body: JSON.stringify({ email }),
     })
     if (!response.ok) {
       const data = await response.json()
