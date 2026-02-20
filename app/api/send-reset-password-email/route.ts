@@ -71,13 +71,11 @@ const resetPasswordEmailTemplate = (resetUrl: string): string => `
 
 export async function POST(request: NextRequest) {
   try {
-    const { email, origin } = await request.json()
+    const { email } = await request.json()
 
     if (!email) {
       return NextResponse.json({ error: 'email é obrigatório' }, { status: 400 })
     }
-
-    const redirectTo = `${origin || APP_URL}/auth/callback`
 
     if (!process.env.RESEND_API_KEY) {
       return NextResponse.json({ error: 'RESEND_API_KEY não configurada' }, { status: 500 })
@@ -89,12 +87,11 @@ export async function POST(request: NextRequest) {
     }
 
     // Gerar link de recuperação via admin API
+    // Sem redirectTo: Supabase usa a Site URL configurada no Dashboard,
+    // evitando o erro de "URL de redirecionamento não autorizada"
     const { data, error: linkError } = await supabase.auth.admin.generateLink({
       type: 'recovery',
       email,
-      options: {
-        redirectTo,
-      },
     })
 
     if (linkError || !data?.properties?.action_link) {
