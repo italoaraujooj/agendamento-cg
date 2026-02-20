@@ -63,6 +63,27 @@ export function AuthProvider({ children }: AuthProviderProps) {
   const [ministryRoles, setMinistryRoles] = useState<MinistryRole[]>([])
   const [initialized, setInitialized] = useState(false)
 
+  // Detecta hash fragment de recuperação de senha (implicit flow do Supabase)
+  // Roda antes de qualquer outra coisa para evitar race condition com onAuthStateChange
+  useEffect(() => {
+    const hash = window.location.hash
+    if (!hash.includes('type=recovery') || !hash.includes('access_token=')) return
+
+    const params = new URLSearchParams(hash.substring(1))
+    const accessToken = params.get('access_token')
+    const refreshToken = params.get('refresh_token')
+
+    if (!accessToken || !refreshToken) return
+
+    supabase.auth.setSession({ access_token: accessToken, refresh_token: refreshToken })
+      .then(() => {
+        window.location.href = '/resetar-senha'
+      })
+      .catch((err) => {
+        console.error('Erro ao processar token de recuperação:', err)
+      })
+  }, [])
+
   // Função para verificar se o usuário é admin e buscar roles de ministério
   const checkAdminStatus = useCallback(async (userId: string | undefined) => {
     setAdminChecked(false)
