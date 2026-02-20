@@ -198,6 +198,12 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
         console.log('🔄 Auth event:', event)
 
+        // Redefinição de senha via link do email (implicit flow)
+        if (event === 'PASSWORD_RECOVERY') {
+          window.location.href = '/resetar-senha'
+          return
+        }
+
         // Eventos de logout
         if (event === 'SIGNED_OUT') {
           setSession(null)
@@ -299,7 +305,10 @@ export function AuthProvider({ children }: AuthProviderProps) {
     const response = await fetch('/api/send-reset-password-email', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email }),
+      body: JSON.stringify({
+        email,
+        origin: window.location.origin,
+      }),
     })
     if (!response.ok) {
       const data = await response.json()
