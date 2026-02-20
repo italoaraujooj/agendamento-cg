@@ -87,12 +87,11 @@ export async function POST(request: NextRequest) {
     }
 
     // Gerar link de recuperação via admin API
+    // Sem redirectTo: Supabase usa a Site URL configurada no Dashboard,
+    // evitando o erro de "URL de redirecionamento não autorizada"
     const { data, error: linkError } = await supabase.auth.admin.generateLink({
       type: 'recovery',
       email,
-      options: {
-        redirectTo: `${APP_URL}/auth/callback`,
-      },
     })
 
     if (linkError || !data?.properties?.action_link) {

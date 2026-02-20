@@ -198,6 +198,12 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
         console.log('🔄 Auth event:', event)
 
+        // Redefinição de senha via link do email (implicit flow)
+        if (event === 'PASSWORD_RECOVERY') {
+          window.location.href = '/resetar-senha'
+          return
+        }
+
         // Eventos de logout
         if (event === 'SIGNED_OUT') {
           setSession(null)
