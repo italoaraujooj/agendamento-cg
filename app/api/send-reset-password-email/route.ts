@@ -71,11 +71,13 @@ const resetPasswordEmailTemplate = (resetUrl: string): string => `
 
 export async function POST(request: NextRequest) {
   try {
-    const { email } = await request.json()
+    const { email, origin } = await request.json()
 
     if (!email) {
       return NextResponse.json({ error: 'email é obrigatório' }, { status: 400 })
     }
+
+    const redirectTo = `${origin || APP_URL}/auth/callback`
 
     if (!process.env.RESEND_API_KEY) {
       return NextResponse.json({ error: 'RESEND_API_KEY não configurada' }, { status: 500 })
@@ -91,7 +93,7 @@ export async function POST(request: NextRequest) {
       type: 'recovery',
       email,
       options: {
-        redirectTo: `${APP_URL}/auth/callback`,
+        redirectTo,
       },
     })
 
