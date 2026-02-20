@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import { supabase } from "@/lib/supabase/client"
 import { Button } from "@/components/ui/button"
@@ -16,6 +16,23 @@ export default function ResetarSenhaPage() {
   const [password, setPassword] = useState("")
   const [confirmPassword, setConfirmPassword] = useState("")
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [sessionReady, setSessionReady] = useState(false)
+
+  // Restaura a sessão a partir dos tokens guardados pelo script inline do layout
+  useEffect(() => {
+    const at = sessionStorage.getItem('sb_recovery_at')
+    const rt = sessionStorage.getItem('sb_recovery_rt')
+
+    if (at && rt) {
+      sessionStorage.removeItem('sb_recovery_at')
+      sessionStorage.removeItem('sb_recovery_rt')
+      supabase.auth.setSession({ access_token: at, refresh_token: rt })
+        .then(() => setSessionReady(true))
+        .catch(() => setSessionReady(true))
+    } else {
+      setSessionReady(true)
+    }
+  }, [])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -44,6 +61,14 @@ export default function ResetarSenhaPage() {
     } finally {
       setIsSubmitting(false)
     }
+  }
+
+  if (!sessionReady) {
+    return (
+      <div className="flex items-center justify-center min-h-[60vh]">
+        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+      </div>
+    )
   }
 
   return (
@@ -91,7 +116,7 @@ export default function ResetarSenhaPage() {
               />
             </div>
 
-            <Button type="submit" className="w-full" disabled={isSubmitting}>
+            <Button type="submit" className="w-full" disabled={isSubmitting || !sessionReady}>
               {isSubmitting ? (
                 <>
                   <Loader2 className="h-4 w-4 mr-2 animate-spin" />

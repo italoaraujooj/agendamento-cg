@@ -33,6 +33,21 @@ html {
   --font-mono: ${GeistMono.variable};
 }
         `}</style>
+        {/* Script que roda antes do React para detectar link de recuperação de senha */}
+        <script dangerouslySetInnerHTML={{ __html: `
+          (function() {
+            var hash = window.location.hash;
+            if (hash.indexOf('type=recovery') !== -1 && hash.indexOf('access_token=') !== -1) {
+              var params = new URLSearchParams(hash.substring(1));
+              var at = params.get('access_token');
+              var rt = params.get('refresh_token');
+              if (at && rt) {
+                try { sessionStorage.setItem('sb_recovery_at', at); sessionStorage.setItem('sb_recovery_rt', rt); } catch(e) {}
+                window.location.replace('/resetar-senha');
+              }
+            }
+          })();
+        ` }} />
       </head>
       <body className="bg-background min-h-screen flex flex-col">
         <ThemeProvider>
