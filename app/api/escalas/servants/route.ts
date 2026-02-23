@@ -42,7 +42,16 @@ export async function GET(request: NextRequest) {
     }
 
     if (ministryId) {
-      query = query.eq("area.ministry_id", ministryId)
+      const { data: areas } = await supabase
+        .from("areas")
+        .select("id")
+        .eq("ministry_id", ministryId)
+        .eq("is_active", true)
+      const areaIds = areas?.map((a) => a.id) ?? []
+      if (areaIds.length === 0) {
+        return NextResponse.json([])
+      }
+      query = query.in("area_id", areaIds)
     }
 
     const { data, error } = await query
