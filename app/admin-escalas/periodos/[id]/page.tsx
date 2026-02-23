@@ -86,13 +86,21 @@ interface BookingToImport {
   already_imported: boolean
 }
 
+interface ServantSummary {
+  id: string
+  name: string
+  area: { id: string; name: string } | null
+}
+
 function AvailabilityTab({
   availabilityData,
   events,
+  servants,
   onRefresh,
 }: {
   availabilityData: AvailabilityRecord[]
   events: ScheduleEvent[]
+  servants: ServantSummary[]
   onRefresh: () => void
 }) {
   // Get unique servants who responded
@@ -108,6 +116,11 @@ function AvailabilityTab({
       })
     }
   }
+
+  // Servants who haven't responded yet
+  const notRespondedServants = servants
+    .filter((s) => !servantsMap.has(s.id))
+    .sort((a, b) => a.name.localeCompare(b.name))
 
   // Group availability by event
   const availByEvent = new Map<string, { available: AvailabilityRecord[]; unavailable: AvailabilityRecord[] }>()
@@ -131,13 +144,14 @@ function AvailabilityTab({
     return acc
   }, {} as Record<string, ScheduleEvent[]>)
 
-  const totalServants = servantsMap.size
+  const totalResponded = servantsMap.size
+  const totalRegistered = servants.length
 
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <p className="text-sm text-muted-foreground">
-          {totalServants} servo(s) responderam até o momento
+          {totalResponded}{totalRegistered > 0 ? ` de ${totalRegistered}` : ""} servo(s) responderam até o momento
         </p>
         <Button variant="ghost" size="sm" onClick={onRefresh}>
           <RefreshCw className="mr-2 h-4 w-4" />
@@ -148,23 +162,54 @@ function AvailabilityTab({
       {/* Who responded */}
       <Card>
         <CardHeader className="pb-2">
-          <CardTitle className="text-base">Quem respondeu</CardTitle>
+          <CardTitle className="text-base flex items-center gap-2">
+            Quem respondeu
+            <Badge variant="secondary" className="text-xs font-normal">{totalResponded}</Badge>
+          </CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="flex flex-wrap gap-2">
-            {Array.from(servantsMap.entries())
-              .sort(([, a], [, b]) => a.name.localeCompare(b.name))
-              .map(([id, servant]) => (
-                <Badge key={id} variant="secondary" className="text-xs">
+          {totalResponded === 0 ? (
+            <p className="text-sm text-muted-foreground italic">Nenhuma resposta ainda</p>
+          ) : (
+            <div className="flex flex-wrap gap-2">
+              {Array.from(servantsMap.entries())
+                .sort(([, a], [, b]) => a.name.localeCompare(b.name))
+                .map(([id, servant]) => (
+                  <Badge key={id} variant="secondary" className="text-xs">
+                    {servant.name}
+                    {servant.area && (
+                      <span className="text-muted-foreground ml-1">({servant.area})</span>
+                    )}
+                  </Badge>
+                ))}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Who hasn't responded */}
+      {notRespondedServants.length > 0 && (
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-base flex items-center gap-2">
+              Quem ainda não respondeu
+              <Badge variant="outline" className="text-xs font-normal text-amber-600 border-amber-300">{notRespondedServants.length}</Badge>
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="flex flex-wrap gap-2">
+              {notRespondedServants.map((servant) => (
+                <Badge key={servant.id} variant="outline" className="text-xs text-muted-foreground">
                   {servant.name}
                   {servant.area && (
-                    <span className="text-muted-foreground ml-1">({servant.area})</span>
+                    <span className="ml-1">({servant.area.name})</span>
                   )}
                 </Badge>
               ))}
-          </div>
-        </CardContent>
-      </Card>
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Availability per event grouped by date */}
       {Object.entries(eventsByDate)
@@ -191,7 +236,7 @@ function AvailabilityTab({
                           <span className="font-mono text-sm">{event.event_time.slice(0, 5)}</span>
                           <span className="font-medium">{event.title}</span>
                           <Badge variant="outline" className="ml-auto text-xs">
-                            {availableCount}/{totalServants}
+                            {availableCount}/{totalResponded}
                           </Badge>
                         </div>
 
@@ -279,6 +324,7 @@ export default function PeriodoDetalhePage() {
   // Availability state
   const [availabilityData, setAvailabilityData] = useState<AvailabilityRecord[]>([])
   const [availabilityLoading, setAvailabilityLoading] = useState(false)
+  const [servants, setServants] = useState<ServantSummary[]>([])
 
   // Delete event state
   const [deleteEventId, setDeleteEventId] = useState<string | null>(null)
@@ -333,6 +379,22 @@ export default function PeriodoDetalhePage() {
     }
   }, [periodId])
 
+  const fetchServants = useCallback(async (ministryId: string) => {
+    try {
+      const response = await fetch(`/api/escalas/servants?ministry_id=${ministryId}`)
+      if (response.ok) {
+        const data = await response.json()
+        setServants(data.map((s: { id: string; name: string; area?: { id: string; name: string } | null }) => ({
+          id: s.id,
+          name: s.name,
+          area: s.area ? { id: s.area.id, name: s.area.name } : null,
+        })))
+      }
+    } catch (error) {
+      console.error("Erro ao buscar servos:", error)
+    }
+  }, [])
+
   useEffect(() => {
     if (isAdmin) {
       fetchPeriod()
@@ -345,6 +407,13 @@ export default function PeriodoDetalhePage() {
       fetchAvailability()
     }
   }, [period?.status, fetchAvailability]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Fetch servants for the period's ministry
+  useEffect(() => {
+    if (period?.ministry_id) {
+      fetchServants(period.ministry_id)
+    }
+  }, [period?.ministry_id, fetchServants]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleGenerateEvents = async () => {
     setActionLoading("generate")
@@ -819,7 +888,7 @@ export default function PeriodoDetalhePage() {
               <div className="flex items-center justify-center py-12">
                 <Loader2 className="h-8 w-8 animate-spin text-primary" />
               </div>
-            ) : availabilityData.length === 0 ? (
+            ) : availabilityData.length === 0 && servants.length === 0 ? (
               <Card className="border-dashed">
                 <CardContent className="flex flex-col items-center justify-center py-12">
                   <Users className="h-12 w-12 text-muted-foreground mb-4" />
@@ -833,6 +902,7 @@ export default function PeriodoDetalhePage() {
               <AvailabilityTab
                 availabilityData={availabilityData}
                 events={period.events || []}
+                servants={servants}
                 onRefresh={fetchAvailability}
               />
             )}
