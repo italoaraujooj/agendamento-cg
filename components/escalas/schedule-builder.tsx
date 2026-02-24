@@ -630,10 +630,9 @@ export function ScheduleBuilder({
               {completedEvents}/{events.length} eventos completos
             </DialogDescription>
           </DialogHeader>
-          <ScrollArea className="max-h-[70vh]">
-            <div className="overflow-x-auto">
+          <div className="overflow-auto max-h-[70vh]">
               <table className="w-full text-sm border-collapse">
-                <thead>
+                <thead className="sticky top-0 z-10 bg-background">
                   <tr className="border-b">
                     <th className="text-left font-medium py-2 pr-4 pl-1 whitespace-nowrap text-muted-foreground w-32">
                       Data
@@ -708,8 +707,7 @@ export function ScheduleBuilder({
                   })}
                 </tbody>
               </table>
-            </div>
-          </ScrollArea>
+          </div>
         </DialogContent>
       </Dialog>
     </div>
