@@ -179,7 +179,11 @@ export default function MontarEscalaPage() {
         throw new Error(data.error || "Erro ao publicar")
       }
 
-      toast.success("Escala publicada com sucesso!")
+      toast.success(
+        period?.status === "published"
+          ? "Escala atualizada com sucesso!"
+          : "Escala publicada com sucesso!"
+      )
       router.push(`/admin-escalas/periodos/${periodId}`)
     } catch (error) {
       console.error("Erro:", error)
@@ -249,9 +253,10 @@ export default function MontarEscalaPage() {
             <Button
               onClick={() => setPublishDialog(true)}
               disabled={!canPublish}
+              variant={period.status === "published" ? "outline" : "default"}
             >
               <Send className="mr-2 h-4 w-4" />
-              Publicar Escala
+              {period.status === "published" ? "Atualizar Escala" : "Publicar Escala"}
             </Button>
           </div>
         </div>
@@ -290,20 +295,33 @@ export default function MontarEscalaPage() {
       <AlertDialog open={publishDialog} onOpenChange={setPublishDialog}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Publicar Escala</AlertDialogTitle>
+            <AlertDialogTitle>
+              {period.status === "published" ? "Atualizar Escala" : "Publicar Escala"}
+            </AlertDialogTitle>
             <AlertDialogDescription>
-              Tem certeza que deseja publicar esta escala?
-              <br />
-              <br />
-              Após publicada, a escala ficará visível para todos os servos e não
-              poderá mais ser editada.
+              {period.status === "published" ? (
+                <>
+                  Tem certeza que deseja atualizar a escala já publicada?
+                  <br />
+                  <br />
+                  As alterações serão refletidas imediatamente para todos os servos que acessarem a página{" "}
+                  <strong>Minha Escala</strong>.
+                </>
+              ) : (
+                <>
+                  Tem certeza que deseja publicar esta escala?
+                  <br />
+                  <br />
+                  Após publicada, a escala ficará visível para todos os servos.
+                </>
+              )}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancelar</AlertDialogCancel>
             <AlertDialogAction onClick={handlePublish} disabled={publishing}>
               {publishing && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-              Publicar
+              {period.status === "published" ? "Atualizar" : "Publicar"}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
