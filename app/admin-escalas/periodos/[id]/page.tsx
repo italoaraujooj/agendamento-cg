@@ -548,6 +548,26 @@ export default function PeriodoDetalhePage() {
   const handleChangeStatus = async (newStatus: string) => {
     setActionLoading("status")
     try {
+      // Ao iniciar a montagem da escala, preencher automaticamente quem não respondeu
+      if (newStatus === "scheduling") {
+        try {
+          const fillRes = await fetch(
+            `/api/escalas/schedule-periods/${periodId}/auto-fill-availability`,
+            { method: "POST" }
+          )
+          if (fillRes.ok) {
+            const fillData = await fillRes.json()
+            if (fillData.filled > 0) {
+              toast.info(
+                `${fillData.filled} servo(s) sem resposta foram marcados como disponíveis automaticamente`
+              )
+            }
+          }
+        } catch {
+          // Falha no auto-fill não impede a mudança de status
+        }
+      }
+
       const response = await fetch(`/api/escalas/schedule-periods/${periodId}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
@@ -561,6 +581,7 @@ export default function PeriodoDetalhePage() {
 
       toast.success(`Status alterado para ${PERIOD_STATUS_LABELS[newStatus as keyof typeof PERIOD_STATUS_LABELS]}`)
       fetchPeriod()
+      if (newStatus === "scheduling") fetchAvailability()
     } catch (error) {
       console.error("Erro:", error)
       toast.error(error instanceof Error ? error.message : "Erro ao alterar status")
