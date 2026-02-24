@@ -707,95 +707,102 @@ export function ScheduleBuilder({
 
       {/* Prévia da Escala */}
       <Dialog open={previewOpen} onOpenChange={setPreviewOpen}>
-        <DialogContent className="max-w-5xl w-full">
+        <DialogContent className="max-w-3xl w-full">
           <DialogHeader>
             <DialogTitle>Prévia da Escala</DialogTitle>
             <DialogDescription>
               {completedEvents}/{events.length} eventos completos
             </DialogDescription>
           </DialogHeader>
-          <div className="overflow-auto max-h-[70vh]">
-              <table className="w-full text-sm border-collapse">
-                <thead className="sticky top-0 z-10 bg-background">
-                  <tr className="border-b">
-                    <th className="text-left font-medium py-2 pr-4 pl-1 whitespace-nowrap text-muted-foreground w-32">
-                      Data
-                    </th>
-                    <th className="text-left font-medium py-2 pr-4 text-muted-foreground">
-                      Evento
-                    </th>
-                    {areas.map((area) => (
-                      <th
-                        key={area.id}
-                        className="text-left font-medium py-2 pr-4 whitespace-nowrap text-muted-foreground"
-                      >
-                        {area.name}
-                      </th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody>
-                  {sortedEvents.map((event, idx) => {
-                    const prevEvent = idx > 0 ? sortedEvents[idx - 1] : null
-                    const isNewDate = !prevEvent || prevEvent.event_date !== event.event_date
-                    const required = getRequiredAreas(event)
-                    const isComplete = required.every((area) =>
-                      assignmentByEventArea.has(`${event.id}-${area.id}`)
-                    )
+          <div className="overflow-y-auto max-h-[72vh] space-y-6 pr-1">
+            {(() => {
+              const groups = new Map<string, ScheduleEvent[]>()
+              sortedEvents.forEach((event) => {
+                if (!groups.has(event.event_date)) groups.set(event.event_date, [])
+                groups.get(event.event_date)!.push(event)
+              })
+              return Array.from(groups.entries()).map(([date, dayEvents]) => (
+                <div key={date} className="space-y-3">
+                  {/* Cabeçalho do dia */}
+                  <div className="flex items-center gap-3">
+                    <span className="text-xs font-semibold uppercase tracking-widest text-muted-foreground whitespace-nowrap">
+                      {format(parseISO(date), "EEEE, dd 'de' MMMM", { locale: ptBR })}
+                    </span>
+                    <div className="flex-1 h-px bg-border" />
+                  </div>
 
-                    return (
-                      <>
-                        {isNewDate && idx > 0 && (
-                          <tr key={`sep-${event.id}`}>
-                            <td colSpan={2 + areas.length} className="py-1" />
-                          </tr>
-                        )}
-                        <tr
+                  {/* Eventos do dia */}
+                  <div className="space-y-2">
+                    {dayEvents.map((event) => {
+                      const required = getRequiredAreas(event)
+                      const assignedCount = required.filter((area) =>
+                        assignmentByEventArea.has(`${event.id}-${area.id}`)
+                      ).length
+                      const isComplete = assignedCount === required.length
+
+                      return (
+                        <div
                           key={event.id}
-                          className={`border-b last:border-0 ${
-                            !isComplete ? "bg-amber-50 dark:bg-amber-950/20" : ""
+                          className={`rounded-lg border px-4 py-3 ${
+                            !isComplete
+                              ? "border-amber-300 bg-amber-50/60 dark:border-amber-800 dark:bg-amber-950/20"
+                              : "bg-muted/30"
                           }`}
                         >
-                          <td className="py-2.5 pr-4 pl-1 whitespace-nowrap align-top">
-                            {isNewDate ? (
-                              <span className="font-medium">
-                                {format(parseISO(event.event_date), "EEE, dd/MM", { locale: ptBR })}
+                          {/* Linha do evento */}
+                          <div className="flex items-center justify-between mb-3">
+                            <div className="flex items-center gap-2.5">
+                              <span className="text-xs font-mono text-muted-foreground bg-background border rounded px-1.5 py-0.5 leading-tight">
+                                {event.event_time.slice(0, 5)}
                               </span>
-                            ) : null}
-                          </td>
-                          <td className="py-2.5 pr-4 align-top">
-                            <span className="font-medium">{event.title}</span>
-                            <span className="text-muted-foreground ml-1.5 text-xs">
-                              {event.event_time.slice(0, 5)}
-                            </span>
-                          </td>
-                          {areas.map((area) => {
-                            const assignment = assignmentByEventArea.get(`${event.id}-${area.id}`)
-                            const isAreaRequired =
-                              !event.requires_areas || event.requires_areas.includes(area.id)
-                            return (
-                              <td key={area.id} className="py-2.5 pr-4 align-top whitespace-nowrap">
-                                {!isAreaRequired ? (
-                                  <span className="text-muted-foreground/40 italic text-xs">N/A</span>
-                                ) : assignment?.servant ? (
-                                  <span className="flex items-center gap-1">
-                                    {assignment.servant.is_leader && (
-                                      <Crown className="h-3 w-3 text-yellow-500 flex-shrink-0" />
-                                    )}
-                                    {assignment.servant.name}
-                                  </span>
-                                ) : (
-                                  <span className="text-muted-foreground">—</span>
-                                )}
-                              </td>
-                            )
-                          })}
-                        </tr>
-                      </>
-                    )
-                  })}
-                </tbody>
-              </table>
+                              <span className="font-semibold text-sm">{event.title}</span>
+                            </div>
+                            {isComplete ? (
+                              <Check className="h-4 w-4 text-green-500 flex-shrink-0" />
+                            ) : (
+                              <span className="text-xs font-medium text-amber-600 dark:text-amber-400 flex-shrink-0">
+                                {assignedCount}/{required.length} áreas
+                              </span>
+                            )}
+                          </div>
+
+                          {/* Grid de áreas */}
+                          <div className="grid grid-cols-2 sm:grid-cols-3 gap-x-6 gap-y-3">
+                            {areas.map((area) => {
+                              const assignment = assignmentByEventArea.get(`${event.id}-${area.id}`)
+                              const isAreaRequired =
+                                !event.requires_areas || event.requires_areas.includes(area.id)
+                              return (
+                                <div
+                                  key={area.id}
+                                  className={!isAreaRequired ? "opacity-35" : ""}
+                                >
+                                  <p className="text-xs text-muted-foreground font-medium mb-0.5">
+                                    {area.name}
+                                  </p>
+                                  {!isAreaRequired ? (
+                                    <p className="text-sm italic text-muted-foreground">N/A</p>
+                                  ) : assignment?.servant ? (
+                                    <p className="text-sm flex items-center gap-1">
+                                      {assignment.servant.is_leader && (
+                                        <Crown className="h-3 w-3 text-yellow-500 flex-shrink-0" />
+                                      )}
+                                      {assignment.servant.name}
+                                    </p>
+                                  ) : (
+                                    <p className="text-sm text-muted-foreground">—</p>
+                                  )}
+                                </div>
+                              )
+                            })}
+                          </div>
+                        </div>
+                      )
+                    })}
+                  </div>
+                </div>
+              ))
+            })()}
           </div>
         </DialogContent>
       </Dialog>
