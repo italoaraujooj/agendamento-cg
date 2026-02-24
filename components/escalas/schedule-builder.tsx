@@ -57,6 +57,7 @@ export function ScheduleBuilder({
   )
   const [loading, setLoading] = useState<string | null>(null)
   const [summarySort, setSummarySort] = useState<"name" | "available" | "area">("name")
+  const [filteredServantName, setFilteredServantName] = useState<string | null>(null)
 
   // Mapa de indisponíveis: servant_id-event_id → false
   const unavailableSet = useMemo(() => {
@@ -151,6 +152,7 @@ export function ScheduleBuilder({
           isLeader: group.some((s) => s.is_leader),
           availCount,
           assignCount,
+          ids,
         }
       })
       .sort((a, b) => a.name.localeCompare(b.name)) // ordenação base sempre por nome
@@ -170,6 +172,35 @@ export function ScheduleBuilder({
     // "name" já está em ordem pela base
     return copy
   }, [servantSummary, summarySort])
+
+  const filteredEvents = useMemo(() => {
+    if (!filteredServantName) return events
+    const summary = servantSummary.find(
+      (s) => s.name.toLowerCase().trim() === filteredServantName.toLowerCase().trim()
+    )
+    if (!summary) return events
+    return events.filter((e) => summary.ids.some((id) => !unavailableSet.has(`${id}-${e.id}`)))
+  }, [filteredServantName, servantSummary, events, unavailableSet])
+
+  const handleServantFilter = (name: string) => {
+    if (filteredServantName === name) {
+      setFilteredServantName(null)
+    } else {
+      setFilteredServantName(name)
+      const summary = servantSummary.find((s) => s.name === name)
+      if (summary) {
+        const available = events
+          .filter((e) => summary.ids.some((id) => !unavailableSet.has(`${id}-${e.id}`)))
+          .sort((a, b) => {
+            const dc = a.event_date.localeCompare(b.event_date)
+            return dc !== 0 ? dc : a.event_time.localeCompare(b.event_time)
+          })
+        if (!selectedEventId || !available.some((e) => e.id === selectedEventId)) {
+          setSelectedEventId(available.length > 0 ? available[0].id : null)
+        }
+      }
+    }
+  }
 
   const selectedEvent = events.find((e) => e.id === selectedEventId)
   const eventAssignments = selectedEventId ? getEventAssignments(selectedEventId) : []
@@ -240,15 +271,33 @@ export function ScheduleBuilder({
             <CardHeader className="pb-3">
               <div className="flex items-center justify-between">
                 <CardTitle className="text-base">Eventos</CardTitle>
-                <Badge variant="outline">
-                  {completedEvents}/{events.length}
-                </Badge>
+                <div className="flex items-center gap-1">
+                  {filteredServantName && (
+                    <Badge variant="secondary" className="text-xs flex items-center gap-1 max-w-[110px]">
+                      <span className="truncate">{filteredServantName.split(" ")[0]}</span>
+                      <button
+                        onClick={() => setFilteredServantName(null)}
+                        className="flex-shrink-0 hover:opacity-70"
+                      >
+                        <X className="h-3 w-3" />
+                      </button>
+                    </Badge>
+                  )}
+                  <Badge variant="outline">
+                    {completedEvents}/{events.length}
+                  </Badge>
+                </div>
               </div>
             </CardHeader>
             <CardContent className="p-0">
               <ScrollArea className="h-[500px]">
                 <div className="space-y-1 p-2">
-                  {events
+                  {filteredEvents.length === 0 && filteredServantName ? (
+                    <p className="text-sm text-muted-foreground text-center py-8">
+                      Nenhum evento disponível para {filteredServantName.split(" ")[0]}
+                    </p>
+                  ) : null}
+                  {filteredEvents
                     .sort((a, b) => {
                       const dateCompare = a.event_date.localeCompare(b.event_date)
                       if (dateCompare !== 0) return dateCompare
@@ -487,7 +536,12 @@ export function ScheduleBuilder({
                 return (
                   <div
                     key={servant.name}
-                    className="flex items-center justify-between gap-2 p-2 rounded-md bg-muted/50"
+                    onClick={() => handleServantFilter(servant.name)}
+                    className={`flex items-center justify-between gap-2 p-2 rounded-md cursor-pointer transition-colors ${
+                      filteredServantName === servant.name
+                        ? "bg-primary/10 ring-1 ring-primary"
+                        : "bg-muted/50 hover:bg-muted"
+                    }`}
                   >
                     <div className="flex items-center gap-1.5 min-w-0">
                       {servant.isLeader && (
