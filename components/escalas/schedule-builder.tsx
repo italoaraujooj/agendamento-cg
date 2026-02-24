@@ -118,6 +118,43 @@ export function ScheduleBuilder({
     return countMap
   }, [servants, events, unavailableSet])
 
+  // Resumo desduplicado por nome para o painel de visão geral
+  const servantSummary = useMemo(() => {
+    const groups = new Map<string, { servants: Servant[]; areas: string[] }>()
+
+    servants.forEach((s) => {
+      const key = s.name.toLowerCase().trim()
+      if (!groups.has(key)) groups.set(key, { servants: [], areas: [] })
+      const group = groups.get(key)!
+      group.servants.push(s)
+      if (s.area?.name && !group.areas.includes(s.area.name)) {
+        group.areas.push(s.area.name)
+      }
+    })
+
+    return Array.from(groups.values())
+      .map(({ servants: group, areas }) => {
+        const ids = group.map((s) => s.id)
+        // Disponível no evento se pelo menos um dos IDs estiver disponível
+        const availCount = events.filter((e) =>
+          ids.some((id) => !unavailableSet.has(`${id}-${e.id}`))
+        ).length
+        // Atribuições somadas de todos os IDs
+        const assignCount = ids.reduce(
+          (sum, id) => sum + (servantAssignmentCount.get(id) || 0),
+          0
+        )
+        return {
+          name: group[0].name,
+          areas,
+          isLeader: group.some((s) => s.is_leader),
+          availCount,
+          assignCount,
+        }
+      })
+      .sort((a, b) => a.name.localeCompare(b.name))
+  }, [servants, events, unavailableSet, servantAssignmentCount])
+
   const selectedEvent = events.find((e) => e.id === selectedEventId)
   const eventAssignments = selectedEventId ? getEventAssignments(selectedEventId) : []
 
@@ -417,60 +454,52 @@ export function ScheduleBuilder({
           </CardHeader>
           <CardContent>
             <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-2">
-              {servants
-                .sort((a, b) => {
-                  if (a.area_id !== b.area_id)
-                    return (a.area?.name || "").localeCompare(b.area?.name || "")
-                  return a.name.localeCompare(b.name)
-                })
-                .map((servant) => {
-                  const availCount = servantAvailableEventCount.get(servant.id) ?? 0
-                  const assignCount = servantAssignmentCount.get(servant.id) ?? 0
-                  const availRatio = events.length > 0 ? availCount / events.length : 1
+              {servantSummary.map((servant) => {
+                const availRatio = events.length > 0 ? servant.availCount / events.length : 1
 
-                  return (
-                    <div
-                      key={servant.id}
-                      className="flex items-center justify-between gap-2 p-2 rounded-md bg-muted/50"
-                    >
-                      <div className="flex items-center gap-1.5 min-w-0">
-                        {servant.is_leader && (
-                          <Crown className="h-3 w-3 text-yellow-500 flex-shrink-0" />
-                        )}
-                        <span className="text-sm font-medium truncate">
-                          {servant.name}
-                        </span>
-                        {servant.area && (
-                          <Badge variant="outline" className="text-xs flex-shrink-0 hidden sm:inline-flex">
-                            {servant.area.name}
-                          </Badge>
-                        )}
-                      </div>
-                      <div className="flex items-center gap-1.5 flex-shrink-0">
-                        <Badge
-                          variant="outline"
-                          className={`text-xs ${
-                            availRatio < 0.5
-                              ? "border-red-300 text-red-600"
-                              : availRatio < 0.8
-                              ? "border-amber-300 text-amber-600"
-                              : "border-green-300 text-green-600"
-                          }`}
-                          title={`Disponível em ${availCount} de ${events.length} eventos`}
-                        >
-                          disp. {availCount}/{events.length}
+                return (
+                  <div
+                    key={servant.name}
+                    className="flex items-center justify-between gap-2 p-2 rounded-md bg-muted/50"
+                  >
+                    <div className="flex items-center gap-1.5 min-w-0">
+                      {servant.isLeader && (
+                        <Crown className="h-3 w-3 text-yellow-500 flex-shrink-0" />
+                      )}
+                      <span className="text-sm font-medium truncate">
+                        {servant.name}
+                      </span>
+                      {servant.areas.length > 0 && (
+                        <Badge variant="outline" className="text-xs flex-shrink-0 hidden sm:inline-flex">
+                          {servant.areas.join(", ")}
                         </Badge>
-                        <Badge
-                          variant={assignCount > 0 ? "secondary" : "outline"}
-                          className="text-xs"
-                          title={`Atribuído em ${assignCount} evento(s)`}
-                        >
-                          ×{assignCount}
-                        </Badge>
-                      </div>
+                      )}
                     </div>
-                  )
-                })}
+                    <div className="flex items-center gap-1.5 flex-shrink-0">
+                      <Badge
+                        variant="outline"
+                        className={`text-xs ${
+                          availRatio < 0.5
+                            ? "border-red-300 text-red-600"
+                            : availRatio < 0.8
+                            ? "border-amber-300 text-amber-600"
+                            : "border-green-300 text-green-600"
+                        }`}
+                        title={`Disponível em ${servant.availCount} de ${events.length} eventos`}
+                      >
+                        disp. {servant.availCount}/{events.length}
+                      </Badge>
+                      <Badge
+                        variant={servant.assignCount > 0 ? "secondary" : "outline"}
+                        className="text-xs"
+                        title={`Atribuído em ${servant.assignCount} evento(s)`}
+                      >
+                        ×{servant.assignCount}
+                      </Badge>
+                    </div>
+                  </div>
+                )
+              })}
             </div>
           </CardContent>
         </Card>
