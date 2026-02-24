@@ -29,6 +29,8 @@ import {
   Clock,
   Users,
   Eye,
+  CircleMinus,
+  CirclePlus,
 } from "lucide-react"
 import { format, parseISO } from "date-fns"
 import { ptBR } from "date-fns/locale"
@@ -266,9 +268,46 @@ export function ScheduleBuilder({
   const formatEventDate = (dateStr: string) =>
     format(parseISO(dateStr), "EEE, dd/MM", { locale: ptBR })
 
+  // Retorna as áreas exigidas para um evento (null/vazio → todas)
+  const getRequiredAreas = (event: ScheduleEvent) => {
+    if (!event.requires_areas || event.requires_areas.length === 0) return areas
+    return areas.filter((a) => event.requires_areas!.includes(a.id))
+  }
+
+  const handleToggleAreaRequirement = async (event: ScheduleEvent, areaId: string) => {
+    const allAreaIds = areas.map((a) => a.id)
+    const currentRequired = event.requires_areas ?? allAreaIds
+    const isRequired = currentRequired.includes(areaId)
+
+    const updated = isRequired
+      ? currentRequired.filter((id) => id !== areaId)
+      : [...currentRequired, areaId]
+
+    // Se todas as áreas estiverem incluídas, usar null (= todas obrigatórias)
+    const newRequired = updated.length >= allAreaIds.length ? null : updated
+
+    setLoading(`area-req-${event.id}-${areaId}`)
+    try {
+      const res = await fetch(`/api/escalas/schedule-events/${event.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ requires_areas: newRequired }),
+      })
+      if (!res.ok) {
+        const data = await res.json()
+        throw new Error(data.error || "Erro ao atualizar")
+      }
+      onAssignmentChange()
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Erro ao atualizar área")
+    } finally {
+      setLoading(null)
+    }
+  }
+
   const completedEvents = events.filter((event) => {
     const eventAssigns = getEventAssignments(event.id)
-    return areas.every((area) => eventAssigns.some((a) => a.area_id === area.id))
+    return getRequiredAreas(event).every((area) => eventAssigns.some((a) => a.area_id === area.id))
   }).length
 
   // Pré-computar mapa de atribuições por evento+área para a prévia
@@ -340,9 +379,11 @@ export function ScheduleBuilder({
                     })
                     .map((event) => {
                       const assigns = getEventAssignments(event.id)
-                      const isComplete = areas.every((area) =>
-                        assigns.some((a) => a.area_id === area.id)
-                      )
+                      const required = getRequiredAreas(event)
+                      const assignedRequired = assigns.filter((a) =>
+                        required.some((r) => r.id === a.area_id)
+                      ).length
+                      const isComplete = assignedRequired === required.length
                       const availableCount = eventAvailableServantCount.get(event.id) ?? 0
                       const isSelected = selectedEventId === event.id
 
@@ -373,7 +414,7 @@ export function ScheduleBuilder({
                               <Check className="h-4 w-4 text-green-500 flex-shrink-0" />
                             ) : (
                               <Badge variant="outline" className="text-xs flex-shrink-0">
-                                {assigns.length}/{areas.length}
+                                {assignedRequired}/{required.length}
                               </Badge>
                             )}
                           </div>
@@ -416,29 +457,70 @@ export function ScheduleBuilder({
                     (a) => a.area_id === area.id
                   )
                   const isLoading = loading === `${selectedEvent.id}-${area.id}`
+                  const isToggling = loading === `area-req-${selectedEvent.id}-${area.id}`
+                  const isRequired =
+                    !selectedEvent.requires_areas ||
+                    selectedEvent.requires_areas.includes(area.id)
 
                   return (
-                    <div key={area.id} className="space-y-2">
+                    <div
+                      key={area.id}
+                      className={`space-y-2 transition-opacity ${!isRequired ? "opacity-50" : ""}`}
+                    >
                       <div className="flex items-center justify-between">
-                        <h4 className="font-medium">{area.name}</h4>
-                        {currentAssignment && (
+                        <div className="flex items-center gap-2">
+                          <h4 className={`font-medium ${!isRequired ? "line-through text-muted-foreground" : ""}`}>
+                            {area.name}
+                          </h4>
+                          {!isRequired && (
+                            <Badge variant="outline" className="text-xs">
+                              Não aplicável
+                            </Badge>
+                          )}
+                        </div>
+                        <div className="flex items-center gap-1">
                           <Button
                             variant="ghost"
                             size="sm"
-                            onClick={() =>
-                              handleRemoveAssignment(selectedEvent.id, area.id)
-                            }
-                            disabled={isLoading}
+                            className="h-7 w-7 p-0"
+                            title={isRequired ? "Excluir área deste evento" : "Restaurar área neste evento"}
+                            onClick={() => handleToggleAreaRequirement(selectedEvent, area.id)}
+                            disabled={isToggling || isLoading}
                           >
-                            {isLoading ? (
-                              <Loader2 className="h-4 w-4 animate-spin" />
+                            {isToggling ? (
+                              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                            ) : isRequired ? (
+                              <CircleMinus className="h-3.5 w-3.5 text-muted-foreground" />
                             ) : (
-                              <X className="h-4 w-4" />
+                              <CirclePlus className="h-3.5 w-3.5 text-emerald-600" />
                             )}
                           </Button>
-                        )}
+                          {currentAssignment && isRequired && (
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="h-7 w-7 p-0"
+                              onClick={() =>
+                                handleRemoveAssignment(selectedEvent.id, area.id)
+                              }
+                              disabled={isLoading}
+                            >
+                              {isLoading ? (
+                                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                              ) : (
+                                <X className="h-3.5 w-3.5" />
+                              )}
+                            </Button>
+                          )}
+                        </div>
                       </div>
 
+                      {!isRequired ? (
+                        <p className="text-xs text-muted-foreground">
+                          Esta área não é necessária neste evento.
+                        </p>
+                      ) : (
+                      <>
                       <Select
                         value={currentAssignment?.servant_id || ""}
                         onValueChange={(servantId) =>
@@ -523,6 +605,8 @@ export function ScheduleBuilder({
                           ).length}{" "}
                           servo(s) disponível(is)
                         </p>
+                      )}
+                      </>
                       )}
                     </div>
                   )
@@ -654,7 +738,8 @@ export function ScheduleBuilder({
                   {sortedEvents.map((event, idx) => {
                     const prevEvent = idx > 0 ? sortedEvents[idx - 1] : null
                     const isNewDate = !prevEvent || prevEvent.event_date !== event.event_date
-                    const isComplete = areas.every((area) =>
+                    const required = getRequiredAreas(event)
+                    const isComplete = required.every((area) =>
                       assignmentByEventArea.has(`${event.id}-${area.id}`)
                     )
 
@@ -686,9 +771,13 @@ export function ScheduleBuilder({
                           </td>
                           {areas.map((area) => {
                             const assignment = assignmentByEventArea.get(`${event.id}-${area.id}`)
+                            const isAreaRequired =
+                              !event.requires_areas || event.requires_areas.includes(area.id)
                             return (
                               <td key={area.id} className="py-2.5 pr-4 align-top whitespace-nowrap">
-                                {assignment?.servant ? (
+                                {!isAreaRequired ? (
+                                  <span className="text-muted-foreground/40 italic text-xs">N/A</span>
+                                ) : assignment?.servant ? (
                                   <span className="flex items-center gap-1">
                                     {assignment.servant.is_leader && (
                                       <Crown className="h-3 w-3 text-yellow-500 flex-shrink-0" />
