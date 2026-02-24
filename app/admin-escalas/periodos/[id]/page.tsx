@@ -86,13 +86,23 @@ interface BookingToImport {
   already_imported: boolean
 }
 
+interface ServantSummary {
+  id: string
+  name: string
+  area: { id: string; name: string } | null
+}
+
 function AvailabilityTab({
   availabilityData,
   events,
+  servants,
+  periodLabel,
   onRefresh,
 }: {
   availabilityData: AvailabilityRecord[]
   events: ScheduleEvent[]
+  servants: ServantSummary[]
+  periodLabel: string
   onRefresh: () => void
 }) {
   // Get unique servants who responded
@@ -108,6 +118,23 @@ function AvailabilityTab({
       })
     }
   }
+
+  // Names of servants who already responded (for deduplication by name)
+  const respondedNames = new Set(
+    Array.from(servantsMap.values()).map((s) => s.name.toLowerCase().trim())
+  )
+
+  // Servants who haven't responded yet — deduplicated by name to handle
+  // servants registered in multiple areas with different IDs
+  const seenNames = new Set<string>()
+  const notRespondedServants = servants
+    .filter((s) => {
+      const key = s.name.toLowerCase().trim()
+      if (seenNames.has(key)) return false
+      seenNames.add(key)
+      return !respondedNames.has(key)
+    })
+    .sort((a, b) => a.name.localeCompare(b.name))
 
   // Group availability by event
   const availByEvent = new Map<string, { available: AvailabilityRecord[]; unavailable: AvailabilityRecord[] }>()
@@ -131,40 +158,142 @@ function AvailabilityTab({
     return acc
   }, {} as Record<string, ScheduleEvent[]>)
 
-  const totalServants = servantsMap.size
+  const totalResponded = servantsMap.size
+  const totalRegistered = servants.length
+
+  const exportToCSV = () => {
+    const sortedEvents = [...events].sort((a, b) =>
+      `${a.event_date}${a.event_time}`.localeCompare(`${b.event_date}${b.event_time}`)
+    )
+
+    // Mapa: servant_id → event_id → disponibilidade
+    const servantEventMap = new Map<string, Map<string, { is_available: boolean; notes: string | null }>>()
+    for (const record of availabilityData) {
+      if (!servantEventMap.has(record.servant_id)) {
+        servantEventMap.set(record.servant_id, new Map())
+      }
+      servantEventMap.get(record.servant_id)!.set(record.event_id, {
+        is_available: record.is_available,
+        notes: record.notes,
+      })
+    }
+
+    const getCell = (servantId: string, eventId: string): string => {
+      const eventMap = servantEventMap.get(servantId)
+      if (!eventMap || !eventMap.has(eventId)) return "Sem resposta"
+      const avail = eventMap.get(eventId)!
+      if (avail.is_available) {
+        return avail.notes?.includes("automaticamente") ? "Disponível (automático)" : "Disponível"
+      }
+      return avail.notes ? `Indisponível (${avail.notes})` : "Indisponível"
+    }
+
+    const eventHeaders = sortedEvents.map(
+      (e) =>
+        `${format(new Date(e.event_date + "T12:00:00"), "dd/MM", { locale: ptBR })} ${e.event_time.slice(0, 5)} - ${e.title}`
+    )
+    const headers = ["Servo", "Área", "Respondeu", ...eventHeaders]
+
+    const respondedRows = Array.from(servantsMap.entries()).map(([id, s]) => [
+      s.name,
+      s.area || "",
+      "Sim",
+      ...sortedEvents.map((e) => getCell(id, e.id)),
+    ])
+
+    const notRespondedRows = notRespondedServants.map((s) => [
+      s.name,
+      s.area?.name || "",
+      "Não",
+      ...sortedEvents.map((e) => getCell(s.id, e.id)),
+    ])
+
+    const allRows = [...respondedRows, ...notRespondedRows].sort((a, b) =>
+      String(a[0]).localeCompare(String(b[0]))
+    )
+
+    const csv = [headers, ...allRows]
+      .map((row) => row.map((cell) => `"${String(cell).replace(/"/g, '""')}"`).join(","))
+      .join("\n")
+
+    const blob = new Blob(["\ufeff" + csv], { type: "text/csv;charset=utf-8;" })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement("a")
+    a.href = url
+    a.download = `disponibilidade-${periodLabel}.csv`
+    a.click()
+    URL.revokeObjectURL(url)
+  }
 
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <p className="text-sm text-muted-foreground">
-          {totalServants} servo(s) responderam até o momento
+          {totalResponded}{totalRegistered > 0 ? ` de ${totalRegistered}` : ""} servo(s) responderam até o momento
         </p>
-        <Button variant="ghost" size="sm" onClick={onRefresh}>
-          <RefreshCw className="mr-2 h-4 w-4" />
-          Atualizar
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button variant="outline" size="sm" onClick={exportToCSV} disabled={totalResponded === 0 && servants.length === 0}>
+            <Download className="mr-2 h-4 w-4" />
+            Exportar CSV
+          </Button>
+          <Button variant="ghost" size="sm" onClick={onRefresh}>
+            <RefreshCw className="mr-2 h-4 w-4" />
+            Atualizar
+          </Button>
+        </div>
       </div>
 
       {/* Who responded */}
       <Card>
         <CardHeader className="pb-2">
-          <CardTitle className="text-base">Quem respondeu</CardTitle>
+          <CardTitle className="text-base flex items-center gap-2">
+            Quem respondeu
+            <Badge variant="secondary" className="text-xs font-normal">{totalResponded}</Badge>
+          </CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="flex flex-wrap gap-2">
-            {Array.from(servantsMap.entries())
-              .sort(([, a], [, b]) => a.name.localeCompare(b.name))
-              .map(([id, servant]) => (
-                <Badge key={id} variant="secondary" className="text-xs">
+          {totalResponded === 0 ? (
+            <p className="text-sm text-muted-foreground italic">Nenhuma resposta ainda</p>
+          ) : (
+            <div className="flex flex-wrap gap-2">
+              {Array.from(servantsMap.entries())
+                .sort(([, a], [, b]) => a.name.localeCompare(b.name))
+                .map(([id, servant]) => (
+                  <Badge key={id} variant="secondary" className="text-xs">
+                    {servant.name}
+                    {servant.area && (
+                      <span className="text-muted-foreground ml-1">({servant.area})</span>
+                    )}
+                  </Badge>
+                ))}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Who hasn't responded */}
+      {notRespondedServants.length > 0 && (
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-base flex items-center gap-2">
+              Quem ainda não respondeu
+              <Badge variant="outline" className="text-xs font-normal text-amber-600 border-amber-300">{notRespondedServants.length}</Badge>
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="flex flex-wrap gap-2">
+              {notRespondedServants.map((servant) => (
+                <Badge key={servant.id} variant="outline" className="text-xs text-muted-foreground">
                   {servant.name}
                   {servant.area && (
-                    <span className="text-muted-foreground ml-1">({servant.area})</span>
+                    <span className="ml-1">({servant.area.name})</span>
                   )}
                 </Badge>
               ))}
-          </div>
-        </CardContent>
-      </Card>
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Availability per event grouped by date */}
       {Object.entries(eventsByDate)
@@ -191,7 +320,7 @@ function AvailabilityTab({
                           <span className="font-mono text-sm">{event.event_time.slice(0, 5)}</span>
                           <span className="font-medium">{event.title}</span>
                           <Badge variant="outline" className="ml-auto text-xs">
-                            {availableCount}/{totalServants}
+                            {availableCount}/{totalResponded}
                           </Badge>
                         </div>
 
@@ -279,6 +408,7 @@ export default function PeriodoDetalhePage() {
   // Availability state
   const [availabilityData, setAvailabilityData] = useState<AvailabilityRecord[]>([])
   const [availabilityLoading, setAvailabilityLoading] = useState(false)
+  const [servants, setServants] = useState<ServantSummary[]>([])
 
   // Delete event state
   const [deleteEventId, setDeleteEventId] = useState<string | null>(null)
@@ -333,6 +463,22 @@ export default function PeriodoDetalhePage() {
     }
   }, [periodId])
 
+  const fetchServants = useCallback(async (ministryId: string) => {
+    try {
+      const response = await fetch(`/api/escalas/servants?ministry_id=${ministryId}`)
+      if (response.ok) {
+        const data = await response.json()
+        setServants(data.map((s: { id: string; name: string; area?: { id: string; name: string } | null }) => ({
+          id: s.id,
+          name: s.name,
+          area: s.area ? { id: s.area.id, name: s.area.name } : null,
+        })))
+      }
+    } catch (error) {
+      console.error("Erro ao buscar servos:", error)
+    }
+  }, [])
+
   useEffect(() => {
     if (isAdmin) {
       fetchPeriod()
@@ -345,6 +491,13 @@ export default function PeriodoDetalhePage() {
       fetchAvailability()
     }
   }, [period?.status, fetchAvailability]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Fetch servants for the period's ministry
+  useEffect(() => {
+    if (period?.ministry_id) {
+      fetchServants(period.ministry_id)
+    }
+  }, [period?.ministry_id, fetchServants]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleGenerateEvents = async () => {
     setActionLoading("generate")
@@ -467,6 +620,26 @@ export default function PeriodoDetalhePage() {
   const handleChangeStatus = async (newStatus: string) => {
     setActionLoading("status")
     try {
+      // Ao iniciar a montagem da escala, preencher automaticamente quem não respondeu
+      if (newStatus === "scheduling") {
+        try {
+          const fillRes = await fetch(
+            `/api/escalas/schedule-periods/${periodId}/auto-fill-availability`,
+            { method: "POST" }
+          )
+          if (fillRes.ok) {
+            const fillData = await fillRes.json()
+            if (fillData.filled > 0) {
+              toast.info(
+                `${fillData.filled} servo(s) sem resposta foram marcados como disponíveis automaticamente`
+              )
+            }
+          }
+        } catch {
+          // Falha no auto-fill não impede a mudança de status
+        }
+      }
+
       const response = await fetch(`/api/escalas/schedule-periods/${periodId}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
@@ -480,6 +653,7 @@ export default function PeriodoDetalhePage() {
 
       toast.success(`Status alterado para ${PERIOD_STATUS_LABELS[newStatus as keyof typeof PERIOD_STATUS_LABELS]}`)
       fetchPeriod()
+      if (newStatus === "scheduling") fetchAvailability()
     } catch (error) {
       console.error("Erro:", error)
       toast.error(error instanceof Error ? error.message : "Erro ao alterar status")
@@ -819,7 +993,7 @@ export default function PeriodoDetalhePage() {
               <div className="flex items-center justify-center py-12">
                 <Loader2 className="h-8 w-8 animate-spin text-primary" />
               </div>
-            ) : availabilityData.length === 0 ? (
+            ) : availabilityData.length === 0 && servants.length === 0 ? (
               <Card className="border-dashed">
                 <CardContent className="flex flex-col items-center justify-center py-12">
                   <Users className="h-12 w-12 text-muted-foreground mb-4" />
@@ -833,6 +1007,8 @@ export default function PeriodoDetalhePage() {
               <AvailabilityTab
                 availabilityData={availabilityData}
                 events={period.events || []}
+                servants={servants}
+                periodLabel={format(new Date(period.year, period.month - 1), "MMMM-yyyy", { locale: ptBR })}
                 onRefresh={fetchAvailability}
               />
             )}
