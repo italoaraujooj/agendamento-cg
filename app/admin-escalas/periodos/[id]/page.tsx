@@ -117,9 +117,21 @@ function AvailabilityTab({
     }
   }
 
-  // Servants who haven't responded yet
+  // Names of servants who already responded (for deduplication by name)
+  const respondedNames = new Set(
+    Array.from(servantsMap.values()).map((s) => s.name.toLowerCase().trim())
+  )
+
+  // Servants who haven't responded yet — deduplicated by name to handle
+  // servants registered in multiple areas with different IDs
+  const seenNames = new Set<string>()
   const notRespondedServants = servants
-    .filter((s) => !servantsMap.has(s.id))
+    .filter((s) => {
+      const key = s.name.toLowerCase().trim()
+      if (seenNames.has(key)) return false
+      seenNames.add(key)
+      return !respondedNames.has(key)
+    })
     .sort((a, b) => a.name.localeCompare(b.name))
 
   // Group availability by event
