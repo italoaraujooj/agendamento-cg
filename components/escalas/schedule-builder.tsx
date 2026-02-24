@@ -1,6 +1,7 @@
 "use client"
 
-import { useState, useMemo } from "react"
+import { useState, useMemo, useRef } from "react"
+import { toPng } from "html-to-image"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -31,6 +32,7 @@ import {
   Eye,
   CircleMinus,
   CirclePlus,
+  ImageDown,
 } from "lucide-react"
 import { format, parseISO } from "date-fns"
 import { ptBR } from "date-fns/locale"
@@ -45,6 +47,7 @@ import type {
 
 interface ScheduleBuilderProps {
   periodId: string
+  periodLabel?: string
   events: ScheduleEvent[]
   areas: Area[]
   servants: Servant[]
@@ -55,6 +58,7 @@ interface ScheduleBuilderProps {
 
 export function ScheduleBuilder({
   periodId,
+  periodLabel,
   events,
   areas,
   servants,
@@ -69,6 +73,8 @@ export function ScheduleBuilder({
   const [summarySort, setSummarySort] = useState<"name" | "available" | "area">("name")
   const [filteredServantName, setFilteredServantName] = useState<string | null>(null)
   const [previewOpen, setPreviewOpen] = useState(false)
+  const [exporting, setExporting] = useState(false)
+  const exportRef = useRef<HTMLDivElement>(null)
 
   // Mapa de indisponíveis: servant_id-event_id → false
   const unavailableSet = useMemo(() => {
@@ -210,6 +216,29 @@ export function ScheduleBuilder({
           setSelectedEventId(available.length > 0 ? available[0].id : null)
         }
       }
+    }
+  }
+
+  const handleExportImage = async () => {
+    if (!exportRef.current) return
+    setExporting(true)
+    try {
+      const dataUrl = await toPng(exportRef.current, {
+        cacheBust: true,
+        backgroundColor: "#ffffff",
+        pixelRatio: 2,
+      })
+      const link = document.createElement("a")
+      const filename = periodLabel
+        ? `escala-${periodLabel.replace(/[^a-z0-9]/gi, "-").toLowerCase()}.png`
+        : "escala.png"
+      link.download = filename
+      link.href = dataUrl
+      link.click()
+    } catch {
+      toast.error("Erro ao gerar imagem")
+    } finally {
+      setExporting(false)
     }
   }
 
@@ -709,10 +738,28 @@ export function ScheduleBuilder({
       <Dialog open={previewOpen} onOpenChange={setPreviewOpen}>
         <DialogContent className="max-w-3xl w-full">
           <DialogHeader>
-            <DialogTitle>Prévia da Escala</DialogTitle>
-            <DialogDescription>
-              {completedEvents}/{events.length} eventos completos
-            </DialogDescription>
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <DialogTitle>Prévia da Escala</DialogTitle>
+                <DialogDescription>
+                  {completedEvents}/{events.length} eventos completos
+                </DialogDescription>
+              </div>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleExportImage}
+                disabled={exporting}
+                className="flex-shrink-0 mt-1"
+              >
+                {exporting ? (
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                ) : (
+                  <ImageDown className="mr-2 h-4 w-4" />
+                )}
+                {exporting ? "Gerando..." : "Salvar imagem"}
+              </Button>
+            </div>
           </DialogHeader>
           <div className="overflow-y-auto max-h-[72vh] space-y-6 pr-1">
             {(() => {
@@ -806,6 +853,103 @@ export function ScheduleBuilder({
           </div>
         </DialogContent>
       </Dialog>
+
+      {/* Div off-screen usada para gerar a imagem exportada */}
+      <div
+        ref={exportRef}
+        aria-hidden="true"
+        style={{
+          position: "fixed",
+          left: "-9999px",
+          top: 0,
+          width: "800px",
+          backgroundColor: "#ffffff",
+          fontFamily: "system-ui, -apple-system, sans-serif",
+          padding: "40px",
+          color: "#111827",
+        }}
+      >
+        {/* Cabeçalho da imagem */}
+        {periodLabel && (
+          <div style={{ marginBottom: "28px" }}>
+            <p style={{ fontSize: "11px", fontWeight: 600, letterSpacing: "0.1em", textTransform: "uppercase", color: "#6b7280", marginBottom: "4px" }}>
+              Escala
+            </p>
+            <p style={{ fontSize: "22px", fontWeight: 700, color: "#111827" }}>
+              {periodLabel}
+            </p>
+          </div>
+        )}
+
+        {/* Conteúdo agrupado por dia */}
+        {(() => {
+          const groups = new Map<string, ScheduleEvent[]>()
+          sortedEvents.forEach((event) => {
+            if (!groups.has(event.event_date)) groups.set(event.event_date, [])
+            groups.get(event.event_date)!.push(event)
+          })
+          return Array.from(groups.entries()).map(([date, dayEvents], groupIdx) => (
+            <div key={date} style={{ marginBottom: groupIdx < groups.size - 1 ? "28px" : 0 }}>
+              {/* Cabeçalho do dia */}
+              <div style={{ display: "flex", alignItems: "center", gap: "12px", marginBottom: "12px" }}>
+                <span style={{ fontSize: "11px", fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", color: "#6b7280", whiteSpace: "nowrap" }}>
+                  {format(parseISO(date), "EEEE, dd 'de' MMMM", { locale: ptBR })}
+                </span>
+                <div style={{ flex: 1, height: "1px", backgroundColor: "#e5e7eb" }} />
+              </div>
+
+              {/* Eventos do dia */}
+              <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+                {dayEvents.map((event) => {
+                  const required = getRequiredAreas(event)
+                  const isComplete = required.every((area) =>
+                    assignmentByEventArea.has(`${event.id}-${area.id}`)
+                  )
+                  return (
+                    <div
+                      key={event.id}
+                      style={{
+                        borderRadius: "8px",
+                        border: `1px solid ${!isComplete ? "#fcd34d" : "#e5e7eb"}`,
+                        backgroundColor: !isComplete ? "#fffbeb" : "#f9fafb",
+                        padding: "14px 16px",
+                      }}
+                    >
+                      {/* Linha do evento */}
+                      <div style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "12px" }}>
+                        <span style={{ fontSize: "12px", fontFamily: "monospace", color: "#6b7280", backgroundColor: "#ffffff", border: "1px solid #e5e7eb", borderRadius: "4px", padding: "2px 6px" }}>
+                          {event.event_time.slice(0, 5)}
+                        </span>
+                        <span style={{ fontSize: "15px", fontWeight: 600, color: "#111827" }}>
+                          {event.title}
+                        </span>
+                      </div>
+
+                      {/* Grid de áreas */}
+                      <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: "8px 24px" }}>
+                        {areas.map((area) => {
+                          const assignment = assignmentByEventArea.get(`${event.id}-${area.id}`)
+                          const isAreaRequired = !event.requires_areas || event.requires_areas.includes(area.id)
+                          return (
+                            <div key={area.id} style={{ opacity: !isAreaRequired ? 0.35 : 1 }}>
+                              <p style={{ fontSize: "10px", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.05em", color: "#9ca3af", marginBottom: "2px" }}>
+                                {area.name}
+                              </p>
+                              <p style={{ fontSize: "13px", color: !isAreaRequired ? "#9ca3af" : assignment?.servant ? "#111827" : "#9ca3af", fontStyle: !isAreaRequired ? "italic" : "normal" }}>
+                                {!isAreaRequired ? "N/A" : assignment?.servant ? assignment.servant.name : "—"}
+                              </p>
+                            </div>
+                          )
+                        })}
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+            </div>
+          ))
+        })()}
+      </div>
     </div>
   )
 }
