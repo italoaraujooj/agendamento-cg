@@ -14,7 +14,7 @@ const servantSchema = z.object({
 // GET - Listar servos (opcionalmente filtrar por área)
 export async function GET(request: NextRequest) {
   try {
-    const supabase = await createServerClient()
+    const supabase = createAdminClient()
     if (!supabase) {
       return NextResponse.json({ error: "Erro de configuração" }, { status: 500 })
     }
@@ -42,11 +42,14 @@ export async function GET(request: NextRequest) {
     }
 
     if (ministryId) {
-      const { data: areas } = await supabase
+      const { data: areas, error: areasError } = await supabase
         .from("areas")
         .select("id")
         .eq("ministry_id", ministryId)
-        .eq("is_active", true)
+      if (areasError) {
+        console.error("Erro ao buscar áreas do ministério:", areasError)
+        return NextResponse.json({ error: "Erro ao buscar áreas" }, { status: 500 })
+      }
       const areaIds = areas?.map((a) => a.id) ?? []
       if (areaIds.length === 0) {
         return NextResponse.json([])
