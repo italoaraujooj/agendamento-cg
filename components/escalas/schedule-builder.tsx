@@ -56,6 +56,7 @@ export function ScheduleBuilder({
     events.length > 0 ? events[0].id : null
   )
   const [loading, setLoading] = useState<string | null>(null)
+  const [summarySort, setSummarySort] = useState<"name" | "available" | "area">("name")
 
   // Mapa de indisponíveis: servant_id-event_id → false
   const unavailableSet = useMemo(() => {
@@ -152,8 +153,23 @@ export function ScheduleBuilder({
           assignCount,
         }
       })
-      .sort((a, b) => a.name.localeCompare(b.name))
+      .sort((a, b) => a.name.localeCompare(b.name)) // ordenação base sempre por nome
   }, [servants, events, unavailableSet, servantAssignmentCount])
+
+  const sortedSummary = useMemo(() => {
+    const copy = [...servantSummary]
+    if (summarySort === "available") {
+      copy.sort((a, b) => b.availCount - a.availCount || a.name.localeCompare(b.name))
+    } else if (summarySort === "area") {
+      copy.sort((a, b) => {
+        const aArea = a.areas[0] || ""
+        const bArea = b.areas[0] || ""
+        return aArea.localeCompare(bArea) || a.name.localeCompare(b.name)
+      })
+    }
+    // "name" já está em ordem pela base
+    return copy
+  }, [servantSummary, summarySort])
 
   const selectedEvent = events.find((e) => e.id === selectedEventId)
   const eventAssignments = selectedEventId ? getEventAssignments(selectedEventId) : []
@@ -445,16 +461,27 @@ export function ScheduleBuilder({
       {servants.length > 0 && (
         <Card>
           <CardHeader className="pb-3">
-            <div className="flex items-center justify-between">
+            <div className="flex flex-col sm:flex-row sm:items-center gap-2 justify-between">
               <CardTitle className="text-base">Resumo dos Servos</CardTitle>
-              <p className="text-xs text-muted-foreground">
-                disp. = eventos disponíveis · ×N = vezes atribuído
-              </p>
+              <div className="flex items-center gap-1">
+                <span className="text-xs text-muted-foreground mr-1">Ordenar:</span>
+                {(["name", "available", "area"] as const).map((mode) => (
+                  <Button
+                    key={mode}
+                    variant={summarySort === mode ? "secondary" : "ghost"}
+                    size="sm"
+                    className="h-7 px-2 text-xs"
+                    onClick={() => setSummarySort(mode)}
+                  >
+                    {mode === "name" ? "A–Z" : mode === "available" ? "Disponíveis" : "Área"}
+                  </Button>
+                ))}
+              </div>
             </div>
           </CardHeader>
           <CardContent>
             <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-2">
-              {servantSummary.map((servant) => {
+              {sortedSummary.map((servant) => {
                 const availRatio = events.length > 0 ? servant.availCount / events.length : 1
 
                 return (
