@@ -24,13 +24,6 @@ export async function POST(
       return NextResponse.json({ error: "Período não encontrado" }, { status: 404 })
     }
 
-    if (period.status === "published") {
-      return NextResponse.json(
-        { error: "Este período já está publicado" },
-        { status: 400 }
-      )
-    }
-
     const events: { id: string; requires_areas: string[] | null; assignments: { area_id: string }[] }[] =
       period.events || []
 
