@@ -190,10 +190,14 @@ export default function MontarEscalaPage() {
     }
   }
 
-  // Calcular progresso
+  // Calcular progresso (respeitando requires_areas por evento)
   const completedEvents = events.filter((event) => {
     const eventAssigns = assignments.filter((a) => a.schedule_event_id === event.id)
-    return areas.every((area) => eventAssigns.some((a) => a.area_id === area.id))
+    const requiredAreas =
+      event.requires_areas && event.requires_areas.length > 0
+        ? areas.filter((area) => event.requires_areas!.includes(area.id))
+        : areas
+    return requiredAreas.every((area) => eventAssigns.some((a) => a.area_id === area.id))
   }).length
 
   const canPublish = completedEvents === events.length && events.length > 0
