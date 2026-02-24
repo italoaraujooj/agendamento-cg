@@ -96,11 +96,13 @@ function AvailabilityTab({
   availabilityData,
   events,
   servants,
+  periodLabel,
   onRefresh,
 }: {
   availabilityData: AvailabilityRecord[]
   events: ScheduleEvent[]
   servants: ServantSummary[]
+  periodLabel: string
   onRefresh: () => void
 }) {
   // Get unique servants who responded
@@ -159,16 +161,86 @@ function AvailabilityTab({
   const totalResponded = servantsMap.size
   const totalRegistered = servants.length
 
+  const exportToCSV = () => {
+    const sortedEvents = [...events].sort((a, b) =>
+      `${a.event_date}${a.event_time}`.localeCompare(`${b.event_date}${b.event_time}`)
+    )
+
+    // Mapa: servant_id → event_id → disponibilidade
+    const servantEventMap = new Map<string, Map<string, { is_available: boolean; notes: string | null }>>()
+    for (const record of availabilityData) {
+      if (!servantEventMap.has(record.servant_id)) {
+        servantEventMap.set(record.servant_id, new Map())
+      }
+      servantEventMap.get(record.servant_id)!.set(record.event_id, {
+        is_available: record.is_available,
+        notes: record.notes,
+      })
+    }
+
+    const getCell = (servantId: string, eventId: string): string => {
+      const eventMap = servantEventMap.get(servantId)
+      if (!eventMap || !eventMap.has(eventId)) return "Sem resposta"
+      const avail = eventMap.get(eventId)!
+      if (avail.is_available) {
+        return avail.notes?.includes("automaticamente") ? "Disponível (automático)" : "Disponível"
+      }
+      return avail.notes ? `Indisponível (${avail.notes})` : "Indisponível"
+    }
+
+    const eventHeaders = sortedEvents.map(
+      (e) =>
+        `${format(new Date(e.event_date + "T12:00:00"), "dd/MM", { locale: ptBR })} ${e.event_time.slice(0, 5)} - ${e.title}`
+    )
+    const headers = ["Servo", "Área", "Respondeu", ...eventHeaders]
+
+    const respondedRows = Array.from(servantsMap.entries()).map(([id, s]) => [
+      s.name,
+      s.area || "",
+      "Sim",
+      ...sortedEvents.map((e) => getCell(id, e.id)),
+    ])
+
+    const notRespondedRows = notRespondedServants.map((s) => [
+      s.name,
+      s.area?.name || "",
+      "Não",
+      ...sortedEvents.map((e) => getCell(s.id, e.id)),
+    ])
+
+    const allRows = [...respondedRows, ...notRespondedRows].sort((a, b) =>
+      String(a[0]).localeCompare(String(b[0]))
+    )
+
+    const csv = [headers, ...allRows]
+      .map((row) => row.map((cell) => `"${String(cell).replace(/"/g, '""')}"`).join(","))
+      .join("\n")
+
+    const blob = new Blob(["\ufeff" + csv], { type: "text/csv;charset=utf-8;" })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement("a")
+    a.href = url
+    a.download = `disponibilidade-${periodLabel}.csv`
+    a.click()
+    URL.revokeObjectURL(url)
+  }
+
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <p className="text-sm text-muted-foreground">
           {totalResponded}{totalRegistered > 0 ? ` de ${totalRegistered}` : ""} servo(s) responderam até o momento
         </p>
-        <Button variant="ghost" size="sm" onClick={onRefresh}>
-          <RefreshCw className="mr-2 h-4 w-4" />
-          Atualizar
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button variant="outline" size="sm" onClick={exportToCSV} disabled={totalResponded === 0 && servants.length === 0}>
+            <Download className="mr-2 h-4 w-4" />
+            Exportar CSV
+          </Button>
+          <Button variant="ghost" size="sm" onClick={onRefresh}>
+            <RefreshCw className="mr-2 h-4 w-4" />
+            Atualizar
+          </Button>
+        </div>
       </div>
 
       {/* Who responded */}
@@ -936,6 +1008,7 @@ export default function PeriodoDetalhePage() {
                 availabilityData={availabilityData}
                 events={period.events || []}
                 servants={servants}
+                periodLabel={format(new Date(period.year, period.month - 1), "MMMM-yyyy", { locale: ptBR })}
                 onRefresh={fetchAvailability}
               />
             )}
