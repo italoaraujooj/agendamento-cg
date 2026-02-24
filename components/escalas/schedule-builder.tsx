@@ -13,6 +13,13 @@ import {
 } from "@/components/ui/select"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+} from "@/components/ui/dialog"
+import {
   Check,
   X,
   AlertCircle,
@@ -20,7 +27,8 @@ import {
   Crown,
   Calendar,
   Clock,
-  Users
+  Users,
+  Eye,
 } from "lucide-react"
 import { format, parseISO } from "date-fns"
 import { ptBR } from "date-fns/locale"
@@ -58,6 +66,7 @@ export function ScheduleBuilder({
   const [loading, setLoading] = useState<string | null>(null)
   const [summarySort, setSummarySort] = useState<"name" | "available" | "area">("name")
   const [filteredServantName, setFilteredServantName] = useState<string | null>(null)
+  const [previewOpen, setPreviewOpen] = useState(false)
 
   // Mapa de indisponíveis: servant_id-event_id → false
   const unavailableSet = useMemo(() => {
@@ -262,8 +271,34 @@ export function ScheduleBuilder({
     return areas.every((area) => eventAssigns.some((a) => a.area_id === area.id))
   }).length
 
+  // Pré-computar mapa de atribuições por evento+área para a prévia
+  const assignmentByEventArea = useMemo(() => {
+    const map = new Map<string, ScheduleAssignment>()
+    assignments.forEach((a) => {
+      map.set(`${a.schedule_event_id}-${a.area_id}`, a)
+    })
+    return map
+  }, [assignments])
+
+  const sortedEvents = useMemo(
+    () =>
+      [...events].sort((a, b) => {
+        const dc = a.event_date.localeCompare(b.event_date)
+        return dc !== 0 ? dc : a.event_time.localeCompare(b.event_time)
+      }),
+    [events]
+  )
+
   return (
     <div className="space-y-6">
+      {/* Toolbar */}
+      <div className="flex justify-end">
+        <Button variant="outline" size="sm" onClick={() => setPreviewOpen(true)}>
+          <Eye className="mr-2 h-4 w-4" />
+          Ver Prévia da Escala
+        </Button>
+      </div>
+
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Lista de Eventos */}
         <div className="lg:col-span-1">
@@ -585,6 +620,98 @@ export function ScheduleBuilder({
           </CardContent>
         </Card>
       )}
+
+      {/* Prévia da Escala */}
+      <Dialog open={previewOpen} onOpenChange={setPreviewOpen}>
+        <DialogContent className="max-w-5xl w-full">
+          <DialogHeader>
+            <DialogTitle>Prévia da Escala</DialogTitle>
+            <DialogDescription>
+              {completedEvents}/{events.length} eventos completos
+            </DialogDescription>
+          </DialogHeader>
+          <ScrollArea className="max-h-[70vh]">
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm border-collapse">
+                <thead>
+                  <tr className="border-b">
+                    <th className="text-left font-medium py-2 pr-4 pl-1 whitespace-nowrap text-muted-foreground w-32">
+                      Data
+                    </th>
+                    <th className="text-left font-medium py-2 pr-4 text-muted-foreground">
+                      Evento
+                    </th>
+                    {areas.map((area) => (
+                      <th
+                        key={area.id}
+                        className="text-left font-medium py-2 pr-4 whitespace-nowrap text-muted-foreground"
+                      >
+                        {area.name}
+                      </th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {sortedEvents.map((event, idx) => {
+                    const prevEvent = idx > 0 ? sortedEvents[idx - 1] : null
+                    const isNewDate = !prevEvent || prevEvent.event_date !== event.event_date
+                    const isComplete = areas.every((area) =>
+                      assignmentByEventArea.has(`${event.id}-${area.id}`)
+                    )
+
+                    return (
+                      <>
+                        {isNewDate && idx > 0 && (
+                          <tr key={`sep-${event.id}`}>
+                            <td colSpan={2 + areas.length} className="py-1" />
+                          </tr>
+                        )}
+                        <tr
+                          key={event.id}
+                          className={`border-b last:border-0 ${
+                            !isComplete ? "bg-amber-50 dark:bg-amber-950/20" : ""
+                          }`}
+                        >
+                          <td className="py-2.5 pr-4 pl-1 whitespace-nowrap align-top">
+                            {isNewDate ? (
+                              <span className="font-medium">
+                                {format(parseISO(event.event_date), "EEE, dd/MM", { locale: ptBR })}
+                              </span>
+                            ) : null}
+                          </td>
+                          <td className="py-2.5 pr-4 align-top">
+                            <span className="font-medium">{event.title}</span>
+                            <span className="text-muted-foreground ml-1.5 text-xs">
+                              {event.event_time.slice(0, 5)}
+                            </span>
+                          </td>
+                          {areas.map((area) => {
+                            const assignment = assignmentByEventArea.get(`${event.id}-${area.id}`)
+                            return (
+                              <td key={area.id} className="py-2.5 pr-4 align-top whitespace-nowrap">
+                                {assignment?.servant ? (
+                                  <span className="flex items-center gap-1">
+                                    {assignment.servant.is_leader && (
+                                      <Crown className="h-3 w-3 text-yellow-500 flex-shrink-0" />
+                                    )}
+                                    {assignment.servant.name}
+                                  </span>
+                                ) : (
+                                  <span className="text-muted-foreground">—</span>
+                                )}
+                              </td>
+                            )
+                          })}
+                        </tr>
+                      </>
+                    )
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </ScrollArea>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }
