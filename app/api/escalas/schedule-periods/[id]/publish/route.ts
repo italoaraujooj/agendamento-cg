@@ -13,16 +13,10 @@ export async function POST(
       return NextResponse.json({ error: "Erro de configuração" }, { status: 500 })
     }
 
-    // Verificar se o período existe e tem eventos
+    // Verificar se o período existe
     const { data: period, error: fetchError } = await supabase
       .from("schedule_periods")
-      .select(`
-        *,
-        events:schedule_events(
-          id,
-          assignments:schedule_assignments(id)
-        )
-      `)
+      .select("*, events:schedule_events(id, requires_areas, assignments:schedule_assignments(area_id))")
       .eq("id", periodId)
       .single()
 
@@ -37,8 +31,9 @@ export async function POST(
       )
     }
 
-    // Verificar se há eventos e se todos têm atribuições
-    const events = period.events || []
+    const events: { id: string; requires_areas: string[] | null; assignments: { area_id: string }[] }[] =
+      period.events || []
+
     if (events.length === 0) {
       return NextResponse.json(
         { error: "Não há eventos neste período para publicar" },
@@ -46,15 +41,30 @@ export async function POST(
       )
     }
 
-    const eventsWithoutAssignments = events.filter(
-      (e: { assignments: unknown[] }) => !e.assignments || e.assignments.length === 0
-    )
-    
-    if (eventsWithoutAssignments.length > 0) {
+    // Buscar áreas ativas do ministério para saber quais são obrigatórias por padrão
+    const { data: allAreas } = await supabase
+      .from("areas")
+      .select("id")
+      .eq("ministry_id", period.ministry_id)
+      .eq("is_active", true)
+
+    const allAreaIds = (allAreas ?? []).map((a: { id: string }) => a.id)
+
+    // Validar que todas as áreas obrigatórias de cada evento têm atribuição
+    const incompleteEvents = events.filter((event) => {
+      const requiredAreaIds =
+        event.requires_areas && event.requires_areas.length > 0
+          ? event.requires_areas
+          : allAreaIds
+      const assignedAreaIds = new Set((event.assignments ?? []).map((a) => a.area_id))
+      return requiredAreaIds.some((areaId) => !assignedAreaIds.has(areaId))
+    })
+
+    if (incompleteEvents.length > 0) {
       return NextResponse.json(
-        { 
-          error: `Existem ${eventsWithoutAssignments.length} evento(s) sem atribuições. Monte a escala completa antes de publicar.`,
-          eventsWithoutAssignments: eventsWithoutAssignments.length
+        {
+          error: `Existem ${incompleteEvents.length} evento(s) com áreas obrigatórias sem atribuição. Monte a escala completa antes de publicar.`,
+          incompleteEvents: incompleteEvents.length,
         },
         { status: 400 }
       )

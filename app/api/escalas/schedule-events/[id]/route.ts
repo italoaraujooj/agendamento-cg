@@ -1,6 +1,37 @@
 import { NextRequest, NextResponse } from "next/server"
 import { createAdminClient } from "@/lib/supabase/server"
 
+// PATCH - Atualizar campos de um evento (ex: requires_areas)
+export async function PATCH(
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  try {
+    const { id: eventId } = await params
+    const body = await request.json()
+    const supabase = createAdminClient()
+    if (!supabase) {
+      return NextResponse.json({ error: "Erro de configuração" }, { status: 500 })
+    }
+
+    const { requires_areas } = body
+
+    const { error } = await supabase
+      .from("schedule_events")
+      .update({ requires_areas })
+      .eq("id", eventId)
+
+    if (error) {
+      return NextResponse.json({ error: error.message }, { status: 500 })
+    }
+
+    return NextResponse.json({ success: true })
+  } catch (error) {
+    console.error("Erro ao atualizar evento:", error)
+    return NextResponse.json({ error: "Erro interno do servidor" }, { status: 500 })
+  }
+}
+
 // DELETE - Remover um evento do período
 export async function DELETE(
   request: NextRequest,

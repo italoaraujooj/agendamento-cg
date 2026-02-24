@@ -846,6 +846,29 @@ export default function PeriodoDetalhePage() {
               </>
             )}
 
+            {period.status === "published" && (
+              <>
+                <Button variant="outline" asChild className="w-full sm:w-auto">
+                  <Link href={`/admin-escalas/montar/${period.id}`}>
+                    <CheckCircle className="mr-2 h-4 w-4" />
+                    Ver Escala
+                  </Link>
+                </Button>
+                <Button
+                  variant="outline"
+                  className="w-full sm:w-auto"
+                  onClick={() => {
+                    const link = `${window.location.origin}/minha-escala`
+                    navigator.clipboard.writeText(link)
+                    toast.success("Link copiado! Compartilhe com os servos.")
+                  }}
+                >
+                  <Send className="mr-2 h-4 w-4" />
+                  Compartilhar com Servos
+                </Button>
+              </>
+            )}
+
             {period.status !== "published" && period.status !== "closed" && (
               <Button
                 variant="destructive"
