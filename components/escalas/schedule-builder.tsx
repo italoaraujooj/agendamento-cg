@@ -37,6 +37,7 @@ import {
   ChevronRight,
   ChevronDown,
   ChevronUp,
+  Plus,
 } from "lucide-react"
 import { format, parseISO } from "date-fns"
 import { ptBR } from "date-fns/locale"
@@ -74,6 +75,7 @@ export function ScheduleBuilder({
     events.length > 0 ? events[0].id : null
   )
   const [loading, setLoading] = useState<string | null>(null)
+  const [addingAreaId, setAddingAreaId] = useState<string | null>(null)
   const [summarySort, setSummarySort] = useState<"name" | "available" | "area">("name")
   const [filteredServantName, setFilteredServantName] = useState<string | null>(null)
   const [previewOpen, setPreviewOpen] = useState(false)
@@ -273,7 +275,7 @@ export function ScheduleBuilder({
   const selectedEvent = events.find((e) => e.id === selectedEventId)
   const eventAssignments = selectedEventId ? getEventAssignments(selectedEventId) : []
 
-  const handleAssign = async (eventId: string, servantId: string, areaId: string) => {
+  const handleAddAssignment = async (eventId: string, servantId: string, areaId: string) => {
     setLoading(`${eventId}-${areaId}`)
     try {
       const response = await fetch("/api/escalas/assignments", {
@@ -283,6 +285,7 @@ export function ScheduleBuilder({
           schedule_event_id: eventId,
           servant_id: servantId,
           area_id: areaId,
+          mode: "add",
         }),
       })
 
@@ -300,11 +303,11 @@ export function ScheduleBuilder({
     }
   }
 
-  const handleRemoveAssignment = async (eventId: string, areaId: string) => {
-    setLoading(`${eventId}-${areaId}`)
+  const handleRemoveAssignmentById = async (assignmentId: string) => {
+    setLoading(`remove-${assignmentId}`)
     try {
       const response = await fetch(
-        `/api/escalas/assignments?event_id=${eventId}&area_id=${areaId}`,
+        `/api/escalas/assignments?id=${assignmentId}`,
         { method: "DELETE" }
       )
 
@@ -367,11 +370,13 @@ export function ScheduleBuilder({
     return getRequiredAreas(event).every((area) => eventAssigns.some((a) => a.area_id === area.id))
   }).length
 
-  // Pré-computar mapa de atribuições por evento+área para a prévia
-  const assignmentByEventArea = useMemo(() => {
-    const map = new Map<string, ScheduleAssignment>()
+  // Pré-computar mapa de atribuições por evento+área para a prévia (múltiplos por área)
+  const assignmentsByEventArea = useMemo(() => {
+    const map = new Map<string, ScheduleAssignment[]>()
     assignments.forEach((a) => {
-      map.set(`${a.schedule_event_id}-${a.area_id}`, a)
+      const key = `${a.schedule_event_id}-${a.area_id}`
+      if (!map.has(key)) map.set(key, [])
+      map.get(key)!.push(a)
     })
     return map
   }, [assignments])
@@ -420,7 +425,9 @@ export function ScheduleBuilder({
                       {(() => {
                         const assigns = getEventAssignments(selectedEvent.id)
                         const required = getRequiredAreas(selectedEvent)
-                        const done = assigns.filter((a) => required.some((r) => r.id === a.area_id)).length
+                        const done = new Set(
+                          assigns.filter((a) => required.some((r) => r.id === a.area_id)).map((a) => a.area_id)
+                        ).size
                         return done === required.length ? (
                           <Check className="h-4 w-4 text-green-500 flex-shrink-0" />
                         ) : (
@@ -503,9 +510,10 @@ export function ScheduleBuilder({
                   {sortedFilteredEvents.map((event) => {
                     const assigns = getEventAssignments(event.id)
                     const required = getRequiredAreas(event)
-                    const assignedRequired = assigns.filter((a) =>
-                      required.some((r) => r.id === a.area_id)
-                    ).length
+                    const assignedAreaIds = new Set(
+                      assigns.filter((a) => required.some((r) => r.id === a.area_id)).map((a) => a.area_id)
+                    )
+                    const assignedRequired = assignedAreaIds.size
                     const isComplete = assignedRequired === required.length
                     const availableCount = eventAvailableServantCount.get(event.id) ?? 0
                     const isSelected = selectedEventId === event.id
@@ -576,10 +584,10 @@ export function ScheduleBuilder({
               <CardContent className="space-y-6">
                 {areas.map((area) => {
                   const areaServants = getAreaServants(area.id)
-                  const currentAssignment = eventAssignments.find(
-                    (a) => a.area_id === area.id
-                  )
-                  const isLoading = loading === `${selectedEvent.id}-${area.id}`
+                  const areaAssignments = eventAssignments.filter((a) => a.area_id === area.id)
+                  const assignedServantIds = new Set(areaAssignments.map((a) => a.servant_id))
+                  const isAdding = addingAreaId === area.id
+                  const isAreaLoading = loading === `${selectedEvent.id}-${area.id}`
                   const isToggling = loading === `area-req-${selectedEvent.id}-${area.id}`
                   const isRequired =
                     !selectedEvent.requires_areas ||
@@ -590,25 +598,38 @@ export function ScheduleBuilder({
                       key={area.id}
                       className={`space-y-2 transition-opacity ${!isRequired ? "opacity-50" : ""}`}
                     >
+                      {/* Cabeçalho da área */}
                       <div className="flex items-center justify-between">
                         <div className="flex items-center gap-2">
                           <h4 className={`font-medium ${!isRequired ? "line-through text-muted-foreground" : ""}`}>
                             {area.name}
                           </h4>
                           {!isRequired && (
-                            <Badge variant="outline" className="text-xs">
-                              Não aplicável
-                            </Badge>
+                            <Badge variant="outline" className="text-xs">Não aplicável</Badge>
                           )}
                         </div>
                         <div className="flex items-center gap-1">
+                          {/* Adicionar servo */}
+                          {isRequired && (
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="h-7 w-7 p-0"
+                              title="Adicionar servo"
+                              onClick={() => setAddingAreaId(isAdding ? null : area.id)}
+                              disabled={isToggling || !!loading}
+                            >
+                              <Plus className="h-3.5 w-3.5 text-emerald-600" />
+                            </Button>
+                          )}
+                          {/* Excluir/restaurar área */}
                           <Button
                             variant="ghost"
                             size="sm"
                             className="h-7 w-7 p-0"
                             title={isRequired ? "Excluir área deste evento" : "Restaurar área neste evento"}
                             onClick={() => handleToggleAreaRequirement(selectedEvent, area.id)}
-                            disabled={isToggling || isLoading}
+                            disabled={isToggling || !!loading}
                           >
                             {isToggling ? (
                               <Loader2 className="h-3.5 w-3.5 animate-spin" />
@@ -618,23 +639,6 @@ export function ScheduleBuilder({
                               <CirclePlus className="h-3.5 w-3.5 text-emerald-600" />
                             )}
                           </Button>
-                          {currentAssignment && isRequired && (
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              className="h-7 w-7 p-0"
-                              onClick={() =>
-                                handleRemoveAssignment(selectedEvent.id, area.id)
-                              }
-                              disabled={isLoading}
-                            >
-                              {isLoading ? (
-                                <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                              ) : (
-                                <X className="h-3.5 w-3.5" />
-                              )}
-                            </Button>
-                          )}
                         </div>
                       </div>
 
@@ -643,93 +647,121 @@ export function ScheduleBuilder({
                           Esta área não é necessária neste evento.
                         </p>
                       ) : (
-                      <>
-                      <Select
-                        value={currentAssignment?.servant_id || ""}
-                        onValueChange={(servantId) =>
-                          handleAssign(selectedEvent.id, servantId, area.id)
-                        }
-                        disabled={isLoading}
-                      >
-                        <SelectTrigger
-                          className={`w-full${currentAssignment ? " border-green-500 bg-green-50 dark:bg-green-950" : ""}`}
-                        >
-                          <SelectValue placeholder="Selecionar servo..." className="truncate" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {areaServants.length === 0 ? (
-                            <div className="p-2 text-sm text-muted-foreground">
-                              Nenhum servo cadastrado nesta área
-                            </div>
-                          ) : (
-                            areaServants
-                              .sort((a, b) => {
-                                if (a.is_leader !== b.is_leader)
-                                  return b.is_leader ? 1 : -1
-                                return a.name.localeCompare(b.name)
-                              })
-                              .map((servant) => {
-                                const available = isServantAvailable(
-                                  servant.id,
-                                  selectedEvent.id
-                                )
-                                const assignCount =
-                                  servantAssignmentCount.get(servant.id) || 0
-                                const availEventCount =
-                                  servantAvailableEventCount.get(servant.id) ?? 0
+                        <div className="space-y-1.5">
+                          {/* Chips de servos atribuídos */}
+                          {areaAssignments.map((assignment) => {
+                            const isRemoving = loading === `remove-${assignment.id}`
+                            return (
+                              <div
+                                key={assignment.id}
+                                className="flex items-center justify-between px-2.5 py-1.5 rounded-md border border-green-500 bg-green-50 dark:bg-green-950"
+                              >
+                                <div className="flex items-center gap-1.5 text-sm min-w-0">
+                                  {(assignment.servant as { is_leader?: boolean } | null)?.is_leader && (
+                                    <Crown className="h-3 w-3 text-yellow-500 flex-shrink-0" />
+                                  )}
+                                  <span className="font-medium truncate">
+                                    {(assignment.servant as { name?: string } | null)?.name ?? "—"}
+                                  </span>
+                                </div>
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  className="h-6 w-6 p-0 flex-shrink-0"
+                                  onClick={() => handleRemoveAssignmentById(assignment.id)}
+                                  disabled={!!loading}
+                                >
+                                  {isRemoving ? (
+                                    <Loader2 className="h-3 w-3 animate-spin" />
+                                  ) : (
+                                    <X className="h-3 w-3" />
+                                  )}
+                                </Button>
+                              </div>
+                            )
+                          })}
 
-                                return (
-                                  <SelectItem
-                                    key={servant.id}
-                                    value={servant.id}
-                                    disabled={!available}
-                                    className={!available ? "opacity-50" : ""}
-                                  >
-                                    <div className="flex items-center gap-2 w-full">
-                                      {available ? (
-                                        <Check className="h-3 w-3 text-green-500 flex-shrink-0" />
-                                      ) : (
-                                        <AlertCircle className="h-3 w-3 text-red-500 flex-shrink-0" />
-                                      )}
-                                      <span className="flex-1 truncate">
-                                        {servant.name}
-                                        {servant.is_leader && (
-                                          <Crown className="inline h-3 w-3 text-yellow-500 ml-1 flex-shrink-0" />
-                                        )}
-                                      </span>
-                                      <div className="flex items-center gap-1 flex-shrink-0 ml-auto">
-                                        <Badge
-                                          variant="outline"
-                                          className="text-xs"
-                                          title={`Disponível em ${availEventCount} de ${events.length} eventos`}
+                          {/* Select de adição: sempre visível se vazio, ou quando "+" foi clicado */}
+                          {(areaAssignments.length === 0 || isAdding) && (
+                            <Select
+                              value=""
+                              onValueChange={(servantId) => {
+                                handleAddAssignment(selectedEvent.id, servantId, area.id)
+                                setAddingAreaId(null)
+                              }}
+                              disabled={isAreaLoading}
+                            >
+                              <SelectTrigger className="w-full">
+                                <SelectValue
+                                  placeholder={
+                                    areaAssignments.length === 0
+                                      ? "Selecionar servo..."
+                                      : "Adicionar servo..."
+                                  }
+                                />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {areaServants.filter((s) => !assignedServantIds.has(s.id)).length === 0 ? (
+                                  <div className="p-2 text-sm text-muted-foreground">
+                                    {areaServants.length === 0
+                                      ? "Nenhum servo cadastrado nesta área"
+                                      : "Todos os servos já foram adicionados"}
+                                  </div>
+                                ) : (
+                                  areaServants
+                                    .filter((s) => !assignedServantIds.has(s.id))
+                                    .sort((a, b) => {
+                                      if (a.is_leader !== b.is_leader) return b.is_leader ? 1 : -1
+                                      return a.name.localeCompare(b.name)
+                                    })
+                                    .map((servant) => {
+                                      const available = isServantAvailable(servant.id, selectedEvent.id)
+                                      const assignCount = servantAssignmentCount.get(servant.id) || 0
+                                      const availEventCount = servantAvailableEventCount.get(servant.id) ?? 0
+                                      return (
+                                        <SelectItem
+                                          key={servant.id}
+                                          value={servant.id}
+                                          disabled={!available}
+                                          className={!available ? "opacity-50" : ""}
                                         >
-                                          {availEventCount}/{events.length}
-                                        </Badge>
-                                        <Badge
-                                          variant={assignCount > 0 ? "secondary" : "outline"}
-                                          className="text-xs"
-                                          title={`Atribuído em ${assignCount} evento(s)`}
-                                        >
-                                          {assignCount}×
-                                        </Badge>
-                                      </div>
-                                    </div>
-                                  </SelectItem>
-                                )
-                              })
+                                          <div className="flex items-center gap-2 w-full">
+                                            {available ? (
+                                              <Check className="h-3 w-3 text-green-500 flex-shrink-0" />
+                                            ) : (
+                                              <AlertCircle className="h-3 w-3 text-red-500 flex-shrink-0" />
+                                            )}
+                                            <span className="flex-1 truncate">
+                                              {servant.name}
+                                              {servant.is_leader && (
+                                                <Crown className="inline h-3 w-3 text-yellow-500 ml-1 flex-shrink-0" />
+                                              )}
+                                            </span>
+                                            <div className="flex items-center gap-1 flex-shrink-0 ml-auto">
+                                              <Badge
+                                                variant="outline"
+                                                className="text-xs"
+                                                title={`Disponível em ${availEventCount} de ${events.length} eventos`}
+                                              >
+                                                {availEventCount}/{events.length}
+                                              </Badge>
+                                              <Badge
+                                                variant={assignCount > 0 ? "secondary" : "outline"}
+                                                className="text-xs"
+                                                title={`Atribuído em ${assignCount} evento(s)`}
+                                              >
+                                                {assignCount}×
+                                              </Badge>
+                                            </div>
+                                          </div>
+                                        </SelectItem>
+                                      )
+                                    })
+                                )}
+                              </SelectContent>
+                            </Select>
                           )}
-                        </SelectContent>
-                      </Select>
-
-                      {!currentAssignment && (
-                        <p className="text-xs text-muted-foreground">
-                          {areaServants.filter((s) =>
-                            isServantAvailable(s.id, selectedEvent.id)
-                          ).length}{" "}
-                          servo(s) disponível(is)
-                        </p>
-                      )}
-                      </>
+                        </div>
                       )}
                     </div>
                   )
@@ -890,7 +922,7 @@ export function ScheduleBuilder({
                     {dayEvents.map((event) => {
                       const required = getRequiredAreas(event)
                       const assignedCount = required.filter((area) =>
-                        assignmentByEventArea.has(`${event.id}-${area.id}`)
+                        (assignmentsByEventArea.get(`${event.id}-${area.id}`) ?? []).length > 0
                       ).length
                       const isComplete = assignedCount === required.length
 
@@ -923,7 +955,7 @@ export function ScheduleBuilder({
                           {/* Grid de áreas */}
                           <div className="grid grid-cols-2 sm:grid-cols-3 gap-x-6 gap-y-3">
                             {areas.map((area) => {
-                              const assignment = assignmentByEventArea.get(`${event.id}-${area.id}`)
+                              const areaList = assignmentsByEventArea.get(`${event.id}-${area.id}`) ?? []
                               const isAreaRequired =
                                 !event.requires_areas || event.requires_areas.includes(area.id)
                               return (
@@ -936,13 +968,17 @@ export function ScheduleBuilder({
                                   </p>
                                   {!isAreaRequired ? (
                                     <p className="text-sm italic text-muted-foreground">N/A</p>
-                                  ) : assignment?.servant ? (
-                                    <p className="text-sm flex items-center gap-1">
-                                      {assignment.servant.is_leader && (
-                                        <Crown className="h-3 w-3 text-yellow-500 flex-shrink-0" />
-                                      )}
-                                      {assignment.servant.name}
-                                    </p>
+                                  ) : areaList.length > 0 ? (
+                                    <div className="space-y-0.5">
+                                      {areaList.map((a, i) => (
+                                        <p key={i} className="text-sm flex items-center gap-1">
+                                          {(a.servant as { is_leader?: boolean } | null)?.is_leader && (
+                                            <Crown className="h-3 w-3 text-yellow-500 flex-shrink-0" />
+                                          )}
+                                          {(a.servant as { name?: string } | null)?.name ?? "—"}
+                                        </p>
+                                      ))}
+                                    </div>
                                   ) : (
                                     <p className="text-sm text-muted-foreground">—</p>
                                   )}
@@ -1010,7 +1046,7 @@ export function ScheduleBuilder({
                 {dayEvents.map((event) => {
                   const required = getRequiredAreas(event)
                   const isComplete = required.every((area) =>
-                    assignmentByEventArea.has(`${event.id}-${area.id}`)
+                    (assignmentsByEventArea.get(`${event.id}-${area.id}`) ?? []).length > 0
                   )
                   return (
                     <div
@@ -1035,16 +1071,26 @@ export function ScheduleBuilder({
                       {/* Grid de áreas */}
                       <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: "8px 24px" }}>
                         {areas.map((area) => {
-                          const assignment = assignmentByEventArea.get(`${event.id}-${area.id}`)
+                          const areaList = assignmentsByEventArea.get(`${event.id}-${area.id}`) ?? []
                           const isAreaRequired = !event.requires_areas || event.requires_areas.includes(area.id)
                           return (
                             <div key={area.id} style={{ opacity: !isAreaRequired ? 0.35 : 1 }}>
                               <p style={{ fontSize: "10px", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.05em", color: "#9ca3af", marginBottom: "2px" }}>
                                 {area.name}
                               </p>
-                              <p style={{ fontSize: "13px", color: !isAreaRequired ? "#9ca3af" : assignment?.servant ? "#111827" : "#9ca3af", fontStyle: !isAreaRequired ? "italic" : "normal" }}>
-                                {!isAreaRequired ? "N/A" : assignment?.servant ? assignment.servant.name : "—"}
-                              </p>
+                              {!isAreaRequired ? (
+                                <p style={{ fontSize: "13px", color: "#9ca3af", fontStyle: "italic" }}>N/A</p>
+                              ) : areaList.length > 0 ? (
+                                <div>
+                                  {areaList.map((a, i) => (
+                                    <p key={i} style={{ fontSize: "13px", color: "#111827", margin: 0 }}>
+                                      {(a.servant as { name?: string } | null)?.name ?? "—"}
+                                    </p>
+                                  ))}
+                                </div>
+                              ) : (
+                                <p style={{ fontSize: "13px", color: "#9ca3af" }}>—</p>
+                              )}
                             </div>
                           )
                         })}

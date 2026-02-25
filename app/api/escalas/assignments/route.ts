@@ -7,6 +7,7 @@ const assignmentSchema = z.object({
   servant_id: z.string().uuid(),
   area_id: z.string().uuid(),
   notes: z.string().max(500).optional().nullable(),
+  mode: z.enum(["replace", "add"]).optional().default("replace"),
 })
 
 // GET - Listar atribuições (por período ou evento)
@@ -69,14 +70,16 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    const { schedule_event_id, servant_id, area_id, notes } = validationResult.data
+    const { schedule_event_id, servant_id, area_id, notes, mode } = validationResult.data
 
-    // Remover atribuição existente para este evento e área (se houver)
-    await supabase
-      .from("schedule_assignments")
-      .delete()
-      .eq("schedule_event_id", schedule_event_id)
-      .eq("area_id", area_id)
+    // No modo "replace", remove a atribuição existente antes de inserir
+    if (mode !== "add") {
+      await supabase
+        .from("schedule_assignments")
+        .delete()
+        .eq("schedule_event_id", schedule_event_id)
+        .eq("area_id", area_id)
+    }
 
     // Criar nova atribuição
     const { data, error } = await supabase
