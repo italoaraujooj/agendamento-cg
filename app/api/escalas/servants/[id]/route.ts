@@ -10,6 +10,7 @@ const servantUpdateSchema = z.object({
   notes: z.string().max(500).optional().nullable(),
   is_active: z.boolean().optional(),
   area_id: z.string().uuid().optional(),
+  area_ids: z.array(z.string().uuid()).min(1).optional(),
 })
 
 // GET - Buscar servo por ID
@@ -31,7 +32,8 @@ export async function GET(
         area:areas(
           *,
           ministry:ministries(*)
-        )
+        ),
+        servant_areas(area_id, area:areas(*))
       `)
       .eq("id", id)
       .single()
@@ -73,10 +75,16 @@ export async function PUT(
       )
     }
 
-    const updateData = { ...validationResult.data }
+    const { area_ids, ...restData } = validationResult.data
+    const updateData = { ...restData }
     // Converter string vazia para null no email
     if (updateData.email === "") {
       updateData.email = null
+    }
+
+    // Se area_ids fornecido, manter área primária como a primeira da lista
+    if (area_ids && area_ids.length > 0) {
+      updateData.area_id = area_ids[0]
     }
 
     const { data, error } = await supabase
@@ -92,6 +100,14 @@ export async function PUT(
       }
       console.error("Erro ao atualizar servo:", error)
       return NextResponse.json({ error: error.message }, { status: 500 })
+    }
+
+    // Sincronizar servant_areas se area_ids fornecido
+    if (area_ids && area_ids.length > 0) {
+      await supabase.from("servant_areas").delete().eq("servant_id", id)
+      await supabase.from("servant_areas").insert(
+        area_ids.map((area_id) => ({ servant_id: id, area_id }))
+      )
     }
 
     return NextResponse.json(data)

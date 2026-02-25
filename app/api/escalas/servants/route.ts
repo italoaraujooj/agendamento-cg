@@ -31,7 +31,8 @@ export async function GET(request: NextRequest) {
           id,
           name,
           ministry:ministries(id, name, color)
-        )
+        ),
+        servant_areas(area_id, area:areas(id, name, ministry_id))
       `)
       .eq("is_active", true)
       .order("is_leader", { ascending: false })
@@ -41,30 +42,25 @@ export async function GET(request: NextRequest) {
       query = query.eq("area_id", areaId)
     }
 
-    if (ministryId) {
-      const { data: areas, error: areasError } = await supabase
-        .from("areas")
-        .select("id")
-        .eq("ministry_id", ministryId)
-      if (areasError) {
-        console.error("Erro ao buscar áreas do ministério:", areasError)
-        return NextResponse.json({ error: "Erro ao buscar áreas" }, { status: 500 })
-      }
-      const areaIds = areas?.map((a) => a.id) ?? []
-      if (areaIds.length === 0) {
-        return NextResponse.json([])
-      }
-      query = query.in("area_id", areaIds)
-    }
-
-    const { data, error } = await query
+    const { data: allData, error } = await query
 
     if (error) {
       console.error("Erro ao buscar servos:", error)
       return NextResponse.json({ error: error.message }, { status: 500 })
     }
 
-    return NextResponse.json(data)
+    if (ministryId) {
+      const filtered = (allData ?? []).filter((s: any) => {
+        const primaryMatch = s.area?.ministry?.id === ministryId
+        const secondaryMatch = s.servant_areas?.some(
+          (sa: any) => sa.area?.ministry_id === ministryId
+        )
+        return primaryMatch || secondaryMatch
+      })
+      return NextResponse.json(filtered)
+    }
+
+    return NextResponse.json(allData)
   } catch (error) {
     console.error("Erro na API de servos:", error)
     return NextResponse.json({ error: "Erro interno do servidor" }, { status: 500 })
@@ -108,6 +104,12 @@ export async function POST(request: NextRequest) {
       console.error("Erro ao criar servo:", error)
       return NextResponse.json({ error: error.message }, { status: 500 })
     }
+
+    // Inserir na tabela junction servant_areas
+    await supabase
+      .from("servant_areas")
+      .insert({ servant_id: data.id, area_id })
+      .throwOnError()
 
     return NextResponse.json(data, { status: 201 })
   } catch (error) {
