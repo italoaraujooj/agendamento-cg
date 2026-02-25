@@ -652,13 +652,9 @@ export function ScheduleBuilder({
                         disabled={isLoading}
                       >
                         <SelectTrigger
-                          className={
-                            currentAssignment
-                              ? "border-green-500 bg-green-50 dark:bg-green-950"
-                              : ""
-                          }
+                          className={`w-full${currentAssignment ? " border-green-500 bg-green-50 dark:bg-green-950" : ""}`}
                         >
-                          <SelectValue placeholder="Selecionar servo..." />
+                          <SelectValue placeholder="Selecionar servo..." className="truncate" />
                         </SelectTrigger>
                         <SelectContent>
                           {areaServants.length === 0 ? (
