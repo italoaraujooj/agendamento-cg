@@ -101,8 +101,11 @@ function SelectLabel({
 function SelectItem({
   className,
   children,
+  renderValue,
   ...props
-}: React.ComponentProps<typeof SelectPrimitive.Item>) {
+}: React.ComponentProps<typeof SelectPrimitive.Item> & {
+  renderValue?: React.ReactNode
+}) {
   return (
     <SelectPrimitive.Item
       data-slot="select-item"
@@ -117,7 +120,14 @@ function SelectItem({
           <CheckIcon className="size-4" />
         </SelectPrimitive.ItemIndicator>
       </span>
-      <SelectPrimitive.ItemText>{children}</SelectPrimitive.ItemText>
+      {renderValue !== undefined ? (
+        <>
+          <SelectPrimitive.ItemText>{renderValue}</SelectPrimitive.ItemText>
+          {children}
+        </>
+      ) : (
+        <SelectPrimitive.ItemText>{children}</SelectPrimitive.ItemText>
+      )}
     </SelectPrimitive.Item>
   )
 }
