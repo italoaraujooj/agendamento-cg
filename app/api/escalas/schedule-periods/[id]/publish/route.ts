@@ -8,6 +8,8 @@ export async function POST(
 ) {
   try {
     const { id: periodId } = await params
+    const body = await request.json().catch(() => ({}))
+    const force = body?.force === true
     const supabase = createAdminClient()
     if (!supabase) {
       return NextResponse.json({ error: "Erro de configuração" }, { status: 500 })
@@ -53,10 +55,10 @@ export async function POST(
       return requiredAreaIds.some((areaId) => !assignedAreaIds.has(areaId))
     })
 
-    if (incompleteEvents.length > 0) {
+    if (incompleteEvents.length > 0 && !force) {
       return NextResponse.json(
         {
-          error: `Existem ${incompleteEvents.length} evento(s) com áreas obrigatórias sem atribuição. Monte a escala completa antes de publicar.`,
+          error: `Existem ${incompleteEvents.length} evento(s) com áreas obrigatórias sem atribuição.`,
           incompleteEvents: incompleteEvents.length,
         },
         { status: 400 }

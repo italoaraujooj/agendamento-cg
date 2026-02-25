@@ -61,6 +61,8 @@ export default function MontarEscalaPage() {
   const [loading, setLoading] = useState(true)
   const [publishDialog, setPublishDialog] = useState(false)
   const [publishing, setPublishing] = useState(false)
+  const [incompleteWarning, setIncompleteWarning] = useState(false)
+  const [incompleteCount, setIncompleteCount] = useState(0)
 
   useEffect(() => {
     setMode("escalas")
@@ -167,15 +169,23 @@ export default function MontarEscalaPage() {
     }
   }, [isAdmin, fetchData])
 
-  const handlePublish = async () => {
+  const handlePublish = async (force = false) => {
     setPublishing(true)
     try {
       const response = await fetch(`/api/escalas/schedule-periods/${periodId}/publish`, {
         method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ force }),
       })
       const data = await response.json()
 
       if (!response.ok) {
+        if (data.incompleteEvents && !force) {
+          setIncompleteCount(data.incompleteEvents)
+          setPublishDialog(false)
+          setIncompleteWarning(true)
+          return
+        }
         throw new Error(data.error || "Erro ao publicar")
       }
 
@@ -191,6 +201,7 @@ export default function MontarEscalaPage() {
     } finally {
       setPublishing(false)
       setPublishDialog(false)
+      setIncompleteWarning(false)
     }
   }
 
@@ -204,7 +215,7 @@ export default function MontarEscalaPage() {
     return requiredAreas.every((area) => eventAssigns.some((a) => a.area_id === area.id))
   }).length
 
-  const canPublish = completedEvents === events.length && events.length > 0
+  const canPublish = events.length > 0
 
   if (authLoading || !adminChecked || loading) {
     return (
@@ -319,9 +330,35 @@ export default function MontarEscalaPage() {
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancelar</AlertDialogCancel>
-            <AlertDialogAction onClick={handlePublish} disabled={publishing}>
+            <AlertDialogAction onClick={() => handlePublish()} disabled={publishing}>
               {publishing && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
               {period.status === "published" ? "Atualizar" : "Publicar"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Incomplete Events Warning */}
+      <AlertDialog open={incompleteWarning} onOpenChange={setIncompleteWarning}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Eventos sem preenchimento</AlertDialogTitle>
+            <AlertDialogDescription>
+              <strong>{incompleteCount} evento(s)</strong> ainda possuem áreas obrigatórias sem servo atribuído.
+              <br />
+              <br />
+              Deseja publicar a escala mesmo assim? Os eventos incompletos ficarão visíveis com as áreas em branco.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Voltar e corrigir</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => handlePublish(true)}
+              disabled={publishing}
+              className="bg-amber-600 hover:bg-amber-700 text-white"
+            >
+              {publishing && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              Publicar mesmo assim
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
