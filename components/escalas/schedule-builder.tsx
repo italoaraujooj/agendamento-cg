@@ -684,19 +684,6 @@ export function ScheduleBuilder({
                                     value={servant.id}
                                     disabled={!available}
                                     className={!available ? "opacity-50" : ""}
-                                    renderValue={
-                                      <span className="flex items-center gap-1.5 truncate">
-                                        {available ? (
-                                          <Check className="h-3 w-3 text-green-500 flex-shrink-0" />
-                                        ) : (
-                                          <AlertCircle className="h-3 w-3 text-red-500 flex-shrink-0" />
-                                        )}
-                                        <span className="truncate">{servant.name}</span>
-                                        {servant.is_leader && (
-                                          <Crown className="h-3 w-3 text-yellow-500 flex-shrink-0" />
-                                        )}
-                                      </span>
-                                    }
                                   >
                                     <div className="flex items-center gap-2 w-full">
                                       {available ? (
