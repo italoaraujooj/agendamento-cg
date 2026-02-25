@@ -228,25 +228,47 @@ export default function MinhaEscalaPage() {
                                   )}
                                 </div>
 
-                                {/* Atribuições */}
+                                {/* Atribuições agrupadas por área */}
                                 {event.assignments.length > 0 ? (
                                   <div className="space-y-1 pl-1">
-                                    {event.assignments.map((a, idx) => (
-                                      <div
-                                        key={idx}
-                                        className={`flex items-center gap-2 text-sm ${
-                                          a.isMe ? "font-semibold text-primary" : "text-muted-foreground"
-                                        }`}
-                                      >
-                                        {a.isMe && (
-                                          <Crown className="h-3 w-3 text-primary flex-shrink-0" />
-                                        )}
-                                        <span className={`text-xs ${a.isMe ? "text-primary/70" : "text-muted-foreground/70"}`}>
-                                          {a.areaName}:
-                                        </span>
-                                        <span>{a.servantName}</span>
-                                      </div>
-                                    ))}
+                                    {Object.entries(
+                                      event.assignments.reduce<Record<string, Assignment[]>>(
+                                        (acc, a) => {
+                                          if (!acc[a.areaName]) acc[a.areaName] = []
+                                          acc[a.areaName].push(a)
+                                          return acc
+                                        },
+                                        {}
+                                      )
+                                    ).map(([areaName, areaAssignments]) => {
+                                      const hasMe = areaAssignments.some((a) => a.isMe)
+                                      return (
+                                        <div
+                                          key={areaName}
+                                          className={`flex items-start gap-2 text-sm ${
+                                            hasMe ? "font-semibold text-primary" : "text-muted-foreground"
+                                          }`}
+                                        >
+                                          {hasMe && (
+                                            <Crown className="h-3 w-3 text-primary flex-shrink-0 mt-0.5" />
+                                          )}
+                                          <span className={`text-xs flex-shrink-0 mt-0.5 ${hasMe ? "text-primary/70" : "text-muted-foreground/70"}`}>
+                                            {areaName}:
+                                          </span>
+                                          <span className="flex flex-wrap gap-x-1">
+                                            {areaAssignments.map((a, i) => (
+                                              <span
+                                                key={i}
+                                                className={a.isMe ? "text-primary" : ""}
+                                              >
+                                                {a.servantName}
+                                                {i < areaAssignments.length - 1 && ","}
+                                              </span>
+                                            ))}
+                                          </span>
+                                        </div>
+                                      )
+                                    })}
                                   </div>
                                 ) : (
                                   <p className="text-xs text-muted-foreground pl-1">
