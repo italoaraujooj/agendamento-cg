@@ -46,6 +46,7 @@ export interface Servant {
   updated_at: string
   // Relacionamentos
   area?: Area
+  servant_areas?: { area_id: string; area?: Area }[]
 }
 
 export interface RegularEvent {

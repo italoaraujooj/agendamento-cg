@@ -118,18 +118,21 @@ export default function MontarEscalaPage() {
 
       setAreas(areasData || [])
 
-      // Buscar servos das áreas
+      // Buscar servos das áreas (incluindo áreas secundárias via servant_areas)
       const { data: servantsData } = await supabase
         .from("servants")
         .select(`
           *,
-          area:areas(*)
+          area:areas(*),
+          servant_areas(area_id, area:areas(id, ministry_id))
         `)
         .eq("is_active", true)
 
-      // Filtrar servos do ministério
+      // Filtrar servos do ministério (área primária OU área secundária)
       const ministryServants = servantsData?.filter(
-        (s) => s.area?.ministry_id === periodData.ministry_id
+        (s) =>
+          s.area?.ministry_id === periodData.ministry_id ||
+          s.servant_areas?.some((sa: any) => sa.area?.ministry_id === periodData.ministry_id)
       ) || []
       setServants(ministryServants)
 

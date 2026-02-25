@@ -43,7 +43,9 @@ export async function GET(
             name,
             email,
             is_active,
-            is_leader
+            is_leader,
+            area_id,
+            servant_areas(area_id)
           )
         )
       `)
@@ -63,7 +65,9 @@ export async function GET(
               name,
               email,
               is_active,
-              is_leader
+              is_leader,
+              area_id,
+              servant_areas(area_id)
             )
           )
         `)
