@@ -691,24 +691,28 @@ export function ScheduleBuilder({
                                       ) : (
                                         <AlertCircle className="h-3 w-3 text-red-500 flex-shrink-0" />
                                       )}
-                                      <span className="flex-1">{servant.name}</span>
-                                      {servant.is_leader && (
-                                        <Crown className="h-3 w-3 text-yellow-500 flex-shrink-0" />
-                                      )}
-                                      <Badge
-                                        variant="outline"
-                                        className="ml-1 text-xs"
-                                        title={`Disponível em ${availEventCount} de ${events.length} eventos`}
-                                      >
-                                        {availEventCount}/{events.length}
-                                      </Badge>
-                                      <Badge
-                                        variant={assignCount > 0 ? "secondary" : "outline"}
-                                        className="text-xs"
-                                        title={`Atribuído em ${assignCount} evento(s)`}
-                                      >
-                                        {assignCount}×
-                                      </Badge>
+                                      <span className="flex-1 truncate">
+                                        {servant.name}
+                                        {servant.is_leader && (
+                                          <Crown className="inline h-3 w-3 text-yellow-500 ml-1 flex-shrink-0" />
+                                        )}
+                                      </span>
+                                      <div className="flex items-center gap-1 flex-shrink-0 ml-auto">
+                                        <Badge
+                                          variant="outline"
+                                          className="text-xs"
+                                          title={`Disponível em ${availEventCount} de ${events.length} eventos`}
+                                        >
+                                          {availEventCount}/{events.length}
+                                        </Badge>
+                                        <Badge
+                                          variant={assignCount > 0 ? "secondary" : "outline"}
+                                          className="text-xs"
+                                          title={`Atribuído em ${assignCount} evento(s)`}
+                                        >
+                                          {assignCount}×
+                                        </Badge>
+                                      </div>
                                     </div>
                                   </SelectItem>
                                 )
