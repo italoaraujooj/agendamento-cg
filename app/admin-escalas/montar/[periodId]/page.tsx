@@ -201,7 +201,6 @@ export default function MontarEscalaPage() {
     } finally {
       setPublishing(false)
       setPublishDialog(false)
-      setIncompleteWarning(false)
     }
   }
 
