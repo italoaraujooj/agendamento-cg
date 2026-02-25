@@ -13,6 +13,7 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog"
 import { Loader2, Search, UserPlus } from "lucide-react"
+import { Checkbox } from "@/components/ui/checkbox"
 import { toast } from "sonner"
 import { maskPhone } from "@/lib/masks"
 import type { Servant, Area, Ministry } from "@/types/escalas"
@@ -24,12 +25,13 @@ interface ServantWithArea extends Servant {
 interface ServantFormProps {
   areaId: string
   servant?: Servant
+  areas?: Area[]
   open: boolean
   onOpenChange: (open: boolean) => void
   onSuccess: () => void
 }
 
-export function ServantForm({ areaId, servant, open, onOpenChange, onSuccess }: ServantFormProps) {
+export function ServantForm({ areaId, servant, areas, open, onOpenChange, onSuccess }: ServantFormProps) {
   const isEditing = !!servant
 
   const [loading, setLoading] = useState(false)
@@ -39,6 +41,15 @@ export function ServantForm({ areaId, servant, open, onOpenChange, onSuccess }: 
     phone: servant?.phone || "",
     notes: servant?.notes || "",
   })
+
+  // Area selection state (editing only)
+  const getInitialAreaIds = () => {
+    if (!servant) return [areaId]
+    const ids = new Set<string>([servant.area_id])
+    servant.servant_areas?.forEach((sa) => ids.add(sa.area_id))
+    return Array.from(ids)
+  }
+  const [selectedAreaIds, setSelectedAreaIds] = useState<string[]>(getInitialAreaIds)
 
   // Existing servant search state
   const [searchQuery, setSearchQuery] = useState("")
@@ -75,13 +86,16 @@ export function ServantForm({ areaId, servant, open, onOpenChange, onSuccess }: 
     return () => document.removeEventListener("mousedown", handleClickOutside)
   }, [])
 
-  // Reset state when dialog closes
+  // Reset state when dialog closes or servant changes
   useEffect(() => {
     if (!open) {
       setSearchQuery("")
       setShowResults(false)
+    } else {
+      // Re-initialize area selections when opening
+      setSelectedAreaIds(getInitialAreaIds())
     }
-  }, [open])
+  }, [open]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const filteredServants = searchQuery.trim().length >= 2
     ? allServants.filter(s =>
@@ -111,12 +125,16 @@ export function ServantForm({ areaId, servant, open, onOpenChange, onSuccess }: 
         ? `/api/escalas/servants/${servant.id}`
         : "/api/escalas/servants"
 
-      const payload = {
+      const payload: Record<string, unknown> = {
         area_id: areaId,
         name: formData.name,
         email: formData.email || null,
         phone: formData.phone || null,
         notes: formData.notes || null,
+      }
+
+      if (isEditing && areas && areas.length > 0) {
+        payload.area_ids = selectedAreaIds.length > 0 ? selectedAreaIds : [areaId]
       }
 
       const response = await fetch(url, {
@@ -274,6 +292,44 @@ export function ServantForm({ areaId, servant, open, onOpenChange, onSuccess }: 
                 rows={2}
               />
             </div>
+
+            {/* Area checkboxes — only when editing and areas provided */}
+            {isEditing && areas && areas.length > 1 && (
+              <div className="space-y-2">
+                <Label>Áreas</Label>
+                <div className="space-y-2">
+                  {areas.filter(a => a.is_active).map((area) => {
+                    const checked = selectedAreaIds.includes(area.id)
+                    const isLast = checked && selectedAreaIds.length === 1
+                    return (
+                      <div key={area.id} className="flex items-center gap-2">
+                        <Checkbox
+                          id={`area-${area.id}`}
+                          checked={checked}
+                          disabled={isLast}
+                          onCheckedChange={(value) => {
+                            setSelectedAreaIds((prev) =>
+                              value
+                                ? [...prev, area.id]
+                                : prev.filter((id) => id !== area.id)
+                            )
+                          }}
+                        />
+                        <label
+                          htmlFor={`area-${area.id}`}
+                          className="text-sm cursor-pointer select-none"
+                        >
+                          {area.name}
+                        </label>
+                      </div>
+                    )
+                  })}
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  Mínimo de 1 área obrigatória.
+                </p>
+              </div>
+            )}
           </div>
 
           <DialogFooter>

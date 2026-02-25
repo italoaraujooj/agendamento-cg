@@ -109,8 +109,15 @@ export function ScheduleBuilder({
     const servantMap = new Map<string, Servant[]>()
     servants.forEach((s) => {
       if (!s.is_active) return
-      if (!servantMap.has(s.area_id)) servantMap.set(s.area_id, [])
-      servantMap.get(s.area_id)!.push(s)
+      // Collect all area IDs this servant belongs to (primary + servant_areas)
+      const areaIds = new Set<string>([s.area_id])
+      s.servant_areas?.forEach((sa) => areaIds.add(sa.area_id))
+      areaIds.forEach((areaId) => {
+        if (!servantMap.has(areaId)) servantMap.set(areaId, [])
+        if (!servantMap.get(areaId)!.some((x) => x.id === s.id)) {
+          servantMap.get(areaId)!.push(s)
+        }
+      })
     })
     return (areaId: string) => servantMap.get(areaId) || []
   }, [servants])

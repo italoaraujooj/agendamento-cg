@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState, useCallback } from "react"
+import { useEffect, useState, useCallback, useMemo } from "react"
 import { useRouter, useParams } from "next/navigation"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -47,8 +47,10 @@ import { toast } from "sonner"
 import Link from "next/link"
 import type { Ministry, Area, Servant } from "@/types/escalas"
 
+type ServantWithAreas = Servant & { servant_areas?: { area_id: string }[] }
+
 interface MinistryWithAreas extends Ministry {
-  areas: (Area & { servants: Servant[] })[]
+  areas: (Area & { servants: ServantWithAreas[] })[]
 }
 
 export default function MinisterioDetalhePage() {
@@ -111,10 +113,34 @@ export default function MinisterioDetalhePage() {
     fetchMinistry()
   }, [fetchMinistry])
 
-  // Get all active servants across all areas
-  const allServants = (ministry?.areas
-    ?.flatMap(a => a.servants?.filter(s => s.is_active) || []) || [])
-    .sort((a, b) => a.name.localeCompare(b.name))
+  // Build servantsByAreaId from servant_areas junction (so servants appear in all their areas)
+  const servantsByAreaId = useMemo(() => {
+    const map = new Map<string, ServantWithAreas[]>()
+    ministry?.areas?.forEach((area) => {
+      area.servants?.filter(s => s.is_active).forEach((servant) => {
+        // Collect all area IDs this servant belongs to
+        const areaIds = new Set<string>([servant.area_id])
+        servant.servant_areas?.forEach((sa) => areaIds.add(sa.area_id))
+        areaIds.forEach((aid) => {
+          if (!map.has(aid)) map.set(aid, [])
+          // Avoid duplicates (same servant added via multiple paths)
+          if (!map.get(aid)!.some(s => s.id === servant.id)) {
+            map.get(aid)!.push(servant)
+          }
+        })
+      })
+    })
+    return map
+  }, [ministry])
+
+  // Get all active servants across all areas (deduplicated by id)
+  const allServants = useMemo(() => {
+    const seen = new Set<string>()
+    return (ministry?.areas
+      ?.flatMap(a => a.servants?.filter(s => s.is_active) || []) || [])
+      .filter(s => { if (seen.has(s.id)) return false; seen.add(s.id); return true })
+      .sort((a, b) => a.name.localeCompare(b.name))
+  }, [ministry])
 
   const uniqueServantCount = new Set(allServants.map(s => s.name.toLowerCase().trim())).size
 
@@ -318,7 +344,7 @@ export default function MinisterioDetalhePage() {
                   .filter(a => a.is_active)
                   .sort((a, b) => a.name.localeCompare(b.name))
                   .map((area) => {
-                    const count = area.servants?.filter(s => s.is_active).length || 0
+                    const count = servantsByAreaId.get(area.id)?.length || 0
                     return (
                       <Badge key={area.id} variant="secondary">
                         {area.name}: {count}
@@ -369,7 +395,7 @@ export default function MinisterioDetalhePage() {
                   .filter(a => a.is_active)
                   .sort((a, b) => a.name.localeCompare(b.name))
                   .map((area) => {
-                    const count = area.servants?.filter(s => s.is_active).length || 0
+                    const count = servantsByAreaId.get(area.id)?.length || 0
                     return (
                       <Badge key={area.id} variant="secondary">
                         {area.name}: {count}
@@ -462,11 +488,11 @@ export default function MinisterioDetalhePage() {
                     <div className="space-y-3">
                       <div className="flex items-center justify-between">
                         <span className="text-sm font-medium text-muted-foreground">
-                          Servos ({area.servants?.filter(s => s.is_active).length || 0})
+                          Servos ({servantsByAreaId.get(area.id)?.length || 0})
                         </span>
                         {canEdit && (
-                          <Button 
-                            variant="outline" 
+                          <Button
+                            variant="outline"
                             size="sm"
                             onClick={() => handleAddServant(area.id)}
                           >
@@ -475,15 +501,14 @@ export default function MinisterioDetalhePage() {
                           </Button>
                         )}
                       </div>
-                      
-                      {area.servants?.filter(s => s.is_active).length === 0 ? (
+
+                      {(servantsByAreaId.get(area.id)?.length || 0) === 0 ? (
                         <p className="text-sm text-muted-foreground italic">
                           Nenhum servo cadastrado nesta área.
                         </p>
                       ) : (
                         <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
-                          {area.servants
-                            ?.filter(s => s.is_active)
+                          {(servantsByAreaId.get(area.id) ?? [])
                             .sort((a, b) => a.name.localeCompare(b.name))
                             .map((servant) => (
                               <div 
@@ -546,6 +571,7 @@ export default function MinisterioDetalhePage() {
       <ServantForm
         areaId={selectedAreaId}
         servant={editingServant}
+        areas={ministry.areas.filter(a => a.is_active)}
         open={servantFormOpen}
         onOpenChange={setServantFormOpen}
         onSuccess={fetchMinistry}
