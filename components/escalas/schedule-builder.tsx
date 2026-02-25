@@ -33,6 +33,10 @@ import {
   CircleMinus,
   CirclePlus,
   ImageDown,
+  ChevronLeft,
+  ChevronRight,
+  ChevronDown,
+  ChevronUp,
 } from "lucide-react"
 import { format, parseISO } from "date-fns"
 import { ptBR } from "date-fns/locale"
@@ -74,6 +78,7 @@ export function ScheduleBuilder({
   const [filteredServantName, setFilteredServantName] = useState<string | null>(null)
   const [previewOpen, setPreviewOpen] = useState(false)
   const [exporting, setExporting] = useState(false)
+  const [summaryOpen, setSummaryOpen] = useState(false)
   const exportRef = useRef<HTMLDivElement>(null)
 
   // Mapa de indisponíveis: servant_id-event_id → false
@@ -198,6 +203,29 @@ export function ScheduleBuilder({
     if (!summary) return events
     return events.filter((e) => summary.ids.some((id) => !unavailableSet.has(`${id}-${e.id}`)))
   }, [filteredServantName, servantSummary, events, unavailableSet])
+
+  const sortedFilteredEvents = useMemo(
+    () =>
+      [...filteredEvents].sort((a, b) => {
+        const dc = a.event_date.localeCompare(b.event_date)
+        return dc !== 0 ? dc : a.event_time.localeCompare(b.event_time)
+      }),
+    [filteredEvents]
+  )
+
+  const currentFilteredIndex = sortedFilteredEvents.findIndex((e) => e.id === selectedEventId)
+
+  const goToPrev = () => {
+    if (currentFilteredIndex > 0) {
+      setSelectedEventId(sortedFilteredEvents[currentFilteredIndex - 1].id)
+    }
+  }
+
+  const goToNext = () => {
+    if (currentFilteredIndex < sortedFilteredEvents.length - 1) {
+      setSelectedEventId(sortedFilteredEvents[currentFilteredIndex + 1].id)
+    }
+  }
 
   const handleServantFilter = (name: string) => {
     if (filteredServantName === name) {
@@ -358,7 +386,7 @@ export function ScheduleBuilder({
   )
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
       {/* Toolbar */}
       <div className="flex justify-end">
         <Button variant="outline" size="sm" onClick={() => setPreviewOpen(true)}>
@@ -367,9 +395,81 @@ export function ScheduleBuilder({
         </Button>
       </div>
 
+      {/* Mobile: Event Navigator */}
+      <div className="lg:hidden">
+        <Card>
+          <CardContent className="p-3">
+            <div className="flex items-center gap-2">
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-10 w-10 flex-shrink-0"
+                onClick={goToPrev}
+                disabled={currentFilteredIndex <= 0}
+              >
+                <ChevronLeft className="h-5 w-5" />
+              </Button>
+
+              <div className="flex-1 text-center min-w-0">
+                {selectedEvent ? (
+                  <>
+                    <div className="flex items-center justify-center gap-2">
+                      <p className="text-sm font-semibold capitalize">
+                        {format(parseISO(selectedEvent.event_date), "EEE, dd/MM", { locale: ptBR })}
+                      </p>
+                      {(() => {
+                        const assigns = getEventAssignments(selectedEvent.id)
+                        const required = getRequiredAreas(selectedEvent)
+                        const done = assigns.filter((a) => required.some((r) => r.id === a.area_id)).length
+                        return done === required.length ? (
+                          <Check className="h-4 w-4 text-green-500 flex-shrink-0" />
+                        ) : (
+                          <Badge variant="outline" className="text-xs flex-shrink-0">
+                            {done}/{required.length}
+                          </Badge>
+                        )
+                      })()}
+                    </div>
+                    <p className="text-xs text-muted-foreground truncate mt-0.5">
+                      {selectedEvent.event_time.slice(0, 5)} — {selectedEvent.title}
+                    </p>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      {currentFilteredIndex + 1} / {sortedFilteredEvents.length}
+                      {filteredServantName && (
+                        <span className="ml-1.5 text-primary font-medium">
+                          · {filteredServantName.split(" ")[0]}
+                          <button
+                            onClick={(e) => { e.stopPropagation(); setFilteredServantName(null) }}
+                            className="ml-1 hover:opacity-70"
+                          >
+                            <X className="inline h-3 w-3" />
+                          </button>
+                        </span>
+                      )}
+                    </p>
+                  </>
+                ) : (
+                  <p className="text-sm text-muted-foreground">Nenhum evento</p>
+                )}
+              </div>
+
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-10 w-10 flex-shrink-0"
+                onClick={goToNext}
+                disabled={currentFilteredIndex >= sortedFilteredEvents.length - 1}
+              >
+                <ChevronRight className="h-5 w-5" />
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Lista de Eventos */}
-        <div className="lg:col-span-1">
+        {/* Lista de Eventos — desktop only */}
+        <div className="hidden lg:block lg:col-span-1">
           <Card>
             <CardHeader className="pb-3">
               <div className="flex items-center justify-between">
@@ -395,61 +495,55 @@ export function ScheduleBuilder({
             <CardContent className="p-0">
               <ScrollArea className="h-[500px]">
                 <div className="space-y-1 p-2">
-                  {filteredEvents.length === 0 && filteredServantName ? (
+                  {sortedFilteredEvents.length === 0 && filteredServantName ? (
                     <p className="text-sm text-muted-foreground text-center py-8">
                       Nenhum evento disponível para {filteredServantName.split(" ")[0]}
                     </p>
                   ) : null}
-                  {filteredEvents
-                    .sort((a, b) => {
-                      const dateCompare = a.event_date.localeCompare(b.event_date)
-                      if (dateCompare !== 0) return dateCompare
-                      return a.event_time.localeCompare(b.event_time)
-                    })
-                    .map((event) => {
-                      const assigns = getEventAssignments(event.id)
-                      const required = getRequiredAreas(event)
-                      const assignedRequired = assigns.filter((a) =>
-                        required.some((r) => r.id === a.area_id)
-                      ).length
-                      const isComplete = assignedRequired === required.length
-                      const availableCount = eventAvailableServantCount.get(event.id) ?? 0
-                      const isSelected = selectedEventId === event.id
+                  {sortedFilteredEvents.map((event) => {
+                    const assigns = getEventAssignments(event.id)
+                    const required = getRequiredAreas(event)
+                    const assignedRequired = assigns.filter((a) =>
+                      required.some((r) => r.id === a.area_id)
+                    ).length
+                    const isComplete = assignedRequired === required.length
+                    const availableCount = eventAvailableServantCount.get(event.id) ?? 0
+                    const isSelected = selectedEventId === event.id
 
-                      return (
-                        <button
-                          key={event.id}
-                          onClick={() => setSelectedEventId(event.id)}
-                          className={`w-full text-left p-3 rounded-lg transition-colors ${
-                            isSelected
-                              ? "bg-primary text-primary-foreground"
-                              : "hover:bg-muted"
-                          }`}
-                        >
-                          <div className="flex items-center justify-between gap-2">
-                            <div className="min-w-0">
-                              <p className="text-sm font-medium">
-                                {formatEventDate(event.event_date)}
-                              </p>
-                              <p className="text-xs opacity-80">
-                                {event.event_time.slice(0, 5)} — {event.title}
-                              </p>
-                              <p className={`text-xs mt-0.5 ${isSelected ? "opacity-70" : "text-muted-foreground"}`}>
-                                <Users className="inline h-3 w-3 mr-0.5" />
-                                {availableCount} disponív.
-                              </p>
-                            </div>
-                            {isComplete ? (
-                              <Check className="h-4 w-4 text-green-500 flex-shrink-0" />
-                            ) : (
-                              <Badge variant="outline" className="text-xs flex-shrink-0">
-                                {assignedRequired}/{required.length}
-                              </Badge>
-                            )}
+                    return (
+                      <button
+                        key={event.id}
+                        onClick={() => setSelectedEventId(event.id)}
+                        className={`w-full text-left p-3 rounded-lg transition-colors ${
+                          isSelected
+                            ? "bg-primary text-primary-foreground"
+                            : "hover:bg-muted"
+                        }`}
+                      >
+                        <div className="flex items-center justify-between gap-2">
+                          <div className="min-w-0">
+                            <p className="text-sm font-medium">
+                              {formatEventDate(event.event_date)}
+                            </p>
+                            <p className="text-xs opacity-80">
+                              {event.event_time.slice(0, 5)} — {event.title}
+                            </p>
+                            <p className={`text-xs mt-0.5 ${isSelected ? "opacity-70" : "text-muted-foreground"}`}>
+                              <Users className="inline h-3 w-3 mr-0.5" />
+                              {availableCount} disponív.
+                            </p>
                           </div>
-                        </button>
-                      )
-                    })}
+                          {isComplete ? (
+                            <Check className="h-4 w-4 text-green-500 flex-shrink-0" />
+                          ) : (
+                            <Badge variant="outline" className="text-xs flex-shrink-0">
+                              {assignedRequired}/{required.length}
+                            </Badge>
+                          )}
+                        </div>
+                      </button>
+                    )
+                  })}
                 </div>
               </ScrollArea>
             </CardContent>
@@ -457,7 +551,7 @@ export function ScheduleBuilder({
         </div>
 
         {/* Painel de Atribuição */}
-        <div className="lg:col-span-2">
+        <div className="col-span-1 lg:col-span-2">
           {selectedEvent ? (
             <Card>
               <CardHeader>
@@ -558,13 +652,9 @@ export function ScheduleBuilder({
                         disabled={isLoading}
                       >
                         <SelectTrigger
-                          className={
-                            currentAssignment
-                              ? "border-green-500 bg-green-50 dark:bg-green-950"
-                              : ""
-                          }
+                          className={`w-full${currentAssignment ? " border-green-500 bg-green-50 dark:bg-green-950" : ""}`}
                         >
-                          <SelectValue placeholder="Selecionar servo..." />
+                          <SelectValue placeholder="Selecionar servo..." className="truncate" />
                         </SelectTrigger>
                         <SelectContent>
                           {areaServants.length === 0 ? (
@@ -601,24 +691,28 @@ export function ScheduleBuilder({
                                       ) : (
                                         <AlertCircle className="h-3 w-3 text-red-500 flex-shrink-0" />
                                       )}
-                                      <span className="flex-1">{servant.name}</span>
-                                      {servant.is_leader && (
-                                        <Crown className="h-3 w-3 text-yellow-500 flex-shrink-0" />
-                                      )}
-                                      <Badge
-                                        variant="outline"
-                                        className="ml-1 text-xs"
-                                        title={`Disponível em ${availEventCount} de ${events.length} eventos`}
-                                      >
-                                        {availEventCount}/{events.length}
-                                      </Badge>
-                                      <Badge
-                                        variant={assignCount > 0 ? "secondary" : "outline"}
-                                        className="text-xs"
-                                        title={`Atribuído em ${assignCount} evento(s)`}
-                                      >
-                                        {assignCount}×
-                                      </Badge>
+                                      <span className="flex-1 truncate">
+                                        {servant.name}
+                                        {servant.is_leader && (
+                                          <Crown className="inline h-3 w-3 text-yellow-500 ml-1 flex-shrink-0" />
+                                        )}
+                                      </span>
+                                      <div className="flex items-center gap-1 flex-shrink-0 ml-auto">
+                                        <Badge
+                                          variant="outline"
+                                          className="text-xs"
+                                          title={`Disponível em ${availEventCount} de ${events.length} eventos`}
+                                        >
+                                          {availEventCount}/{events.length}
+                                        </Badge>
+                                        <Badge
+                                          variant={assignCount > 0 ? "secondary" : "outline"}
+                                          className="text-xs"
+                                          title={`Atribuído em ${assignCount} evento(s)`}
+                                        >
+                                          {assignCount}×
+                                        </Badge>
+                                      </div>
                                     </div>
                                   </SelectItem>
                                 )
@@ -658,9 +752,22 @@ export function ScheduleBuilder({
       {servants.length > 0 && (
         <Card>
           <CardHeader className="pb-3">
-            <div className="flex flex-col sm:flex-row sm:items-center gap-2 justify-between">
-              <CardTitle className="text-base">Resumo dos Servos</CardTitle>
-              <div className="flex items-center gap-1">
+            <div className="flex items-center justify-between gap-2">
+              <button
+                className="flex items-center gap-2 flex-1 text-left"
+                onClick={() => setSummaryOpen((v) => !v)}
+              >
+                <CardTitle className="text-base">Resumo dos Servos</CardTitle>
+                <Badge variant="outline" className="text-xs font-normal">
+                  {sortedSummary.length}
+                </Badge>
+                {summaryOpen ? (
+                  <ChevronUp className="h-4 w-4 text-muted-foreground lg:hidden" />
+                ) : (
+                  <ChevronDown className="h-4 w-4 text-muted-foreground lg:hidden" />
+                )}
+              </button>
+              <div className={`flex items-center gap-1 ${!summaryOpen ? "hidden lg:flex" : ""}`}>
                 <span className="text-xs text-muted-foreground mr-1">Ordenar:</span>
                 {(["name", "available", "area"] as const).map((mode) => (
                   <Button
@@ -676,7 +783,7 @@ export function ScheduleBuilder({
               </div>
             </div>
           </CardHeader>
-          <CardContent>
+          <CardContent className={`${summaryOpen ? "" : "hidden lg:block"}`}>
             <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-2">
               {sortedSummary.map((servant) => {
                 const availRatio = events.length > 0 ? servant.availCount / events.length : 1
