@@ -683,83 +683,96 @@ export function ScheduleBuilder({
 
                           {/* Select de adição: sempre visível se vazio, ou quando "+" foi clicado */}
                           {(areaAssignments.length === 0 || isAdding) && (
-                            <Select
-                              value=""
-                              onValueChange={(servantId) => {
-                                handleAddAssignment(selectedEvent.id, servantId, area.id)
-                                setAddingAreaId(null)
-                              }}
-                              disabled={isAreaLoading}
-                            >
-                              <SelectTrigger className="w-full">
-                                <SelectValue
-                                  placeholder={
-                                    areaAssignments.length === 0
-                                      ? "Selecionar servo..."
-                                      : "Adicionar servo..."
-                                  }
-                                />
-                              </SelectTrigger>
-                              <SelectContent>
-                                {areaServants.filter((s) => !assignedServantIds.has(s.id)).length === 0 ? (
-                                  <div className="p-2 text-sm text-muted-foreground">
-                                    {areaServants.length === 0
-                                      ? "Nenhum servo cadastrado nesta área"
-                                      : "Todos os servos já foram adicionados"}
-                                  </div>
-                                ) : (
-                                  areaServants
-                                    .filter((s) => !assignedServantIds.has(s.id))
-                                    .sort((a, b) => {
-                                      if (a.is_leader !== b.is_leader) return b.is_leader ? 1 : -1
-                                      return a.name.localeCompare(b.name)
-                                    })
-                                    .map((servant) => {
-                                      const available = isServantAvailable(servant.id, selectedEvent.id)
-                                      const assignCount = servantAssignmentCount.get(servant.id) || 0
-                                      const availEventCount = servantAvailableEventCount.get(servant.id) ?? 0
-                                      return (
-                                        <SelectItem
-                                          key={servant.id}
-                                          value={servant.id}
-                                          disabled={!available}
-                                          className={!available ? "opacity-50" : ""}
-                                        >
-                                          <div className="flex items-center gap-2 w-full">
-                                            {available ? (
-                                              <Check className="h-3 w-3 text-green-500 flex-shrink-0" />
-                                            ) : (
-                                              <AlertCircle className="h-3 w-3 text-red-500 flex-shrink-0" />
-                                            )}
-                                            <span className="flex-1 truncate">
-                                              {servant.name}
-                                              {servant.is_leader && (
-                                                <Crown className="inline h-3 w-3 text-yellow-500 ml-1 flex-shrink-0" />
+                            <div className={isAdding && areaAssignments.length > 0 ? "flex items-center gap-1.5" : ""}>
+                              <Select
+                                value=""
+                                onValueChange={(servantId) => {
+                                  handleAddAssignment(selectedEvent.id, servantId, area.id)
+                                  setAddingAreaId(null)
+                                }}
+                                disabled={isAreaLoading}
+                              >
+                                <SelectTrigger className="w-full">
+                                  <SelectValue
+                                    placeholder={
+                                      areaAssignments.length === 0
+                                        ? "Selecionar servo..."
+                                        : "Adicionar servo..."
+                                    }
+                                  />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  {areaServants.filter((s) => !assignedServantIds.has(s.id)).length === 0 ? (
+                                    <div className="p-2 text-sm text-muted-foreground">
+                                      {areaServants.length === 0
+                                        ? "Nenhum servo cadastrado nesta área"
+                                        : "Todos os servos já foram adicionados"}
+                                    </div>
+                                  ) : (
+                                    areaServants
+                                      .filter((s) => !assignedServantIds.has(s.id))
+                                      .sort((a, b) => {
+                                        if (a.is_leader !== b.is_leader) return b.is_leader ? 1 : -1
+                                        return a.name.localeCompare(b.name)
+                                      })
+                                      .map((servant) => {
+                                        const available = isServantAvailable(servant.id, selectedEvent.id)
+                                        const assignCount = servantAssignmentCount.get(servant.id) || 0
+                                        const availEventCount = servantAvailableEventCount.get(servant.id) ?? 0
+                                        return (
+                                          <SelectItem
+                                            key={servant.id}
+                                            value={servant.id}
+                                            disabled={!available}
+                                            className={!available ? "opacity-50" : ""}
+                                          >
+                                            <div className="flex items-center gap-2 w-full">
+                                              {available ? (
+                                                <Check className="h-3 w-3 text-green-500 flex-shrink-0" />
+                                              ) : (
+                                                <AlertCircle className="h-3 w-3 text-red-500 flex-shrink-0" />
                                               )}
-                                            </span>
-                                            <div className="flex items-center gap-1 flex-shrink-0 ml-auto">
-                                              <Badge
-                                                variant="outline"
-                                                className="text-xs"
-                                                title={`Disponível em ${availEventCount} de ${events.length} eventos`}
-                                              >
-                                                {availEventCount}/{events.length}
-                                              </Badge>
-                                              <Badge
-                                                variant={assignCount > 0 ? "secondary" : "outline"}
-                                                className="text-xs"
-                                                title={`Atribuído em ${assignCount} evento(s)`}
-                                              >
-                                                {assignCount}×
-                                              </Badge>
+                                              <span className="flex-1 truncate">
+                                                {servant.name}
+                                                {servant.is_leader && (
+                                                  <Crown className="inline h-3 w-3 text-yellow-500 ml-1 flex-shrink-0" />
+                                                )}
+                                              </span>
+                                              <div className="flex items-center gap-1 flex-shrink-0 ml-auto">
+                                                <Badge
+                                                  variant="outline"
+                                                  className="text-xs"
+                                                  title={`Disponível em ${availEventCount} de ${events.length} eventos`}
+                                                >
+                                                  {availEventCount}/{events.length}
+                                                </Badge>
+                                                <Badge
+                                                  variant={assignCount > 0 ? "secondary" : "outline"}
+                                                  className="text-xs"
+                                                  title={`Atribuído em ${assignCount} evento(s)`}
+                                                >
+                                                  {assignCount}×
+                                                </Badge>
+                                              </div>
                                             </div>
-                                          </div>
-                                        </SelectItem>
-                                      )
-                                    })
-                                )}
-                              </SelectContent>
-                            </Select>
+                                          </SelectItem>
+                                        )
+                                      })
+                                  )}
+                                </SelectContent>
+                              </Select>
+                              {isAdding && areaAssignments.length > 0 && (
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  className="h-9 w-9 p-0 flex-shrink-0"
+                                  title="Cancelar"
+                                  onClick={() => setAddingAreaId(null)}
+                                >
+                                  <X className="h-4 w-4" />
+                                </Button>
+                              )}
+                            </div>
                           )}
                         </div>
                       )}
