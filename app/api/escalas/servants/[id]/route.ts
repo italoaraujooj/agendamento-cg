@@ -29,7 +29,7 @@ export async function GET(
       .from("servants")
       .select(`
         *,
-        area:areas(
+        area:areas!servants_area_id_fkey(
           *,
           ministry:ministries(*)
         ),
