@@ -23,7 +23,7 @@ export async function GET(
       return NextResponse.json({ error: "Erro de configuração" }, { status: 500 })
     }
 
-    // Try with leader/co_leader joins first; fall back if columns don't exist yet
+    // Try with leader/co_leader joins + servant_areas first
     let result = await supabase
       .from("ministries")
       .select(`
@@ -52,7 +52,7 @@ export async function GET(
       .eq("id", id)
       .single()
 
-    // Fallback: if query failed (e.g. columns not yet created), retry without leader joins
+    // Fallback 1: retry without leader joins (columns may not exist yet)
     if (result.error && result.error.code !== "PGRST116") {
       result = await supabase
         .from("ministries")
@@ -68,6 +68,28 @@ export async function GET(
               is_leader,
               area_id,
               servant_areas(area_id)
+            )
+          )
+        `)
+        .eq("id", id)
+        .single()
+    }
+
+    // Fallback 2: retry without servant_areas (table or RLS may not be ready yet)
+    if (result.error && result.error.code !== "PGRST116") {
+      result = await supabase
+        .from("ministries")
+        .select(`
+          *,
+          areas (
+            *,
+            servants (
+              id,
+              name,
+              email,
+              is_active,
+              is_leader,
+              area_id
             )
           )
         `)
