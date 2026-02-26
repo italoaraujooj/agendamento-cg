@@ -38,7 +38,7 @@ export async function GET(
         ),
         areas (
           *,
-          servants (
+          servants!servants_area_id_fkey (
             id,
             name,
             email,
@@ -60,7 +60,7 @@ export async function GET(
           *,
           areas (
             *,
-            servants (
+            servants!servants_area_id_fkey (
               id,
               name,
               email,
@@ -75,7 +75,7 @@ export async function GET(
         .single()
     }
 
-    // Fallback 2: retry without servant_areas (table or RLS may not be ready yet)
+    // Fallback 2: retry without servant_areas
     if (result.error && result.error.code !== "PGRST116") {
       result = await supabase
         .from("ministries")
@@ -83,7 +83,7 @@ export async function GET(
           *,
           areas (
             *,
-            servants (
+            servants!servants_area_id_fkey (
               id,
               name,
               email,
