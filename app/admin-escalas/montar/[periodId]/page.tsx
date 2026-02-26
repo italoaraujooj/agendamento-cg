@@ -123,7 +123,7 @@ export default function MontarEscalaPage() {
         .from("servants")
         .select(`
           *,
-          area:areas(*),
+          area:areas!servants_area_id_fkey(*),
           servant_areas(area_id, area:areas(id, ministry_id))
         `)
         .eq("is_active", true)

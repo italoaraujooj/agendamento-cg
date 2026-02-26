@@ -27,7 +27,7 @@ export async function GET(request: NextRequest) {
       .from("servants")
       .select(`
         *,
-        area:areas(
+        area:areas!servants_area_id_fkey(
           id,
           name,
           ministry:ministries(id, name, color)

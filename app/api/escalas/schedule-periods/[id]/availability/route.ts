@@ -23,7 +23,7 @@ export async function GET(
         is_available,
         notes,
         submitted_at,
-        servant:servants(id, name, area:areas(id, name))
+        servant:servants(id, name, area:areas!servants_area_id_fkey(id, name))
       `)
       .eq("period_id", periodId)
       .order("submitted_at", { ascending: false })
