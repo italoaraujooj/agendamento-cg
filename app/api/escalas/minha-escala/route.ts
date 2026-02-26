@@ -15,7 +15,7 @@ export async function GET(request: NextRequest) {
   // Buscar servos com esse email
   const { data: servants } = await supabase
     .from("servants")
-    .select("id, name, area:areas(id, name, ministry_id)")
+    .select("id, name, area:areas!servants_area_id_fkey(id, name, ministry_id)")
     .ilike("email", email)
     .eq("is_active", true)
 
