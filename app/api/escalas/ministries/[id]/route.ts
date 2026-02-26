@@ -18,7 +18,7 @@ export async function GET(
 ) {
   try {
     const { id } = await params
-    const supabase = await createServerClient()
+    const supabase = createAdminClient()
     if (!supabase) {
       return NextResponse.json({ error: "Erro de configuração" }, { status: 500 })
     }
