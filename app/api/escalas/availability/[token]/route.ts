@@ -74,11 +74,8 @@ export async function GET(
         name,
         email,
         is_leader,
-        area:areas(
-          id,
-          name,
-          ministry_id
-        )
+        area:areas!servants_area_id_fkey(id, name, ministry_id),
+        servant_areas(area_id, area:areas(id, name, ministry_id))
       `)
       .eq("is_active", true)
 
@@ -87,10 +84,14 @@ export async function GET(
       return NextResponse.json({ error: "Erro ao carregar servos" }, { status: 500 })
     }
 
-    // Filtrar servos do ministério
-    const ministryServants = servants?.filter(
-      (s) => s.area?.ministry_id === period.ministry?.id
-    ) || []
+    // Filtrar servos do ministério (área primária ou secundária via junction)
+    const ministryServants = (servants ?? []).filter((s: any) => {
+      const primaryMatch = s.area?.ministry_id === period.ministry?.id
+      const secondaryMatch = s.servant_areas?.some(
+        (sa: any) => sa.area?.ministry_id === period.ministry?.id
+      )
+      return primaryMatch || secondaryMatch
+    })
 
     return NextResponse.json({
       period: {
