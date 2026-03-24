@@ -10,7 +10,7 @@ import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Calendar as CalendarIcon, Clock, Users, Phone, Mail, Building, User, CheckCircle, Plus, X } from "lucide-react"
+import { Calendar as CalendarIcon, Clock, Users, Phone, Mail, Building, User, CheckCircle, Plus, X, HandHelping } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { supabase } from "@/lib/supabase/client"
 import { DatePicker } from "@/components/ui/date-picker"
@@ -51,6 +51,8 @@ export default function BookingForm({ environments, preselectedEnvironment }: Bo
   const [extraOccurrences, setExtraOccurrences] = useState<Array<{ date: string; startTime: string; duration: string }>>([])
   const [envAvailabilityByWeekday, setEnvAvailabilityByWeekday] = useState<Record<number, { start: number; end: number }[]>>({})
   const [isLoadingEnvAvailability, setIsLoadingEnvAvailability] = useState(false)
+  const [ministries, setMinistries] = useState<{ id: string; name: string; color: string }[]>([])
+  const [selectedMinistryIds, setSelectedMinistryIds] = useState<string[]>([])
 
   const [formData, setFormData] = useState({
     environmentId: preselectedEnvironment || "",
@@ -92,6 +94,25 @@ export default function BookingForm({ environments, preselectedEnvironment }: Bo
     { environment_id: string | number; start_time: string; end_time: string }[]
   >([])
   const [isLoadingAvailability, setIsLoadingAvailability] = useState(false)
+
+  // Detecta se o Salão Principal está entre os ambientes selecionados
+  const isSalaoPrincipalSelected = useMemo(() => {
+    return environments
+      .filter(env => formData.environmentIds.includes(String(env.id)))
+      .some(env => env.name === "Salão Principal")
+  }, [environments, formData.environmentIds])
+
+  // Busca ministérios ativos quando o Salão Principal é selecionado
+  useEffect(() => {
+    if (!isSalaoPrincipalSelected) {
+      setSelectedMinistryIds([])
+      return
+    }
+    fetch('/api/escalas/ministries')
+      .then(r => r.json())
+      .then(data => setMinistries(Array.isArray(data) ? data : []))
+      .catch(() => {})
+  }, [isSalaoPrincipalSelected])
 
   const WEEKDAY_LABELS_PT_BR: readonly string[] = [
     "Domingo",
@@ -922,6 +943,29 @@ export default function BookingForm({ environments, preselectedEnvironment }: Bo
           }
         }
         
+        // Salvar solicitações de apoio de ministérios (apenas para bookings do Salão Principal)
+        if (selectedMinistryIds.length > 0 && bookingsToProcess && bookingsToProcess.length > 0) {
+          try {
+            const salaoPrincipal = environments.find(e => e.name === "Salão Principal")
+            const salaoBookings = salaoPrincipal
+              ? (bookingsToProcess as any[]).filter(b => String(b.environment_id) === String(salaoPrincipal.id))
+              : []
+
+            if (salaoBookings.length > 0) {
+              const ministryRequests = salaoBookings.flatMap((b: any) =>
+                selectedMinistryIds.map(ministryId => ({
+                  booking_id: b.id,
+                  ministry_id: ministryId,
+                }))
+              )
+              await supabase.from("booking_ministry_requests").insert(ministryRequests)
+            }
+          } catch (err) {
+            console.error('Erro ao salvar solicitações de ministério:', err)
+            // Não falha o fluxo principal
+          }
+        }
+
         // Tentar criar eventos no Google Calendar
         try {
           if (user?.email && bookingsToProcess && bookingsToProcess.length > 0) {
@@ -1519,6 +1563,49 @@ export default function BookingForm({ environments, preselectedEnvironment }: Bo
             </div>
           </div>
             </>
+          )}
+
+          {/* Apoio de ministérios — exibido apenas quando Salão Principal está selecionado */}
+          {isSalaoPrincipalSelected && ministries.length > 0 && (
+            <div className="space-y-3">
+              <Label className="flex items-center gap-2">
+                <HandHelping className="h-4 w-4" />
+                Apoio de Ministérios
+              </Label>
+              <p className="text-sm text-muted-foreground">
+                Você precisa de apoio de algum ministério para este evento? O líder será notificado após a aprovação da reserva.
+              </p>
+              <div className="grid md:grid-cols-2 gap-2">
+                {ministries.map(ministry => {
+                  const checked = selectedMinistryIds.includes(ministry.id)
+                  return (
+                    <label
+                      key={ministry.id}
+                      className={`flex items-center gap-2 border rounded px-3 py-2 cursor-pointer select-none transition-colors ${checked ? 'bg-accent/40 border-primary' : 'hover:bg-accent/10'}`}
+                    >
+                      <input
+                        type="checkbox"
+                        className="accent-current"
+                        checked={checked}
+                        onChange={(e) => {
+                          setSelectedMinistryIds(prev => {
+                            const set = new Set(prev)
+                            if (e.target.checked) set.add(ministry.id)
+                            else set.delete(ministry.id)
+                            return Array.from(set)
+                          })
+                        }}
+                      />
+                      <span
+                        className="inline-block w-2 h-2 rounded-full flex-shrink-0"
+                        style={{ backgroundColor: ministry.color }}
+                      />
+                      <span className="flex-1">{ministry.name}</span>
+                    </label>
+                  )
+                })}
+              </div>
+            </div>
           )}
 
           {/* Aviso de disponibilidade por dia */}
