@@ -116,6 +116,82 @@ export async function POST(request: NextRequest) {
       // Não falha a criação do período; os eventos podem ser gerados depois manualmente
     }
 
+    // Auto-importar agendamentos aprovados do Salão Principal que solicitaram apoio deste ministério
+    try {
+      const startDateStr = startDate.toISOString().split("T")[0]
+      const endDateStr = endDate.toISOString().split("T")[0]
+
+      // Buscar o ID do Salão Principal
+      const { data: salaoEnv } = await supabase
+        .from("environments")
+        .select("id")
+        .eq("name", "Salão Principal")
+        .single()
+
+      if (salaoEnv) {
+        // Buscar IDs de bookings que solicitaram apoio deste ministério
+        const { data: ministryRequests } = await supabase
+          .from("booking_ministry_requests")
+          .select("booking_id")
+          .eq("ministry_id", ministry_id)
+
+        const requestedBookingIds = (ministryRequests || []).map(r => r.booking_id)
+
+        if (requestedBookingIds.length > 0) {
+          // Buscar esses bookings aprovados no intervalo do período
+          const { data: bookings } = await supabase
+            .from("bookings")
+            .select("id, booking_date, start_time, occasion, responsible_person, name")
+            .eq("environment_id", salaoEnv.id)
+            .eq("status", "approved")
+            .gte("booking_date", startDateStr)
+            .lte("booking_date", endDateStr)
+            .in("id", requestedBookingIds)
+            .order("booking_date", { ascending: true })
+
+          if (bookings && bookings.length > 0) {
+            // Verificar quais já foram importados para não duplicar
+            const { data: existingEvents } = await supabase
+              .from("schedule_events")
+              .select("external_id")
+              .eq("period_id", data.id)
+              .eq("source", "booking_system")
+              .not("external_id", "is", null)
+
+            const importedIds = new Set((existingEvents || []).map(e => e.external_id))
+
+            const eventsToInsert = bookings
+              .filter(b => !importedIds.has(String(b.id)))
+              .map(b => ({
+                period_id: data.id,
+                event_date: b.booking_date,
+                event_time: b.start_time,
+                event_type: "imported" as const,
+                title: b.occasion || "Evento importado",
+                description: `Reserva: ${b.occasion} | Responsável: ${b.responsible_person} | Local: Salão Principal`,
+                source: "booking_system" as const,
+                external_id: String(b.id),
+              }))
+
+            if (eventsToInsert.length > 0) {
+              const { error: insertErr } = await supabase
+                .from("schedule_events")
+                .insert(eventsToInsert)
+
+              if (insertErr) {
+                console.error("Erro ao auto-importar bookings no período:", insertErr)
+              } else {
+                console.log(`✅ ${eventsToInsert.length} evento(s) do Salão Principal importado(s) automaticamente para o período`)
+              }
+            }
+          }
+        }
+      }
+    } catch (importError) {
+      console.error("Erro no auto-import de bookings (período já criado):", importError)
+      // Não falha a criação do período
+    }
+
     return NextResponse.json(data, { status: 201 })
   } catch (error) {
     console.error("Erro na API de períodos:", error)

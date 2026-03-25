@@ -236,6 +236,20 @@ export default function AdminPage() {
         // Não falhar a ação por causa do email
       }
 
+      // Se aprovado no Salão Principal, notificar líderes de ministérios solicitados
+      if (newStatus === 'approved' && environmentData?.name === 'Salão Principal') {
+        try {
+          await fetch('/api/notify-ministry-leaders', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ booking_id: booking.id }),
+          })
+        } catch (ministryError) {
+          console.error('Erro ao notificar líderes de ministério:', ministryError)
+          // Não falhar a ação por causa do email
+        }
+      }
+
       // Atualizar lista local
       setBookings(prev =>
         prev.map(b =>
