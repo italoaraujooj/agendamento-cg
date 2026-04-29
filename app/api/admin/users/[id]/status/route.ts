@@ -44,20 +44,6 @@ export async function PATCH(
       return NextResponse.json({ error: "Acesso negado" }, { status: 403 })
     }
 
-    // Não pode desativar outro admin
-    const { data: targetProfile } = await adminClient
-      .from("profiles")
-      .select("is_admin, full_name")
-      .eq("id", id)
-      .single()
-
-    if (targetProfile?.is_admin) {
-      return NextResponse.json(
-        { error: "Não é possível desativar uma conta de administrador" },
-        { status: 403 }
-      )
-    }
-
     const body = await request.json()
     const result = statusSchema.safeParse(body)
     if (!result.success) {
@@ -65,6 +51,22 @@ export async function PATCH(
     }
 
     const { active } = result.data
+
+    // Não pode desativar outro admin (reativar é permitido)
+    if (!active) {
+      const { data: targetProfile } = await adminClient
+        .from("profiles")
+        .select("is_admin")
+        .eq("id", id)
+        .single()
+
+      if (targetProfile?.is_admin) {
+        return NextResponse.json(
+          { error: "Não é possível desativar uma conta de administrador" },
+          { status: 403 }
+        )
+      }
+    }
 
     // Aplicar ban ou desban via Supabase Admin SDK
     const { error: updateError } = await adminClient.auth.admin.updateUserById(id, {

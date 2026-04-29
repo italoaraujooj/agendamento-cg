@@ -378,6 +378,10 @@ export default function AdminUsuariosPage() {
 
   const handleSaveRole = async () => {
     if (!editingUser) return
+    if (editingUser.id === currentUser?.id && editRole !== "admin") {
+      toast.error("Não é possível remover seu próprio acesso de administrador")
+      return
+    }
     setIsSavingRole(true)
     try {
       const { error } = await supabase

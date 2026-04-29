@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server"
-import { createAdminClient } from "@/lib/supabase/server"
+import { createAdminClient, createServerClient } from "@/lib/supabase/server"
 
 export async function GET(request: NextRequest) {
   const email = request.nextUrl.searchParams.get("email")?.trim().toLowerCase()
@@ -14,14 +14,25 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: "Erro de configuração" }, { status: 500 })
   }
 
+  // Quando user_id é fornecido, validar que pertence à sessão autenticada
+  let resolvedUserId = userId
+  if (userId) {
+    const serverClient = await createServerClient()
+    const { data: { user } } = await serverClient?.auth.getUser() ?? { data: { user: null } }
+    if (!user || user.id !== userId) {
+      return NextResponse.json({ error: "Não autorizado" }, { status: 403 })
+    }
+    resolvedUserId = user.id
+  }
+
   // Buscar servos pelo user_id ou pelo email
   let servantsQuery = supabase
     .from("servants")
     .select("id, name, area:areas!servants_area_id_fkey(id, name, ministry_id)")
     .eq("is_active", true)
 
-  if (userId) {
-    servantsQuery = servantsQuery.eq("user_id", userId)
+  if (resolvedUserId) {
+    servantsQuery = servantsQuery.eq("user_id", resolvedUserId)
   } else {
     servantsQuery = servantsQuery.ilike("email", email!)
   }
