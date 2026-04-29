@@ -36,6 +36,7 @@ export interface Servant {
   id: string
   area_id: string
   user_id: string | null
+  has_account?: boolean
   name: string
   email: string | null
   phone: string | null

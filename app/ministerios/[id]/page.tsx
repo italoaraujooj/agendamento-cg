@@ -518,7 +518,7 @@ export default function MinisterioDetalhePage() {
                               >
                                 <div className="flex items-center gap-2 min-w-0">
                                   <span className="text-sm truncate">{servant.name}</span>
-                                  {canEdit && servant.email && !servant.user_id && (
+                                  {canEdit && servant.email && !servant.has_account && (
                                     <Badge
                                       variant="outline"
                                       className="text-xs text-amber-600 border-amber-300 bg-amber-50 dark:bg-amber-950/30 flex-shrink-0 gap-1"
