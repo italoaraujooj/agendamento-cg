@@ -42,6 +42,7 @@ export async function GET(
             id,
             name,
             email,
+            user_id,
             is_active,
             is_leader,
             area_id,
@@ -64,6 +65,7 @@ export async function GET(
               id,
               name,
               email,
+              user_id,
               is_active,
               is_leader,
               area_id,
@@ -87,6 +89,7 @@ export async function GET(
               id,
               name,
               email,
+              user_id,
               is_active,
               is_leader,
               area_id
@@ -105,7 +108,19 @@ export async function GET(
       return NextResponse.json({ error: result.error.message }, { status: 500 })
     }
 
-    return NextResponse.json(result.data)
+    // Replace user_id with has_account to avoid leaking stable auth identifiers
+    const data = result.data as any
+    if (data?.areas) {
+      data.areas = data.areas.map((area: any) => ({
+        ...area,
+        servants: (area.servants ?? []).map(({ user_id, ...s }: any) => ({
+          ...s,
+          has_account: user_id !== null,
+        })),
+      }))
+    }
+
+    return NextResponse.json(data)
   } catch (error) {
     console.error("Erro na API de ministérios:", error)
     return NextResponse.json({ error: "Erro interno do servidor" }, { status: 500 })

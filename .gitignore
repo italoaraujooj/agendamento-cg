@@ -19,9 +19,15 @@ yarn-error.log*
 # env files
 .env*
 
+# MCP config (contains access tokens)
+.mcp.json
+
 # vercel
 .vercel
 
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# local-only docs (sensitive)
+QUESTIONS.md

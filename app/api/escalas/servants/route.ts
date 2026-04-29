@@ -111,6 +111,34 @@ export async function POST(request: NextRequest) {
       .insert({ servant_id: data.id, area_id })
       .throwOnError()
 
+    // Auto-vincular ou convidar usuário pelo email
+    if (email) {
+      const { data: profile } = await supabase
+        .from("profiles")
+        .select("id")
+        .ilike("email", email)
+        .single()
+
+      if (profile) {
+        // Perfil existe → vincular servant ao usuário
+        await supabase
+          .from("servants")
+          .update({ user_id: profile.id })
+          .eq("id", data.id)
+      } else {
+        // Sem conta → enviar convite pelo Supabase Auth
+        const APP_URL = process.env.NEXT_PUBLIC_APP_URL || "https://agendamento-cg.vercel.app"
+        try {
+          await supabase.auth.admin.inviteUserByEmail(email, {
+            redirectTo: `${APP_URL}/completar-cadastro`,
+          })
+        } catch (inviteErr) {
+          // Não bloqueia a criação do servo; apenas loga o erro
+          console.error("Erro ao enviar convite:", inviteErr)
+        }
+      }
+    }
+
     return NextResponse.json(data, { status: 201 })
   } catch (error) {
     console.error("Erro na API de servos:", error)
