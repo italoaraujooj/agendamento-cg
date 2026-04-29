@@ -14,7 +14,8 @@ import {
   Trash2,
   MoreHorizontal,
   Crown,
-  Save
+  Save,
+  UserX
 } from "lucide-react"
 import {
   DropdownMenu,
@@ -511,12 +512,21 @@ export default function MinisterioDetalhePage() {
                           {(servantsByAreaId.get(area.id) ?? [])
                             .sort((a, b) => a.name.localeCompare(b.name))
                             .map((servant) => (
-                              <div 
+                              <div
                                 key={servant.id}
                                 className="flex items-center justify-between p-2 rounded-md bg-muted/50"
                               >
                                 <div className="flex items-center gap-2 min-w-0">
                                   <span className="text-sm truncate">{servant.name}</span>
+                                  {canEdit && servant.email && !servant.user_id && (
+                                    <Badge
+                                      variant="outline"
+                                      className="text-xs text-amber-600 border-amber-300 bg-amber-50 dark:bg-amber-950/30 flex-shrink-0 gap-1"
+                                    >
+                                      <UserX className="h-3 w-3" />
+                                      Sem conta
+                                    </Badge>
+                                  )}
                                 </div>
                                 {canEdit && (
                                   <DropdownMenu>

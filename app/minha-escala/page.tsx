@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -8,6 +8,7 @@ import { Badge } from "@/components/ui/badge"
 import { Loader2, Search, Calendar, Crown, ChevronDown, ChevronUp } from "lucide-react"
 import { format, parseISO } from "date-fns"
 import { ptBR } from "date-fns/locale"
+import { supabase } from "@/lib/supabase/client"
 
 interface Assignment {
   servantName: string
@@ -41,9 +42,47 @@ interface ApiResponse {
 export default function MinhaEscalaPage() {
   const [email, setEmail] = useState("")
   const [loading, setLoading] = useState(false)
+  const [autoLoading, setAutoLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [data, setData] = useState<ApiResponse | null>(null)
   const [collapsedPeriods, setCollapsedPeriods] = useState<Set<string>>(new Set())
+  const [loggedInUser, setLoggedInUser] = useState<{ id: string; name: string | null } | null>(null)
+
+  // Auto-carregar escala se o usuário estiver logado
+  useEffect(() => {
+    async function tryAutoLoad() {
+      try {
+        const { data: { session } } = await supabase.auth.getSession()
+        if (!session) {
+          setAutoLoading(false)
+          return
+        }
+
+        const userId = session.user.id
+
+        const res = await fetch(`/api/escalas/minha-escala?user_id=${encodeURIComponent(userId)}`)
+        const json = await res.json()
+
+        if (res.ok) {
+          setLoggedInUser({ id: userId, name: json.servantName })
+          setData(json)
+          if (json.periods.length > 1) {
+            const toCollapse = new Set<string>(json.periods.slice(1).map((p: PeriodData) => p.id))
+            setCollapsedPeriods(toCollapse)
+          }
+        } else {
+          // Usuário logado mas sem servo vinculado — deixa formulário de email visível
+          setLoggedInUser({ id: userId, name: null })
+        }
+      } catch {
+        // Silencioso — fallback para formulário manual
+      } finally {
+        setAutoLoading(false)
+      }
+    }
+
+    tryAutoLoad()
+  }, [])
 
   const handleSearch = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -96,6 +135,14 @@ export default function MinhaEscalaPage() {
     return groups
   }
 
+  if (autoLoading) {
+    return (
+      <div className="flex items-center justify-center min-h-[60vh]">
+        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+      </div>
+    )
+  }
+
   return (
     <div className="min-h-screen bg-muted/30">
       <div className="container max-w-2xl mx-auto px-4 py-10 space-y-8">
@@ -106,37 +153,47 @@ export default function MinhaEscalaPage() {
           </div>
           <h1 className="text-2xl font-bold">Minha Escala</h1>
           <p className="text-muted-foreground text-sm">
-            Digite seu email cadastrado para ver os eventos em que você está escalado.
+            {loggedInUser && data
+              ? `Olá, ${data.servantName}! Aqui está sua escala.`
+              : "Digite seu email cadastrado para ver os eventos em que você está escalado."}
           </p>
         </div>
 
-        {/* Formulário */}
-        <Card>
-          <CardContent className="pt-6">
-            <form onSubmit={handleSearch} className="flex gap-2">
-              <Input
-                type="email"
-                placeholder="seu@email.com"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                className="flex-1"
-                autoFocus
-              />
-              <Button type="submit" disabled={loading || !email.trim()}>
-                {loading ? (
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                ) : (
-                  <Search className="h-4 w-4" />
-                )}
-                <span className="ml-2 hidden sm:inline">Buscar</span>
-              </Button>
-            </form>
+        {/* Formulário — oculto quando já carregou automaticamente */}
+        {!(loggedInUser && data) && (
+          <Card>
+            <CardContent className="pt-6">
+              <form onSubmit={handleSearch} className="flex gap-2">
+                <Input
+                  type="email"
+                  placeholder="seu@email.com"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  className="flex-1"
+                  autoFocus
+                />
+                <Button type="submit" disabled={loading || !email.trim()}>
+                  {loading ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <Search className="h-4 w-4" />
+                  )}
+                  <span className="ml-2 hidden sm:inline">Buscar</span>
+                </Button>
+              </form>
 
-            {error && (
-              <p className="mt-3 text-sm text-destructive">{error}</p>
-            )}
-          </CardContent>
-        </Card>
+              {loggedInUser && !data && (
+                <p className="mt-3 text-sm text-muted-foreground">
+                  Você está logado, mas ainda não há um servo vinculado à sua conta. Busque pelo seu email cadastrado.
+                </p>
+              )}
+
+              {error && (
+                <p className="mt-3 text-sm text-destructive">{error}</p>
+              )}
+            </CardContent>
+          </Card>
+        )}
 
         {/* Resultados */}
         {data && (

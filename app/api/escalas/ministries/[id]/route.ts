@@ -42,6 +42,7 @@ export async function GET(
             id,
             name,
             email,
+            user_id,
             is_active,
             is_leader,
             area_id,
@@ -64,6 +65,7 @@ export async function GET(
               id,
               name,
               email,
+              user_id,
               is_active,
               is_leader,
               area_id,
@@ -87,6 +89,7 @@ export async function GET(
               id,
               name,
               email,
+              user_id,
               is_active,
               is_leader,
               area_id
