@@ -3,8 +3,10 @@ import { createAdminClient } from "@/lib/supabase/server"
 
 export async function GET(request: NextRequest) {
   const email = request.nextUrl.searchParams.get("email")?.trim().toLowerCase()
-  if (!email) {
-    return NextResponse.json({ error: "Email obrigatório" }, { status: 400 })
+  const userId = request.nextUrl.searchParams.get("user_id")?.trim()
+
+  if (!email && !userId) {
+    return NextResponse.json({ error: "Email ou user_id obrigatório" }, { status: 400 })
   }
 
   const supabase = createAdminClient()
@@ -12,15 +14,22 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: "Erro de configuração" }, { status: 500 })
   }
 
-  // Buscar servos com esse email
-  const { data: servants } = await supabase
+  // Buscar servos pelo user_id ou pelo email
+  let servantsQuery = supabase
     .from("servants")
     .select("id, name, area:areas!servants_area_id_fkey(id, name, ministry_id)")
-    .ilike("email", email)
     .eq("is_active", true)
 
+  if (userId) {
+    servantsQuery = servantsQuery.eq("user_id", userId)
+  } else {
+    servantsQuery = servantsQuery.ilike("email", email!)
+  }
+
+  const { data: servants } = await servantsQuery
+
   if (!servants || servants.length === 0) {
-    return NextResponse.json({ error: "Nenhum servo encontrado com esse email" }, { status: 404 })
+    return NextResponse.json({ error: "Nenhum servo encontrado" }, { status: 404 })
   }
 
   const servantIds = servants.map((s) => s.id)

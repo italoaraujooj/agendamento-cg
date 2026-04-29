@@ -32,7 +32,6 @@ import {
   UserCog,
 } from "lucide-react"
 import { ExternalRentalsManager } from "@/components/admin/external-rentals"
-import { UsersManager } from "@/components/admin/users-manager"
 import { supabase } from "@/lib/supabase/client"
 import { toast } from "sonner"
 import Link from "next/link"
@@ -1059,12 +1058,21 @@ export default function AdminPage() {
 
           {/* Conteúdo de Gerenciamento de Usuários */}
           <TabsContent value="users">
-            <div className="mb-6">
-              <p className="text-muted-foreground">
-                Gerencie usuários do sistema, defina roles e vincule líderes aos ministérios
-              </p>
+            <div className="flex flex-col items-center justify-center py-16 gap-4 text-center">
+              <UserCog className="h-12 w-12 text-muted-foreground" />
+              <div>
+                <h3 className="text-lg font-semibold">Gerenciamento de Usuários</h3>
+                <p className="text-muted-foreground text-sm mt-1">
+                  Defina roles, vínculos de ministério, recupere senhas e gerencie contas.
+                </p>
+              </div>
+              <Link href="/admin/usuarios">
+                <Button>
+                  <UserCog className="mr-2 h-4 w-4" />
+                  Acessar gerenciamento de usuários
+                </Button>
+              </Link>
             </div>
-            <UsersManager />
           </TabsContent>
         </Tabs>
       </div>

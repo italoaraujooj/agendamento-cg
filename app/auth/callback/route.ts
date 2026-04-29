@@ -1,5 +1,6 @@
 import { createServerClient } from '@supabase/ssr'
 import { NextRequest, NextResponse } from 'next/server'
+import { createAdminClient } from '@/lib/supabase/server'
 
 export async function GET(request: NextRequest) {
   const { searchParams, origin } = new URL(request.url)
@@ -22,6 +23,8 @@ export async function GET(request: NextRequest) {
       redirectUrl = `${origin}/login?confirmed=true`
     } else if (type === 'recovery') {
       redirectUrl = `${origin}/resetar-senha`
+    } else if (type === 'invite') {
+      redirectUrl = `${origin}/completar-cadastro`
     }
 
     const response = NextResponse.redirect(redirectUrl)
@@ -125,6 +128,32 @@ export async function GET(request: NextRequest) {
       }
     } catch (error) {
       console.error('❌ Erro ao sincronizar perfil:', error)
+    }
+
+    // Auto-vincular servos com o mesmo email ao usuário
+    if (user.email) {
+      try {
+        const adminClient = createAdminClient()
+        if (adminClient) {
+          const { data: unlinkedServants } = await adminClient
+            .from('servants')
+            .select('id')
+            .ilike('email', user.email)
+            .is('user_id', null)
+            .eq('is_active', true)
+
+          if (unlinkedServants && unlinkedServants.length > 0) {
+            console.log(`🔗 Vinculando ${unlinkedServants.length} servo(s) ao usuário ${user.email}...`)
+            await adminClient
+              .from('servants')
+              .update({ user_id: user.id })
+              .in('id', unlinkedServants.map((s: { id: string }) => s.id))
+            console.log('✅ Servos vinculados!')
+          }
+        }
+      } catch (err) {
+        console.error('❌ Erro ao vincular servos ao perfil:', err)
+      }
     }
 
     // Se há provider_token, armazenar no banco para Google Calendar
