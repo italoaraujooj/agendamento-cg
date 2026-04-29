@@ -83,7 +83,6 @@ export async function POST(
     // Separar em dois grupos:
     // - pendingServants: não responderam e não são duplicatas (recebem is_available=true)
     // - duplicatesToCopy: não responderam mas são duplicatas de quem respondeu (recebem cópia das respostas)
-    const seenNames = new Set<string>()
     const pendingServants: { id: string }[] = []
     const duplicatesToCopy: { duplicateId: string; sourceId: string }[] = []
 
@@ -95,8 +94,6 @@ export async function POST(
         duplicatesToCopy.push({ duplicateId: s.id, sourceId: nameToRespondedId.get(nameLower)! })
         return
       }
-      if (seenNames.has(nameLower)) return
-      seenNames.add(nameLower)
       pendingServants.push(s)
     })
 
@@ -155,7 +152,11 @@ export async function POST(
             }))
         )
         if (copyRecords.length > 0) {
-          await supabase.from("servant_availability").insert(copyRecords)
+          const { error: copyError } = await supabase.from("servant_availability").insert(copyRecords)
+          if (copyError) {
+            console.error("Erro ao copiar disponibilidades para duplicatas:", copyError)
+            return NextResponse.json({ error: copyError.message }, { status: 500 })
+          }
           totalFilled += duplicatesToCopy.length
         }
       }
