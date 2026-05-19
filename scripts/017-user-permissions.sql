@@ -19,7 +19,8 @@ CREATE POLICY "Users can read own permissions"
 
 CREATE POLICY "Admins manage permissions"
   ON public.user_permissions FOR ALL
-  USING (public.is_admin(auth.uid()));
+  USING (public.is_admin(auth.uid()))
+  WITH CHECK (public.is_admin(auth.uid()));
 
 -- Função auxiliar para verificar permissão (admin sempre tem tudo)
 CREATE OR REPLACE FUNCTION public.has_permission(p_user uuid, p_key varchar)
@@ -38,6 +39,11 @@ CREATE POLICY "Permission holders can update bookings"
     auth.uid() = user_id
     OR public.is_admin(auth.uid())
     OR public.has_permission(auth.uid(), 'approve_bookings')
+  )
+  WITH CHECK (
+    auth.uid() = user_id
+    OR public.is_admin(auth.uid())
+    OR public.has_permission(auth.uid(), 'approve_bookings')
   );
 
 -- Usuários com manage_external_rentals acessam as três tabelas de locações
@@ -50,13 +56,14 @@ BEGIN
   ) THEN
     CREATE POLICY "Permission holders can manage external rentals"
       ON public.external_rentals FOR ALL
-      USING (public.is_admin(auth.uid()) OR public.has_permission(auth.uid(), 'manage_external_rentals'));
+      USING (public.is_admin(auth.uid()) OR public.has_permission(auth.uid(), 'manage_external_rentals'))
+      WITH CHECK (public.is_admin(auth.uid()) OR public.has_permission(auth.uid(), 'manage_external_rentals'));
   ELSE
-    -- Substituir política existente que só verificava is_admin
     DROP POLICY IF EXISTS "Permission holders can manage external rentals" ON public.external_rentals;
     CREATE POLICY "Permission holders can manage external rentals"
       ON public.external_rentals FOR ALL
-      USING (public.is_admin(auth.uid()) OR public.has_permission(auth.uid(), 'manage_external_rentals'));
+      USING (public.is_admin(auth.uid()) OR public.has_permission(auth.uid(), 'manage_external_rentals'))
+      WITH CHECK (public.is_admin(auth.uid()) OR public.has_permission(auth.uid(), 'manage_external_rentals'));
   END IF;
 
   -- rental_payments
@@ -66,7 +73,14 @@ BEGIN
   ) THEN
     CREATE POLICY "Permission holders can manage rental payments"
       ON public.rental_payments FOR ALL
-      USING (public.is_admin(auth.uid()) OR public.has_permission(auth.uid(), 'manage_external_rentals'));
+      USING (public.is_admin(auth.uid()) OR public.has_permission(auth.uid(), 'manage_external_rentals'))
+      WITH CHECK (public.is_admin(auth.uid()) OR public.has_permission(auth.uid(), 'manage_external_rentals'));
+  ELSE
+    DROP POLICY IF EXISTS "Permission holders can manage rental payments" ON public.rental_payments;
+    CREATE POLICY "Permission holders can manage rental payments"
+      ON public.rental_payments FOR ALL
+      USING (public.is_admin(auth.uid()) OR public.has_permission(auth.uid(), 'manage_external_rentals'))
+      WITH CHECK (public.is_admin(auth.uid()) OR public.has_permission(auth.uid(), 'manage_external_rentals'));
   END IF;
 
   -- rental_costs
@@ -76,7 +90,14 @@ BEGIN
   ) THEN
     CREATE POLICY "Permission holders can manage rental costs"
       ON public.rental_costs FOR ALL
-      USING (public.is_admin(auth.uid()) OR public.has_permission(auth.uid(), 'manage_external_rentals'));
+      USING (public.is_admin(auth.uid()) OR public.has_permission(auth.uid(), 'manage_external_rentals'))
+      WITH CHECK (public.is_admin(auth.uid()) OR public.has_permission(auth.uid(), 'manage_external_rentals'));
+  ELSE
+    DROP POLICY IF EXISTS "Permission holders can manage rental costs" ON public.rental_costs;
+    CREATE POLICY "Permission holders can manage rental costs"
+      ON public.rental_costs FOR ALL
+      USING (public.is_admin(auth.uid()) OR public.has_permission(auth.uid(), 'manage_external_rentals'))
+      WITH CHECK (public.is_admin(auth.uid()) OR public.has_permission(auth.uid(), 'manage_external_rentals'));
   END IF;
 END $$;
 

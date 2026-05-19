@@ -897,7 +897,7 @@ export function ExternalRentalsManager({ userId }: ExternalRentalsManagerProps) 
               {formatCurrency(calculateTotalRevenue())}
             </p>
             <p className="text-xs text-green-600 dark:text-green-500 mt-1">
-              {payments.length} pagamento(s)
+              {payments.filter(p => p.payment_date >= summaryStart && p.payment_date <= summaryEnd).length} pagamento(s)
             </p>
           </CardContent>
         </Card>
@@ -914,7 +914,7 @@ export function ExternalRentalsManager({ userId }: ExternalRentalsManagerProps) 
               {formatCurrency(calculateTotalCosts())}
             </p>
             <p className="text-xs text-red-600 dark:text-red-500 mt-1">
-              {costs.length} despesa(s)
+              {costs.filter(c => c.cost_date >= summaryStart && c.cost_date <= summaryEnd).length} despesa(s)
             </p>
           </CardContent>
         </Card>
