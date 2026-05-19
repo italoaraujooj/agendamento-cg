@@ -17,7 +17,7 @@ import { useSystemMode } from "@/components/system-mode-provider"
 import Link from "next/link"
 
 export default function EscalasDashboardPage() {
-  const { isAuthenticated, isAdmin, loading } = useAuth()
+  const { isAuthenticated, isAdmin, loading, adminChecked, canAccessEscalas } = useAuth()
   const { setMode } = useSystemMode()
   const router = useRouter()
 
@@ -26,14 +26,19 @@ export default function EscalasDashboardPage() {
     setMode("escalas")
   }, [setMode])
 
-  // Redirecionar usuários não autenticados para a home
+  // Redirecionar se não autenticado ou sem permissão de escalas
   useEffect(() => {
-    if (!loading && !isAuthenticated) {
+    if (loading || !adminChecked) return
+    if (!isAuthenticated) {
+      router.replace("/")
+      return
+    }
+    if (!canAccessEscalas()) {
       router.replace("/")
     }
-  }, [loading, isAuthenticated, router])
+  }, [loading, adminChecked, isAuthenticated, canAccessEscalas, router])
 
-  if (loading || !isAuthenticated) {
+  if (loading || !adminChecked || !isAuthenticated) {
     return (
       <div className="container mx-auto p-6">
         <div className="flex items-center justify-center min-h-[400px]">

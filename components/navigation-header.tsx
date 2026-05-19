@@ -22,7 +22,7 @@ import {
 
 export default function NavigationHeader() {
   const pathname = usePathname()
-  const { isAdmin, isAuthenticated } = useAuth()
+  const { isAdmin, isAuthenticated, hasPermission, canAccessEscalas } = useAuth()
   const { isEscalas } = useSystemMode()
   const [open, setOpen] = useState(false)
 
@@ -79,25 +79,17 @@ export default function NavigationHeader() {
   // Selecionar menu baseado no modo
   const baseNavItems = isEscalas ? escalasNavItems : agendamentosNavItems
 
-  // Adicionar link de admin se o usuário for administrador
-  const allNavItems = isAuthenticated && isAdmin
-    ? [
-        ...baseNavItems,
-        isEscalas
-          ? {
-              href: "/admin-escalas",
-              label: "Admin",
-              icon: Shield,
-              active: pathname === "/admin-escalas" || pathname.startsWith("/admin-escalas/"),
-            }
-          : {
-              href: "/admin",
-              label: "Admin",
-              icon: Shield,
-              active: pathname === "/admin" || pathname.startsWith("/admin/"),
-            },
-      ]
-    : baseNavItems
+  // Mostrar Admin (agendamentos) se tiver qualquer permissão de gestão; escalas apenas para admin
+  const canSeeAgendamentosAdmin = isAuthenticated && (isAdmin || hasPermission('approve_bookings') || hasPermission('manage_external_rentals'))
+  const canSeeEscalasAdmin = isAuthenticated && isAdmin
+
+  const adminNavItem = isEscalas && canSeeEscalasAdmin
+    ? { href: "/admin-escalas", label: "Admin", icon: Shield, active: pathname === "/admin-escalas" || pathname.startsWith("/admin-escalas/") }
+    : !isEscalas && canSeeAgendamentosAdmin
+    ? { href: "/admin", label: "Admin", icon: Shield, active: pathname === "/admin" || pathname.startsWith("/admin/") }
+    : null
+
+  const allNavItems = adminNavItem ? [...baseNavItems, adminNavItem] : baseNavItems
 
   // Título e ícone baseado no modo
   const headerTitle = isEscalas ? "Escalas - Cidade Viva CG" : "Agendamento - Cidade Viva CG"

@@ -51,6 +51,7 @@ import {
 import {
   Users,
   Shield,
+  ShieldCheck,
   UserCheck,
   User,
   Search,
@@ -77,6 +78,7 @@ import {
   Link2Off,
   Music,
 } from "lucide-react"
+import { Switch } from "@/components/ui/switch"
 import { supabase } from "@/lib/supabase/client"
 import { toast } from "sonner"
 import { format, parseISO } from "date-fns"
@@ -118,6 +120,7 @@ interface UserProfile {
   profile_completed: boolean
   created_at: string
   ministry_roles: MinistryRole[]
+  permissions: string[]
   // de auth.users
   last_sign_in_at: string | null
   email_confirmed_at: string | null
@@ -126,6 +129,18 @@ interface UserProfile {
 }
 
 // ─── Config ───────────────────────────────────────────────────────────────────
+
+const PERMISSIONS = [
+  { key: "approve_bookings", label: "Aprovar agendamentos", description: "Pode aprovar/rejeitar solicitações de reserva" },
+  { key: "manage_external_rentals", label: "Gerenciar locações externas", description: "Acesso ao módulo de locações, pagamentos e custos" },
+  { key: "access_escalas", label: "Acesso ao módulo de Escalas", description: "Pode acessar /escalas e visualizar ministérios" },
+] as const
+
+const PERMISSION_LABELS: Record<string, string> = {
+  approve_bookings: "Aprovar agendamentos",
+  manage_external_rentals: "Locações externas",
+  access_escalas: "Escalas",
+}
 
 const ROLE_CONFIG = {
   user: {
@@ -192,6 +207,7 @@ export default function AdminUsuariosPage() {
   const [editTab, setEditTab] = useState("account")
   const [editRole, setEditRole] = useState<UserProfile["role"]>("user")
   const [isSavingRole, setIsSavingRole] = useState(false)
+  const [togglingPermission, setTogglingPermission] = useState<string | null>(null)
 
   // Ministérios (aba 2)
   const [addingMinistry, setAddingMinistry] = useState(false)
@@ -396,6 +412,39 @@ export default function AdminUsuariosPage() {
       toast.error(error.message || "Erro ao atualizar role")
     } finally {
       setIsSavingRole(false)
+    }
+  }
+
+  // ── Permissões granulares ──────────────────────────────────────────────────
+
+  const togglePermission = async (userId: string, permission: string, grant: boolean) => {
+    setTogglingPermission(permission)
+    try {
+      if (grant) {
+        const { error } = await supabase
+          .from("user_permissions")
+          .upsert({ user_id: userId, permission, granted_by: currentUser?.id }, { onConflict: "user_id,permission" })
+        if (error) throw error
+      } else {
+        const { error } = await supabase
+          .from("user_permissions")
+          .delete()
+          .eq("user_id", userId)
+          .eq("permission", permission)
+        if (error) throw error
+      }
+      await fetchUsers()
+      setEditingUser((prev) => {
+        if (!prev) return prev
+        const perms = grant
+          ? [...(prev.permissions ?? []).filter((p) => p !== permission), permission]
+          : (prev.permissions ?? []).filter((p) => p !== permission)
+        return { ...prev, permissions: perms }
+      })
+    } catch (error: any) {
+      toast.error(error.message || "Erro ao alterar permissão")
+    } finally {
+      setTogglingPermission(null)
     }
   }
 
@@ -767,6 +816,16 @@ export default function AdminUsuariosPage() {
                             ))}
                           </div>
                         )}
+                        {user.permissions?.length > 0 && !user.is_admin && (
+                          <div className="flex items-center gap-2 mt-1 flex-wrap">
+                            <ShieldCheck className="h-3 w-3 text-emerald-600" />
+                            {user.permissions.map((p) => (
+                              <Badge key={p} variant="outline" className="text-xs text-emerald-700 border-emerald-200 bg-emerald-50 dark:bg-emerald-950/20 dark:text-emerald-400 dark:border-emerald-800">
+                                {PERMISSION_LABELS[p] ?? p}
+                              </Badge>
+                            ))}
+                          </div>
+                        )}
                       </div>
                     </div>
 
@@ -939,6 +998,35 @@ export default function AdminUsuariosPage() {
                           : <><UserX className="h-4 w-4 mr-2" />Desativar conta</>
                         }
                       </Button>
+                    )}
+                  </div>
+
+                  {/* Permissões granulares */}
+                  <div className="space-y-3 border-t pt-4">
+                    <p className="text-sm font-medium flex items-center gap-2">
+                      <ShieldCheck className="h-4 w-4" />
+                      Permissões
+                    </p>
+                    {editingUser.is_admin ? (
+                      <p className="text-xs text-muted-foreground">
+                        Administradores já possuem acesso total ao sistema.
+                      </p>
+                    ) : (
+                      <div className="space-y-3">
+                        {PERMISSIONS.map(({ key, label, description }) => (
+                          <div key={key} className="flex items-center justify-between gap-3">
+                            <div className="min-w-0">
+                              <p className="text-sm font-medium">{label}</p>
+                              <p className="text-xs text-muted-foreground">{description}</p>
+                            </div>
+                            <Switch
+                              checked={(editingUser.permissions ?? []).includes(key)}
+                              onCheckedChange={(v) => togglePermission(editingUser.id, key, v)}
+                              disabled={togglingPermission === key}
+                            />
+                          </div>
+                        ))}
+                      </div>
                     )}
                   </div>
                 </TabsContent>

@@ -8,7 +8,7 @@ import { cn } from "@/lib/utils"
 
 export function SystemModeSwitch() {
   const { mode } = useSystemMode()
-  const { isAuthenticated } = useAuth()
+  const { isAuthenticated, canAccessEscalas } = useAuth()
   const router = useRouter()
   const pathname = usePathname()
 
@@ -23,6 +23,8 @@ export function SystemModeSwitch() {
   if (isPublicPage || !isAuthenticated) {
     return null
   }
+
+  const hasEscalasAccess = canAccessEscalas()
 
   const handleSwitch = (target: "agendamentos" | "escalas") => {
     if (target === mode) return
@@ -48,19 +50,21 @@ export function SystemModeSwitch() {
         <Calendar className="h-4 w-4" />
         <span className="hidden sm:inline">Agendamentos</span>
       </button>
-      <button
-        onClick={() => handleSwitch("escalas")}
-        aria-label="Escalas"
-        className={cn(
-          "flex items-center gap-1.5 rounded-md px-2.5 py-1 text-sm font-medium transition-all",
-          mode === "escalas"
-            ? "bg-background text-foreground shadow-sm"
-            : "text-muted-foreground hover:text-foreground"
-        )}
-      >
-        <Users2 className="h-4 w-4" />
-        <span className="hidden sm:inline">Escalas</span>
-      </button>
+      {hasEscalasAccess && (
+        <button
+          onClick={() => handleSwitch("escalas")}
+          aria-label="Escalas"
+          className={cn(
+            "flex items-center gap-1.5 rounded-md px-2.5 py-1 text-sm font-medium transition-all",
+            mode === "escalas"
+              ? "bg-background text-foreground shadow-sm"
+              : "text-muted-foreground hover:text-foreground"
+          )}
+        >
+          <Users2 className="h-4 w-4" />
+          <span className="hidden sm:inline">Escalas</span>
+        </button>
+      )}
     </div>
   )
 }

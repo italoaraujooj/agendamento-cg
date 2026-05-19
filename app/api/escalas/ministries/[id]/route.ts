@@ -296,6 +296,14 @@ async function syncMinistryRoles(
         .update({ role: "ministry_leader" })
         .eq("id", userId)
         .eq("role", "user")
+
+      // Conceder access_escalas automaticamente ao novo líder
+      await supabase
+        .from("user_permissions")
+        .upsert(
+          { user_id: userId, permission: "access_escalas", granted_by: null },
+          { onConflict: "user_id,permission" }
+        )
     }
   } catch (err) {
     // Log mas não falha a request principal
