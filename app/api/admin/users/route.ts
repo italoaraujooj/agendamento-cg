@@ -40,10 +40,23 @@ export async function GET(_request: NextRequest) {
       return NextResponse.json({ error: profilesError.message }, { status: 500 })
     }
 
-    // Buscar ministry_roles
-    const { data: ministryRoles } = await adminClient
-      .from("user_ministry_roles")
-      .select("id, user_id, ministry_id, role, ministry:ministries(id, name, color)")
+    // Buscar ministry_roles e permissões granulares em paralelo
+    const [{ data: ministryRoles }, { data: permissionsData }] = await Promise.all([
+      adminClient
+        .from("user_ministry_roles")
+        .select("id, user_id, ministry_id, role, ministry:ministries(id, name, color)"),
+      adminClient
+        .from("user_permissions")
+        .select("user_id, permission"),
+    ])
+
+    // Mapear permissões por user_id
+    const permissionsMap = new Map<string, string[]>()
+    for (const row of permissionsData ?? []) {
+      const list = permissionsMap.get(row.user_id) ?? []
+      list.push(row.permission)
+      permissionsMap.set(row.user_id, list)
+    }
 
     // Buscar dados de auth (último login, provedores, status de ban)
     const { data: authData, error: authError } = await adminClient.auth.admin.listUsers({
@@ -69,6 +82,7 @@ export async function GET(_request: NextRequest) {
     const users = (profiles ?? []).map((p) => ({
       ...p,
       ministry_roles: (ministryRoles ?? []).filter((r) => r.user_id === p.id),
+      permissions: permissionsMap.get(p.id) ?? [],
       ...(authMap.get(p.id) ?? {
         last_sign_in_at: null,
         email_confirmed_at: null,

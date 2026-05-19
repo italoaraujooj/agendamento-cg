@@ -53,6 +53,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
+import { Switch } from "@/components/ui/switch"
 
 // Tipos
 interface Environment {
@@ -80,6 +81,7 @@ interface ExternalRental {
   status: 'pending' | 'confirmed' | 'completed' | 'cancelled'
   notes: string | null
   contract_signed: boolean
+  blocks_all_environments: boolean
   created_at: string
   updated_at: string
   environments?: Environment
@@ -220,6 +222,17 @@ export function ExternalRentalsManager({ userId }: ExternalRentalsManagerProps) 
     id: string
   }>({ open: false, type: 'rental', id: '' })
 
+  // Estados de filtro
+  const [statusFilter, setStatusFilter] = useState<string>('all')
+  const [summaryStart, setSummaryStart] = useState(() => {
+    const d = new Date()
+    return new Date(d.getFullYear(), d.getMonth(), 1).toISOString().split('T')[0]
+  })
+  const [summaryEnd, setSummaryEnd] = useState(() => {
+    const d = new Date()
+    return new Date(d.getFullYear(), d.getMonth() + 1, 0).toISOString().split('T')[0]
+  })
+
   // Estados do formulário de locação
   const [rentalForm, setRentalForm] = useState({
     environment_id: '',
@@ -235,9 +248,10 @@ export function ExternalRentalsManager({ userId }: ExternalRentalsManagerProps) 
     expected_participants: '',
     total_value: '',
     discount: '0',
-    status: 'pending' as const,
+    status: 'pending' as 'pending' | 'confirmed' | 'completed' | 'cancelled',
     notes: '',
     contract_signed: false,
+    blocks_all_environments: true,
   })
 
   // Estados do formulário de pagamento
@@ -322,13 +336,17 @@ export function ExternalRentalsManager({ userId }: ExternalRentalsManagerProps) 
     }
   }
 
-  // Funções de cálculo
+  // Funções de cálculo (filtradas por período do sumário)
   const calculateTotalRevenue = () => {
-    return payments.reduce((sum, p) => sum + Number(p.amount), 0)
+    return payments
+      .filter(p => p.payment_date >= summaryStart && p.payment_date <= summaryEnd)
+      .reduce((sum, p) => sum + Number(p.amount), 0)
   }
 
   const calculateTotalCosts = () => {
-    return costs.reduce((sum, c) => sum + Number(c.amount), 0)
+    return costs
+      .filter(c => c.cost_date >= summaryStart && c.cost_date <= summaryEnd)
+      .reduce((sum, c) => sum + Number(c.amount), 0)
   }
 
   const calculateNetBalance = () => {
@@ -390,6 +408,10 @@ export function ExternalRentalsManager({ userId }: ExternalRentalsManagerProps) 
       toast.error('Informe os horários de início e fim')
       return
     }
+    if (rentalForm.start_time >= rentalForm.end_time) {
+      toast.error('O horário de término deve ser posterior ao horário de início')
+      return
+    }
     if (!rentalForm.renter_name) {
       toast.error('Informe o nome do locador')
       return
@@ -416,39 +438,50 @@ export function ExternalRentalsManager({ userId }: ExternalRentalsManagerProps) 
       const endMinutes = timeToMinutes(rentalForm.end_time)
 
       // Verificar conflito com agendamentos internos (bookings)
-      const { data: existingBookings, error: bookingsError } = await supabase
+      // Se blocks_all_environments, busca em todos os ambientes; senão, só no ambiente alugado
+      const bookingsQuery = supabase
         .from('bookings')
-        .select('id, booking_date, start_time, end_time, name, status')
-        .eq('environment_id', envId)
+        .select('id, booking_date, start_time, end_time, name, status, environment_id')
         .eq('booking_date', rentalDate)
         .neq('status', 'rejected')
 
+      const { data: existingBookings, error: bookingsError } = rentalForm.blocks_all_environments
+        ? await bookingsQuery
+        : await bookingsQuery.eq('environment_id', envId)
+
       if (bookingsError) {
         console.error('Erro ao verificar agendamentos:', bookingsError)
-        // Continuar mesmo com erro (tabela pode não existir)
       }
 
-      // Verificar sobreposição com agendamentos internos
       const conflictingBookings = (existingBookings || []).filter(booking => {
         const bookingStart = timeToMinutes(booking.start_time)
         const bookingEnd = timeToMinutes(booking.end_time)
         return hasTimeOverlap(startMinutes, endMinutes, bookingStart, bookingEnd)
       })
 
-      if (conflictingBookings.length > 0) {
-        const conflictNames = conflictingBookings.map(b => b.name).join(', ')
-        toast.error(`Conflito com agendamento(s) interno(s): ${conflictNames}. Este horário já está reservado.`)
+      // Conflitos no próprio ambiente → bloqueante; em outros ambientes (blocks_all) → aviso
+      const directConflicts = conflictingBookings.filter(b => b.environment_id === envId)
+      const otherConflicts = conflictingBookings.filter(b => b.environment_id !== envId)
+
+      if (directConflicts.length > 0) {
+        const conflictNames = directConflicts.map(b => b.name).join(', ')
+        toast.error(`Conflito com agendamento(s) no ambiente selecionado: ${conflictNames}. Este horário já está reservado.`)
         setIsSubmitting(false)
         return
       }
 
+      if (otherConflicts.length > 0) {
+        toast.warning(`Atenção: ${otherConflicts.length} reserva(s) interna(s) em outros ambientes serão bloqueadas por esta locação.`)
+      }
+
       // Verificar conflito com outras locações externas (exceto a que está sendo editada)
+      // Inclui locações que bloqueiam todos os ambientes
       let externalQuery = supabase
         .from('external_rentals')
-        .select('id, rental_date, start_time, end_time, renter_name, status')
-        .eq('environment_id', envId)
+        .select('id, rental_date, start_time, end_time, renter_name, status, blocks_all_environments')
         .eq('rental_date', rentalDate)
         .neq('status', 'cancelled')
+        .or(`environment_id.eq.${envId},blocks_all_environments.eq.true`)
 
       if (editingRental) {
         externalQuery = externalQuery.neq('id', editingRental.id)
@@ -457,11 +490,9 @@ export function ExternalRentalsManager({ userId }: ExternalRentalsManagerProps) 
       const { data: existingRentals, error: rentalsError } = await externalQuery
 
       if (rentalsError && rentalsError.code !== '42P01') {
-        // 42P01 = tabela não existe (primeira vez usando)
         console.error('Erro ao verificar locações:', rentalsError)
       }
 
-      // Verificar sobreposição com outras locações externas
       const conflictingRentals = (existingRentals || []).filter(rental => {
         const rentalStart = timeToMinutes(rental.start_time)
         const rentalEnd = timeToMinutes(rental.end_time)
@@ -500,6 +531,7 @@ export function ExternalRentalsManager({ userId }: ExternalRentalsManagerProps) 
         status: rentalForm.status,
         notes: rentalForm.notes?.trim() || null,
         contract_signed: rentalForm.contract_signed,
+        blocks_all_environments: rentalForm.blocks_all_environments,
         created_by: userId,
       }
 
@@ -577,6 +609,7 @@ export function ExternalRentalsManager({ userId }: ExternalRentalsManagerProps) 
       status: 'pending',
       notes: '',
       contract_signed: false,
+      blocks_all_environments: true,
     })
   }
 
@@ -599,6 +632,7 @@ export function ExternalRentalsManager({ userId }: ExternalRentalsManagerProps) 
       status: rental.status,
       notes: rental.notes || '',
       contract_signed: rental.contract_signed,
+      blocks_all_environments: rental.blocks_all_environments,
     })
     setShowRentalForm(true)
   }
@@ -831,6 +865,24 @@ export function ExternalRentalsManager({ userId }: ExternalRentalsManagerProps) 
 
   return (
     <div className="space-y-6">
+      {/* Filtro de período do sumário financeiro */}
+      <div className="flex items-center gap-3 flex-wrap">
+        <span className="text-sm font-medium text-muted-foreground">Período do resumo:</span>
+        <Input
+          type="date"
+          value={summaryStart}
+          onChange={(e) => setSummaryStart(e.target.value)}
+          className="w-40 h-8 text-sm"
+        />
+        <span className="text-sm text-muted-foreground">até</span>
+        <Input
+          type="date"
+          value={summaryEnd}
+          onChange={(e) => setSummaryEnd(e.target.value)}
+          className="w-40 h-8 text-sm"
+        />
+      </div>
+
       {/* Cards de Resumo Financeiro */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         <Card className="bg-gradient-to-br from-green-50 to-emerald-50 dark:from-green-950/30 dark:to-emerald-950/30 border-green-200 dark:border-green-800">
@@ -934,14 +986,28 @@ export function ExternalRentalsManager({ userId }: ExternalRentalsManagerProps) 
         {/* Aba de Locações */}
         <TabsContent value="rentals" className="mt-4">
           <div className="flex justify-between items-center mb-4">
-            <h3 className="text-lg font-semibold">Locações Externas</h3>
+            <div className="flex items-center gap-3">
+              <h3 className="text-lg font-semibold">Locações Externas</h3>
+              <Select value={statusFilter} onValueChange={setStatusFilter}>
+                <SelectTrigger className="w-40 h-8 text-sm">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Todos</SelectItem>
+                  <SelectItem value="pending">Pendente</SelectItem>
+                  <SelectItem value="confirmed">Confirmado</SelectItem>
+                  <SelectItem value="completed">Realizado</SelectItem>
+                  <SelectItem value="cancelled">Cancelado</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
             <Button onClick={() => { resetRentalForm(); setEditingRental(null); setShowRentalForm(true); }}>
               <Plus className="h-4 w-4 mr-2" />
               Nova Locação
             </Button>
           </div>
 
-          {rentals.length === 0 ? (
+          {rentals.filter(r => statusFilter === 'all' || r.status === statusFilter).length === 0 ? (
             <Card className="p-8 text-center">
               <Building className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
               <h4 className="text-lg font-semibold mb-2">Nenhuma locação cadastrada</h4>
@@ -955,22 +1021,28 @@ export function ExternalRentalsManager({ userId }: ExternalRentalsManagerProps) 
             </Card>
           ) : (
             <div className="space-y-4">
-              {rentals.map((rental) => {
+              {rentals.filter(r => statusFilter === 'all' || r.status === statusFilter).map((rental) => {
                 const StatusIcon = STATUS_CONFIG[rental.status].icon
                 const pendingBalance = getRentalPendingBalance(rental)
                 const totalPaid = getRentalTotalPaid(rental.id)
+                const paymentProgress = rental.final_value > 0 ? Math.min((totalPaid / rental.final_value) * 100, 100) : 0
                 
                 return (
                   <Card key={rental.id} className="overflow-hidden">
                     <CardHeader className="pb-2">
                       <div className="flex items-start justify-between">
                         <div>
-                          <CardTitle className="text-lg flex items-center gap-2">
+                          <CardTitle className="text-lg flex items-center gap-2 flex-wrap">
                             {rental.renter_name}
                             <Badge className={STATUS_CONFIG[rental.status].color}>
                               <StatusIcon className="h-3 w-3 mr-1" />
                               {STATUS_CONFIG[rental.status].label}
                             </Badge>
+                            {rental.blocks_all_environments && (
+                              <Badge variant="outline" className="text-xs text-amber-600 border-amber-300 bg-amber-50 dark:bg-amber-950/30">
+                                Bloqueia todos os ambientes
+                              </Badge>
+                            )}
                           </CardTitle>
                           <CardDescription className="flex items-center gap-4 mt-1">
                             <span className="flex items-center gap-1">
@@ -1044,9 +1116,17 @@ export function ExternalRentalsManager({ userId }: ExternalRentalsManagerProps) 
                             <span>Valor Final:</span>
                             <span className="text-primary">{formatCurrency(rental.final_value)}</span>
                           </div>
-                          <div className="flex justify-between items-center text-sm">
-                            <span className="text-muted-foreground">Pago:</span>
-                            <span className="text-green-600">{formatCurrency(totalPaid)}</span>
+                          <div className="space-y-1">
+                            <div className="flex justify-between items-center text-sm">
+                              <span className="text-muted-foreground">Pago:</span>
+                              <span className="text-green-600">{formatCurrency(totalPaid)} / {formatCurrency(rental.final_value)}</span>
+                            </div>
+                            <div className="h-1.5 rounded-full bg-muted overflow-hidden">
+                              <div
+                                className={`h-1.5 rounded-full transition-all ${paymentProgress >= 100 ? 'bg-green-500' : 'bg-amber-500'}`}
+                                style={{ width: `${paymentProgress}%` }}
+                              />
+                            </div>
                           </div>
                           {pendingBalance > 0 && (
                             <div className="flex justify-between items-center text-sm">
@@ -1289,6 +1369,23 @@ export function ExternalRentalsManager({ userId }: ExternalRentalsManagerProps) 
                     value={rentalForm.rental_date}
                     onChange={(e) => setRentalForm({ ...rentalForm, rental_date: e.target.value })}
                   />
+                </div>
+              </div>
+
+              {/* Bloqueio de ambientes */}
+              <div className="flex items-center gap-3 p-3 rounded-lg border bg-amber-50 dark:bg-amber-950/20 border-amber-200 dark:border-amber-800">
+                <Switch
+                  id="blocks_all"
+                  checked={rentalForm.blocks_all_environments}
+                  onCheckedChange={(v) => setRentalForm(p => ({ ...p, blocks_all_environments: v }))}
+                />
+                <div>
+                  <Label htmlFor="blocks_all" className="font-medium text-sm cursor-pointer">
+                    Bloquear todos os ambientes
+                  </Label>
+                  <p className="text-xs text-muted-foreground">
+                    Impede reservas internas em qualquer ambiente durante este horário
+                  </p>
                 </div>
               </div>
 
