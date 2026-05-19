@@ -515,18 +515,19 @@ export default function AdminUsuariosPage() {
 
   const handleSaveName = async () => {
     if (!editingUser) return
+    const userId = editingUser.id
     setIsSavingName(true)
     try {
       const trimmed = nameValue.trim() || null
       const { error } = await supabase
         .from("profiles")
         .update({ full_name: trimmed })
-        .eq("id", editingUser.id)
+        .eq("id", userId)
       if (error) throw error
       toast.success("Nome atualizado!")
       setEditingName(false)
-      setEditingUser((prev) => prev ? { ...prev, full_name: trimmed } : prev)
-      setUsers((prev) => prev.map((u) => u.id === editingUser.id ? { ...u, full_name: trimmed } : u))
+      setEditingUser((prev) => prev && prev.id === userId ? { ...prev, full_name: trimmed } : prev)
+      setUsers((prev) => prev.map((u) => u.id === userId ? { ...u, full_name: trimmed } : u))
     } catch (error: any) {
       toast.error(error.message || "Erro ao atualizar nome")
     } finally {
@@ -906,7 +907,10 @@ export default function AdminUsuariosPage() {
 
       {/* ── Sheet de edição ────────────────────────────────────────────────── */}
       <Sheet open={isSheetOpen} onOpenChange={(open) => { if (!open) closeEditSheet() }}>
-        <SheetContent className="w-full sm:max-w-lg flex flex-col overflow-hidden p-0">
+        <SheetContent
+          className="w-full sm:max-w-lg flex flex-col overflow-hidden p-0"
+          onEscapeKeyDown={(e) => { if (editingName) e.preventDefault() }}
+        >
           {editingUser && (
             <>
               {/* Header fixo com padding para o botão X */}
@@ -930,6 +934,7 @@ export default function AdminUsuariosPage() {
                         className="h-6 w-6 shrink-0 text-green-600 hover:text-green-700"
                         onClick={handleSaveName}
                         disabled={isSavingName}
+                        aria-label={isSavingName ? "Salvando..." : "Salvar nome"}
                       >
                         {isSavingName ? <Loader2 className="h-3 w-3 animate-spin" /> : <Check className="h-3 w-3" />}
                       </Button>
@@ -939,6 +944,7 @@ export default function AdminUsuariosPage() {
                         className="h-6 w-6 shrink-0"
                         onClick={() => setEditingName(false)}
                         disabled={isSavingName}
+                        aria-label="Cancelar edição"
                       >
                         <X className="h-3 w-3" />
                       </Button>
@@ -952,6 +958,7 @@ export default function AdminUsuariosPage() {
                           variant="ghost"
                           className="h-6 w-6 text-muted-foreground hover:text-foreground"
                           onClick={() => { setNameValue(editingUser.full_name ?? ""); setEditingName(true) }}
+                          aria-label="Editar nome"
                         >
                           <Pencil className="h-3 w-3" />
                         </Button>
