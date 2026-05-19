@@ -30,7 +30,10 @@ interface AuthContextType {
   isAdmin: boolean
   adminChecked: boolean // Indica se a verificação de admin foi concluída
   ministryRoles: MinistryRole[]
+  permissions: string[]
   isMinistryLeader: (ministryId: string) => boolean
+  hasPermission: (key: string) => boolean
+  canAccessEscalas: () => boolean
   signInWithGoogle: () => Promise<void>
   signInWithEmail: (email: string, password: string) => Promise<void>
   signUp: (email: string, password: string, fullName: string) => Promise<void>
@@ -61,6 +64,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
   const [isAdmin, setIsAdmin] = useState(false)
   const [adminChecked, setAdminChecked] = useState(false)
   const [ministryRoles, setMinistryRoles] = useState<MinistryRole[]>([])
+  const [permissions, setPermissions] = useState<string[]>([])
   const [initialized, setInitialized] = useState(false)
 
   // Detecta hash fragment de recuperação de senha (implicit flow do Supabase)
@@ -102,7 +106,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
       })
 
       const fetchAll = async () => {
-        const [profileResult, rolesResult] = await Promise.all([
+        const [profileResult, rolesResult, permsResult] = await Promise.all([
           supabase
             .from('profiles')
             .select('is_admin')
@@ -112,8 +116,12 @@ export function AuthProvider({ children }: AuthProviderProps) {
             .from('user_ministry_roles')
             .select('ministry_id, role')
             .eq('user_id', userId),
+          supabase
+            .from('user_permissions')
+            .select('permission')
+            .eq('user_id', userId),
         ])
-        return { profileResult, rolesResult }
+        return { profileResult, rolesResult, permsResult }
       }
 
       const result = await Promise.race([fetchAll(), timeoutPromise])
@@ -122,11 +130,12 @@ export function AuthProvider({ children }: AuthProviderProps) {
         // Timeout
         setIsAdmin(false)
         setMinistryRoles([])
+        setPermissions([])
         setAdminChecked(true)
         return
       }
 
-      const { profileResult, rolesResult } = result
+      const { profileResult, rolesResult, permsResult } = result
 
       if (profileResult.error) {
         setIsAdmin(false)
@@ -139,10 +148,17 @@ export function AuthProvider({ children }: AuthProviderProps) {
       } else {
         setMinistryRoles(rolesResult.data || [])
       }
+
+      if (permsResult.error) {
+        setPermissions([])
+      } else {
+        setPermissions(permsResult.data?.map((p: { permission: string }) => p.permission) ?? [])
+      }
     } catch (err) {
       console.warn('Erro ao verificar admin:', err)
       setIsAdmin(false)
       setMinistryRoles([])
+      setPermissions([])
     } finally {
       setAdminChecked(true)
     }
@@ -157,6 +173,15 @@ export function AuthProvider({ children }: AuthProviderProps) {
   const isMinistryLeader = useCallback((ministryId: string) => {
     return ministryRoles.some(r => r.ministry_id === ministryId)
   }, [ministryRoles])
+
+  const hasPermission = useCallback((key: string): boolean => {
+    if (isAdmin) return true
+    return permissions.includes(key)
+  }, [isAdmin, permissions])
+
+  const canAccessEscalas = useCallback((): boolean => {
+    return isAdmin || permissions.includes('access_escalas')
+  }, [isAdmin, permissions])
 
   // Inicialização - executar apenas uma vez
   useEffect(() => {
@@ -193,6 +218,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
           setUser(null)
           setIsAdmin(false)
           setMinistryRoles([])
+          setPermissions([])
           setAdminChecked(true)
         }
       } catch (err) {
@@ -231,6 +257,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
           setUser(null)
           setIsAdmin(false)
           setMinistryRoles([])
+          setPermissions([])
           setAdminChecked(true)
           setLoading(false)
           return
@@ -354,7 +381,10 @@ export function AuthProvider({ children }: AuthProviderProps) {
     isAdmin,
     adminChecked,
     ministryRoles,
+    permissions,
     isMinistryLeader,
+    hasPermission,
+    canAccessEscalas,
     signInWithGoogle,
     signInWithEmail,
     signUp,

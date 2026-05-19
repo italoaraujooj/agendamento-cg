@@ -107,7 +107,7 @@ const parseLocalYmd = (ymd: string): Date => {
 
 export default function AdminPage() {
   const router = useRouter()
-  const { user, isAuthenticated, isAdmin, adminChecked, loading: authLoading } = useAuth()
+  const { user, isAuthenticated, isAdmin, adminChecked, loading: authLoading, hasPermission } = useAuth()
   const [bookings, setBookings] = useState<Booking[]>([])
   const [environments, setEnvironments] = useState<Environment[]>([])
   const [loading, setLoading] = useState(true)
@@ -127,32 +127,34 @@ export default function AdminPage() {
   const [selectedMonths, setSelectedMonths] = useState<string[]>([])
   const [selectAllMonths, setSelectAllMonths] = useState(true)
 
-  // Verificar acesso admin
+  // Verificar acesso ao painel
   useEffect(() => {
-    // Aguardar carregamento da autenticação
     if (authLoading) return
-    
-    // Se não está autenticado, redirecionar
     if (!isAuthenticated) {
       router.push('/')
       return
     }
-    
-    // Aguardar verificação de admin ser concluída
     if (!adminChecked) return
-    
-    // Se não é admin, mostrar erro e redirecionar
-    if (!isAdmin) {
-      toast.error('Acesso negado. Você não tem permissão de administrador.')
+    const canEnterAdmin = isAdmin || hasPermission('approve_bookings') || hasPermission('manage_external_rentals')
+    if (!canEnterAdmin) {
+      toast.error('Acesso negado. Você não tem permissão para acessar o painel.')
       router.push('/')
-      return
     }
-  }, [authLoading, isAuthenticated, isAdmin, adminChecked, router])
+  }, [authLoading, isAuthenticated, isAdmin, adminChecked, hasPermission, router])
 
   // Carregar dados
   useEffect(() => {
+    if (!adminChecked) return
+
+    const canFetchBookings = isAdmin || hasPermission('approve_bookings')
+    const canEnterAdmin = canFetchBookings || hasPermission('manage_external_rentals')
+    if (!canEnterAdmin) return
+
     const fetchData = async () => {
-      if (!isAdmin) return
+      if (!canFetchBookings) {
+        setLoading(false)
+        return
+      }
 
       try {
         const [bookingsRes, environmentsRes] = await Promise.all([
@@ -183,10 +185,8 @@ export default function AdminPage() {
       }
     }
 
-    if (isAdmin) {
-      fetchData()
-    }
-  }, [isAdmin])
+    fetchData()
+  }, [isAdmin, adminChecked, hasPermission])
 
   // Processar ação (aprovar/rejeitar)
   const handleAction = async () => {
@@ -779,7 +779,12 @@ export default function AdminPage() {
     toast.success(`${reportTitle} exportado com sucesso!`)
   }
 
-  // Loading state - aguardar auth e verificação de admin
+  const canSeeBookings = isAdmin || hasPermission('approve_bookings')
+  const canSeeRentals = isAdmin || hasPermission('manage_external_rentals')
+  const canSeeUsers = isAdmin
+  const canEnterAdmin = canSeeBookings || canSeeRentals
+
+  // Loading state - aguardar auth e verificação de permissões
   if (authLoading || loading || (isAuthenticated && !adminChecked)) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -791,8 +796,7 @@ export default function AdminPage() {
     )
   }
 
-  // Não autorizado
-  if (!isAdmin) {
+  if (!canEnterAdmin) {
     return null
   }
 
@@ -818,27 +822,33 @@ export default function AdminPage() {
 
       <div className="container mx-auto px-4 py-6">
         {/* Tabs Principais no Subheader */}
-        <Tabs defaultValue="bookings" className="w-full">
+        <Tabs defaultValue={canSeeBookings ? 'bookings' : canSeeRentals ? 'rentals' : 'users'} className="w-full">
           <TabsList className="flex w-full mb-6 h-auto overflow-x-auto">
-            <TabsTrigger value="bookings" className="flex items-center gap-2 text-sm md:text-base py-3">
-              <ClipboardList className="h-4 w-4 md:h-5 md:w-5" />
-              <span className="hidden sm:inline">Agendamentos Internos</span>
-              <span className="sm:hidden">Agendamentos</span>
-            </TabsTrigger>
-            <TabsTrigger value="rentals" className="flex items-center gap-2 text-sm md:text-base py-3">
-              <DollarSign className="h-4 w-4 md:h-5 md:w-5" />
-              <span className="hidden sm:inline">Locações Externas</span>
-              <span className="sm:hidden">Locações</span>
-            </TabsTrigger>
-            <TabsTrigger value="users" className="flex items-center gap-2 text-sm md:text-base py-3">
-              <UserCog className="h-4 w-4 md:h-5 md:w-5" />
-              <span className="hidden sm:inline">Gerenciar Usuários</span>
-              <span className="sm:hidden">Usuários</span>
-            </TabsTrigger>
+            {canSeeBookings && (
+              <TabsTrigger value="bookings" className="flex items-center gap-2 text-sm md:text-base py-3">
+                <ClipboardList className="h-4 w-4 md:h-5 md:w-5" />
+                <span className="hidden sm:inline">Agendamentos Internos</span>
+                <span className="sm:hidden">Agendamentos</span>
+              </TabsTrigger>
+            )}
+            {canSeeRentals && (
+              <TabsTrigger value="rentals" className="flex items-center gap-2 text-sm md:text-base py-3">
+                <DollarSign className="h-4 w-4 md:h-5 md:w-5" />
+                <span className="hidden sm:inline">Locações Externas</span>
+                <span className="sm:hidden">Locações</span>
+              </TabsTrigger>
+            )}
+            {canSeeUsers && (
+              <TabsTrigger value="users" className="flex items-center gap-2 text-sm md:text-base py-3">
+                <UserCog className="h-4 w-4 md:h-5 md:w-5" />
+                <span className="hidden sm:inline">Gerenciar Usuários</span>
+                <span className="sm:hidden">Usuários</span>
+              </TabsTrigger>
+            )}
           </TabsList>
 
           {/* Conteúdo de Agendamentos Internos */}
-          <TabsContent value="bookings">
+          {canSeeBookings && <TabsContent value="bookings">
             {/* Header da seção com botões de relatório */}
             <div className="flex items-center justify-between mb-6 flex-wrap gap-4">
               <p className="text-muted-foreground">
@@ -1049,31 +1059,35 @@ export default function AdminPage() {
                 )}
               </TabsContent>
             </Tabs>
-          </TabsContent>
+          </TabsContent>}
 
           {/* Conteúdo de Locações Externas */}
-          <TabsContent value="rentals">
-            <ExternalRentalsManager userId={user?.id || ''} />
-          </TabsContent>
+          {canSeeRentals && (
+            <TabsContent value="rentals">
+              <ExternalRentalsManager userId={user?.id || ''} />
+            </TabsContent>
+          )}
 
           {/* Conteúdo de Gerenciamento de Usuários */}
-          <TabsContent value="users">
-            <div className="flex flex-col items-center justify-center py-16 gap-4 text-center">
-              <UserCog className="h-12 w-12 text-muted-foreground" />
-              <div>
-                <h3 className="text-lg font-semibold">Gerenciamento de Usuários</h3>
-                <p className="text-muted-foreground text-sm mt-1">
-                  Defina roles, vínculos de ministério, recupere senhas e gerencie contas.
-                </p>
+          {canSeeUsers && (
+            <TabsContent value="users">
+              <div className="flex flex-col items-center justify-center py-16 gap-4 text-center">
+                <UserCog className="h-12 w-12 text-muted-foreground" />
+                <div>
+                  <h3 className="text-lg font-semibold">Gerenciamento de Usuários</h3>
+                  <p className="text-muted-foreground text-sm mt-1">
+                    Defina roles, vínculos de ministério, recupere senhas e gerencie contas.
+                  </p>
+                </div>
+                <Link href="/admin/usuarios">
+                  <Button>
+                    <UserCog className="mr-2 h-4 w-4" />
+                    Acessar gerenciamento de usuários
+                  </Button>
+                </Link>
               </div>
-              <Link href="/admin/usuarios">
-                <Button>
-                  <UserCog className="mr-2 h-4 w-4" />
-                  Acessar gerenciamento de usuários
-                </Button>
-              </Link>
-            </div>
-          </TabsContent>
+            </TabsContent>
+          )}
         </Tabs>
       </div>
 
