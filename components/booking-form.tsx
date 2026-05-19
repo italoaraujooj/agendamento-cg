@@ -861,23 +861,32 @@ export default function BookingForm({ environments, preselectedEnvironment }: Bo
       }
 
       // Pré-checagem de conflitos com locações externas
+      // Inclui locações com blocks_all_environments=true que bloqueiam qualquer ambiente
       const { data: externalRentals } = await supabase
         .from("external_rentals")
-        .select("rental_date,start_time,end_time,environment_id")
-        .in("environment_id", envIds)
+        .select("rental_date,start_time,end_time,environment_id,blocks_all_environments")
         .in("rental_date", queryDates)
-        .neq("status", "cancelled") // Ignorar locações canceladas
+        .neq("status", "cancelled")
+        .or(`environment_id.in.(${envIds.join(",")}),blocks_all_environments.eq.true`)
 
       const externalConflicts: string[] = []
       for (const rental of externalRentals || []) {
         const d = (rental as any).rental_date as string
+        const blocksAll = (rental as any).blocks_all_environments as boolean
         const env = Number((rental as any).environment_id)
-        const target = (byEnvByDate[env] || {})[d]
-        if (!target) continue
         const rS = timeStringToHour((rental as any).start_time)
         const rE = timeStringToHour((rental as any).end_time)
-        if (overlaps(target.start, target.end, rS, rE)) {
-          externalConflicts.push(`${d} (Ambiente ${env} - Locação externa)`)
+
+        for (const [envIdStr, dates] of Object.entries(byEnvByDate)) {
+          const envId = Number(envIdStr)
+          if (!blocksAll && envId !== env) continue
+          const target = (dates as any)[d]
+          if (!target) continue
+          if (overlaps(target.start, target.end, rS, rE)) {
+            const label = blocksAll ? "todos os ambientes" : `Ambiente ${env}`
+            externalConflicts.push(`${d} (${label} - Locação externa)`)
+            break
+          }
         }
       }
       if (externalConflicts.length) {
