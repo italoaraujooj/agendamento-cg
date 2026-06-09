@@ -139,6 +139,31 @@ const PERMISSIONS = [
   { key: "manage_avisos", label: "Gerenciar Avisos", description: "Pode aprovar/rejeitar avisos e ver a listagem de avisos programados" },
 ] as const
 
+const PERMISSIONS_BY_MODULE = [
+  {
+    module: "Agendamentos",
+    description: "Módulo de reserva de ambientes e locações externas",
+    permissions: [
+      { key: "approve_bookings", label: "Aprovar reservas", description: "Pode aprovar/rejeitar solicitações de reserva de ambientes" },
+      { key: "manage_external_rentals", label: "Locações externas", description: "Acesso ao módulo de locações, pagamentos e custos" },
+    ],
+  },
+  {
+    module: "Escalas",
+    description: "Módulo de gestão de escalas e ministérios",
+    permissions: [
+      { key: "access_escalas", label: "Acesso ao módulo", description: "Pode acessar o módulo de escalas e visualizar ministérios" },
+    ],
+  },
+  {
+    module: "Avisos no Culto",
+    description: "Módulo de avisos dados nos cultos de domingo",
+    permissions: [
+      { key: "manage_avisos", label: "Gerenciar avisos", description: "Pode aprovar/rejeitar avisos e ver a listagem de avisos programados" },
+    ],
+  },
+] as const
+
 const PERMISSION_LABELS: Record<string, string> = {
   approve_bookings: "Aprovar agendamentos",
   manage_external_rentals: "Locações externas",
@@ -976,9 +1001,10 @@ export default function AdminUsuariosPage() {
                 <Tabs value={editTab} onValueChange={handleTabChange} className="flex flex-col h-full">
                   <div className="shrink-0 px-6 pt-4">
                     <TabsList className="w-full mb-0">
-                      <TabsTrigger value="account" className="flex-1">Conta</TabsTrigger>
-                      <TabsTrigger value="ministries" className="flex-1">Ministérios</TabsTrigger>
-                      <TabsTrigger value="servants" className="flex-1">Servos</TabsTrigger>
+                      <TabsTrigger value="account" className="flex-1 text-xs sm:text-sm">Conta</TabsTrigger>
+                      <TabsTrigger value="permissions" className="flex-1 text-xs sm:text-sm">Acesso</TabsTrigger>
+                      <TabsTrigger value="ministries" className="flex-1 text-xs sm:text-sm">Ministérios</TabsTrigger>
+                      <TabsTrigger value="servants" className="flex-1 text-xs sm:text-sm">Servos</TabsTrigger>
                     </TabsList>
                   </div>
                   <div className="px-6 pt-4 pb-6">
@@ -1089,34 +1115,57 @@ export default function AdminUsuariosPage() {
                     )}
                   </div>
 
-                  {/* Permissões granulares */}
-                  <div className="space-y-3 border-t pt-4">
-                    <p className="text-sm font-medium flex items-center gap-2">
-                      <ShieldCheck className="h-4 w-4" />
-                      Permissões
-                    </p>
-                    {editingUser.is_admin ? (
-                      <p className="text-xs text-muted-foreground">
-                        Administradores já possuem acesso total ao sistema.
-                      </p>
-                    ) : (
-                      <div className="space-y-3">
-                        {PERMISSIONS.map(({ key, label, description }) => (
-                          <div key={key} className="flex items-center justify-between gap-3">
-                            <div className="min-w-0">
-                              <p className="text-sm font-medium">{label}</p>
-                              <p className="text-xs text-muted-foreground">{description}</p>
-                            </div>
-                            <Switch
-                              checked={(editingUser.permissions ?? []).includes(key)}
-                              onCheckedChange={(v) => togglePermission(editingUser.id, key, v)}
-                              disabled={togglingPermission === key}
-                            />
-                          </div>
-                        ))}
+                </TabsContent>
+
+                {/* ── Aba Acesso ───────────────────────────────────────── */}
+                <TabsContent value="permissions" className="space-y-5">
+                  {editingUser.is_admin ? (
+                    <div className="rounded-lg border border-purple-200 bg-purple-50 dark:bg-purple-950/20 p-4 flex items-start gap-3">
+                      <Shield className="h-5 w-5 text-purple-600 dark:text-purple-400 shrink-0 mt-0.5" />
+                      <div>
+                        <p className="text-sm font-semibold text-purple-800 dark:text-purple-300">Acesso total</p>
+                        <p className="text-xs text-muted-foreground mt-0.5">
+                          Administradores têm acesso completo a todos os módulos. Remova o role de administrador para configurar permissões individuais.
+                        </p>
                       </div>
-                    )}
-                  </div>
+                    </div>
+                  ) : (
+                    <div className="space-y-6">
+                      {PERMISSIONS_BY_MODULE.map(({ module, description, permissions }) => {
+                        const activeCount = permissions.filter(p => (editingUser.permissions ?? []).includes(p.key)).length
+                        return (
+                          <div key={module} className="space-y-3">
+                            <div className="flex items-center justify-between">
+                              <div>
+                                <p className="text-sm font-semibold">{module}</p>
+                                <p className="text-xs text-muted-foreground">{description}</p>
+                              </div>
+                              {activeCount > 0 && (
+                                <Badge className="text-xs bg-emerald-100 text-emerald-700 dark:bg-emerald-950/30 dark:text-emerald-400 border-0">
+                                  {activeCount}/{permissions.length} ativo{activeCount !== 1 ? "s" : ""}
+                                </Badge>
+                              )}
+                            </div>
+                            <div className="space-y-2 pl-1">
+                              {permissions.map(({ key, label, description: desc }) => (
+                                <div key={key} className="flex items-center justify-between gap-3 p-3 rounded-lg border bg-muted/20">
+                                  <div className="min-w-0">
+                                    <p className="text-sm font-medium">{label}</p>
+                                    <p className="text-xs text-muted-foreground">{desc}</p>
+                                  </div>
+                                  <Switch
+                                    checked={(editingUser.permissions ?? []).includes(key)}
+                                    onCheckedChange={(v) => togglePermission(editingUser.id, key, v)}
+                                    disabled={togglingPermission === key}
+                                  />
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        )
+                      })}
+                    </div>
+                  )}
                 </TabsContent>
 
                 {/* ── Aba Ministérios ──────────────────────────────────── */}
