@@ -43,7 +43,7 @@ interface Announcement {
   review_notes: string | null
   reviewed_at: string | null
   created_at: string
-  ministry: { id: string; name: string; color: string } | null
+  ministry_name: string | null
   submitter: { id: string; full_name: string | null; email: string } | null
 }
 
@@ -110,10 +110,10 @@ function AnnouncementCard({
         {expanded && (
           <div className="space-y-3 border-t pt-3 text-sm">
             {a.description && <p className="text-muted-foreground">{a.description}</p>}
-            {a.ministry && (
+            {a.ministry_name && (
               <p className="flex items-center gap-2">
-                <span className="w-3 h-3 rounded-full shrink-0" style={{ backgroundColor: a.ministry.color }} />
-                {a.ministry.name}
+                <Building className="h-3.5 w-3.5 text-muted-foreground" />
+                {a.ministry_name}
               </p>
             )}
             {a.location && <p className="flex items-center gap-2"><MapPin className="h-3.5 w-3.5 text-muted-foreground" />{a.location}</p>}

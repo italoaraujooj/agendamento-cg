@@ -25,8 +25,8 @@ CREATE TABLE IF NOT EXISTS public.church_announcements (
   registration_value numeric(10,2),
   registration_where text,
 
-  -- Ministério responsável
-  ministry_id uuid REFERENCES public.ministries(id) ON DELETE SET NULL,
+  -- Ministério responsável (texto livre)
+  ministry_name text,
 
   -- Arte (Supabase Storage)
   has_art boolean NOT NULL DEFAULT false,

@@ -8,7 +8,7 @@ const announcementSchema = z.discriminatedUnion("type", [
     type: z.literal("event"),
     title: z.string().min(3).max(200),
     description: z.string().max(1000).optional(),
-    ministry_id: z.string().uuid().optional().nullable(),
+    ministry_name: z.string().max(150).optional().nullable(),
     location: z.string().min(2).max(200),
     event_time: z.string().min(1).max(20),
     event_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
@@ -20,14 +20,14 @@ const announcementSchema = z.discriminatedUnion("type", [
     type: z.literal("general"),
     title: z.string().min(3).max(200),
     description: z.string().min(5).max(1000),
-    ministry_id: z.string().uuid().optional().nullable(),
+    ministry_name: z.string().max(150).optional().nullable(),
     repeat_weeks: z.number().int().min(1).max(4).default(1),
   }),
   z.object({
     type: z.literal("ministry"),
     title: z.string().min(3).max(200),
     description: z.string().min(5).max(1000),
-    ministry_id: z.string().uuid(),
+    ministry_name: z.string().min(2).max(150),
     repeat_weeks: z.number().int().min(1).max(4).default(1),
   }),
 ])
@@ -58,7 +58,6 @@ export async function GET(request: NextRequest) {
       .from("church_announcements")
       .select(`
         *,
-        ministry:ministries(id, name, color),
         submitter:profiles!church_announcements_submitted_by_fkey(id, full_name, email)
       `)
       .order("created_at", { ascending: false })
@@ -119,7 +118,7 @@ export async function POST(request: NextRequest) {
       type: data.type,
       title: data.title,
       description: "description" in data ? data.description : null,
-      ministry_id: "ministry_id" in data ? data.ministry_id : null,
+      ministry_name: "ministry_name" in data ? (data.ministry_name || null) : null,
       first_sunday: firstSunday.toISOString().slice(0, 10),
       last_sunday: lastSunday.toISOString().slice(0, 10),
       submitted_by: user.id,

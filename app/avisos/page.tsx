@@ -31,7 +31,7 @@ interface Announcement {
   status: "pending" | "approved" | "rejected"
   review_notes: string | null
   created_at: string
-  ministry: { name: string; color: string } | null
+  ministry_name: string | null
 }
 
 const TYPE_LABELS = { event: "Evento", general: "Comunicado Geral", ministry: "Aviso de Ministério" }
@@ -170,11 +170,8 @@ export default function AvisosPage() {
                   {isOpen && (
                     <div className="border-t pt-3 space-y-2 text-sm">
                       {a.description && <p className="text-muted-foreground">{a.description}</p>}
-                      {a.ministry && (
-                        <p className="flex items-center gap-2">
-                          <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: a.ministry.color }} />
-                          {a.ministry.name}
-                        </p>
+                      {a.ministry_name && (
+                        <p className="text-muted-foreground">{a.ministry_name}</p>
                       )}
                       {a.event_date && (
                         <p className="text-muted-foreground">

@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, useRef } from "react"
+import { useState, useRef } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -10,21 +10,19 @@ import { Card, CardContent } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Switch } from "@/components/ui/switch"
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
-import { Loader2, Upload, X, CalendarDays, Info, ImageIcon, Video } from "lucide-react"
+import { Loader2, Upload, X, CalendarDays, Info, ImageIcon } from "lucide-react"
 import { toast } from "sonner"
-import { supabase } from "@/lib/supabase/client"
 import { getNextEligibleSunday, getLastSundayBeforeDate, addWeeks, sundaysBetween, formatSunday } from "@/lib/announcements"
 import { format } from "date-fns"
 import { ptBR } from "date-fns/locale"
 
-interface Ministry { id: string; name: string; color: string }
 interface AnnouncementFormProps { onSuccess?: () => void }
 
 export function AnnouncementForm({ onSuccess }: AnnouncementFormProps) {
   const [type, setType] = useState<"event" | "general" | "ministry">("event")
   const [title, setTitle] = useState("")
   const [description, setDescription] = useState("")
-  const [ministryId, setMinistryId] = useState("")
+  const [ministryName, setMinistryName] = useState("")
   const [location, setLocation] = useState("")
   const [eventTime, setEventTime] = useState("")
   const [eventDate, setEventDate] = useState("")
@@ -35,16 +33,10 @@ export function AnnouncementForm({ onSuccess }: AnnouncementFormProps) {
   const [hasArt, setHasArt] = useState(false)
   const [artFile, setArtFile] = useState<File | null>(null)
   const [artPreview, setArtPreview] = useState<string | null>(null)
-  const [ministries, setMinistries] = useState<Ministry[]>([])
   const [submitting, setSubmitting] = useState(false)
   const [uploadingArt, setUploadingArt] = useState(false)
   const [confirmedSundays, setConfirmedSundays] = useState<Date[] | null>(null)
   const fileRef = useRef<HTMLInputElement>(null)
-
-  useEffect(() => {
-    supabase.from("ministries").select("id, name, color").eq("is_active", true).order("name")
-      .then(({ data }) => setMinistries(data ?? []))
-  }, [])
 
   const previewSundays = (): Date[] => {
     const first = getNextEligibleSunday(new Date())
@@ -79,7 +71,7 @@ export function AnnouncementForm({ onSuccess }: AnnouncementFormProps) {
     try {
       const body: Record<string, unknown> = { type, title }
       if (description) body.description = description
-      if (ministryId) body.ministry_id = ministryId
+      if (ministryName) body.ministry_name = ministryName
 
       if (type === "event") {
         if (!location || !eventTime || !eventDate) {
@@ -95,7 +87,7 @@ export function AnnouncementForm({ onSuccess }: AnnouncementFormProps) {
         }
       } else {
         if (!description) { toast.error("Descrição é obrigatória."); return }
-        if (type === "ministry" && !ministryId) { toast.error("Selecione o ministério responsável."); return }
+        if (type === "ministry" && !ministryName) { toast.error("Informe o ministério responsável."); return }
         body.repeat_weeks = repeatWeeks
       }
 
@@ -155,7 +147,7 @@ export function AnnouncementForm({ onSuccess }: AnnouncementFormProps) {
             setConfirmedSundays(null)
             setTitle(""); setDescription(""); setLocation(""); setEventTime("")
             setEventDate(""); setRegistrationValue(""); setRegistrationWhere("")
-            setMinistryId(""); setHasArt(false); removeArt()
+            setMinistryName(""); setHasArt(false); removeArt()
           }}>
             Enviar outro aviso
           </Button>
@@ -196,19 +188,12 @@ export function AnnouncementForm({ onSuccess }: AnnouncementFormProps) {
       {(type === "ministry" || type === "event") && (
         <div className="space-y-2">
           <Label>Ministério responsável {type === "ministry" && <span className="text-red-500">*</span>}</Label>
-          <Select value={ministryId} onValueChange={setMinistryId}>
-            <SelectTrigger><SelectValue placeholder="Selecione um ministério" /></SelectTrigger>
-            <SelectContent>
-              {ministries.map(m => (
-                <SelectItem key={m.id} value={m.id}>
-                  <span className="flex items-center gap-2">
-                    <span className="w-3 h-3 rounded-full inline-block shrink-0" style={{ backgroundColor: m.color }} />
-                    {m.name}
-                  </span>
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+          <Input
+            value={ministryName}
+            onChange={e => setMinistryName(e.target.value)}
+            placeholder="Ex: Ministério de Louvor"
+            maxLength={150}
+          />
         </div>
       )}
 
