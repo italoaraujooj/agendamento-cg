@@ -4,7 +4,7 @@ import { useState } from "react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { Button } from "@/components/ui/button"
-import { Calendar, MapPin, Users, Home, Shield, Users2, CalendarDays, ClipboardList, Menu } from "lucide-react"
+import { Calendar, MapPin, Users, Home, Shield, Users2, CalendarDays, ClipboardList, Menu, Megaphone } from "lucide-react"
 import { ModeToggle } from "@/components/mode-toggle"
 import { AuthButton } from "@/components/auth/auth-button"
 import { CalendarStatusIndicator } from "@/components/calendar-status-indicator"
@@ -80,7 +80,7 @@ export default function NavigationHeader() {
   const baseNavItems = isEscalas ? escalasNavItems : agendamentosNavItems
 
   // Mostrar Admin (agendamentos) se tiver qualquer permissão de gestão; escalas apenas para admin
-  const canSeeAgendamentosAdmin = isAuthenticated && (isAdmin || hasPermission('approve_bookings') || hasPermission('manage_external_rentals'))
+  const canSeeAgendamentosAdmin = isAuthenticated && (isAdmin || hasPermission('approve_bookings') || hasPermission('manage_external_rentals') || hasPermission('manage_avisos'))
   const canSeeEscalasAdmin = isAuthenticated && isAdmin
 
   const adminNavItem = isEscalas && canSeeEscalasAdmin
@@ -89,7 +89,15 @@ export default function NavigationHeader() {
     ? { href: "/admin", label: "Admin", icon: Shield, active: pathname === "/admin" || pathname.startsWith("/admin/") }
     : null
 
-  const allNavItems = adminNavItem ? [...baseNavItems, adminNavItem] : baseNavItems
+  const avisosNavItem = isAuthenticated && !isEscalas
+    ? { href: "/avisos", label: "Avisos", icon: Megaphone, active: pathname === "/avisos" }
+    : null
+
+  const allNavItems = [
+    ...baseNavItems,
+    ...(avisosNavItem ? [avisosNavItem] : []),
+    ...(adminNavItem ? [adminNavItem] : []),
+  ]
 
   // Título e ícone baseado no modo
   const headerTitle = isEscalas ? "Escalas - Cidade Viva CG" : "Agendamento - Cidade Viva CG"

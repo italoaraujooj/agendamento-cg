@@ -136,12 +136,14 @@ const PERMISSIONS = [
   { key: "approve_bookings", label: "Aprovar agendamentos", description: "Pode aprovar/rejeitar solicitações de reserva" },
   { key: "manage_external_rentals", label: "Gerenciar locações externas", description: "Acesso ao módulo de locações, pagamentos e custos" },
   { key: "access_escalas", label: "Acesso ao módulo de Escalas", description: "Pode acessar /escalas e visualizar ministérios" },
+  { key: "manage_avisos", label: "Gerenciar Avisos", description: "Pode aprovar/rejeitar avisos e ver a listagem de avisos programados" },
 ] as const
 
 const PERMISSION_LABELS: Record<string, string> = {
   approve_bookings: "Aprovar agendamentos",
   manage_external_rentals: "Locações externas",
   access_escalas: "Escalas",
+  manage_avisos: "Avisos",
 }
 
 const ROLE_CONFIG = {

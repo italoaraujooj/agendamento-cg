@@ -30,8 +30,10 @@ import {
   DollarSign,
   ClipboardList,
   UserCog,
+  Megaphone,
 } from "lucide-react"
 import { ExternalRentalsManager } from "@/components/admin/external-rentals"
+import { AnnouncementsManager } from "@/components/admin/announcements-manager"
 import { supabase } from "@/lib/supabase/client"
 import { toast } from "sonner"
 import Link from "next/link"
@@ -781,8 +783,9 @@ export default function AdminPage() {
 
   const canSeeBookings = isAdmin || hasPermission('approve_bookings')
   const canSeeRentals = isAdmin || hasPermission('manage_external_rentals')
+  const canSeeAvisos = isAdmin || hasPermission('manage_avisos')
   const canSeeUsers = isAdmin
-  const canEnterAdmin = canSeeBookings || canSeeRentals
+  const canEnterAdmin = canSeeBookings || canSeeRentals || canSeeAvisos
 
   // Loading state - aguardar auth e verificação de permissões
   if (authLoading || loading || (isAuthenticated && !adminChecked)) {
@@ -822,7 +825,7 @@ export default function AdminPage() {
 
       <div className="container mx-auto px-4 py-6">
         {/* Tabs Principais no Subheader */}
-        <Tabs defaultValue={canSeeBookings ? 'bookings' : canSeeRentals ? 'rentals' : 'users'} className="w-full">
+        <Tabs defaultValue={canSeeBookings ? 'bookings' : canSeeRentals ? 'rentals' : canSeeAvisos ? 'avisos' : 'users'} className="w-full">
           <TabsList className="flex w-full mb-6 h-auto overflow-x-auto">
             {canSeeBookings && (
               <TabsTrigger value="bookings" className="flex items-center gap-2 text-sm md:text-base py-3">
@@ -836,6 +839,13 @@ export default function AdminPage() {
                 <DollarSign className="h-4 w-4 md:h-5 md:w-5" />
                 <span className="hidden sm:inline">Locações Externas</span>
                 <span className="sm:hidden">Locações</span>
+              </TabsTrigger>
+            )}
+            {canSeeAvisos && (
+              <TabsTrigger value="avisos" className="flex items-center gap-2 text-sm md:text-base py-3">
+                <Megaphone className="h-4 w-4 md:h-5 md:w-5" />
+                <span className="hidden sm:inline">Avisos no Culto</span>
+                <span className="sm:hidden">Avisos</span>
               </TabsTrigger>
             )}
             {canSeeUsers && (
@@ -1065,6 +1075,13 @@ export default function AdminPage() {
           {canSeeRentals && (
             <TabsContent value="rentals">
               <ExternalRentalsManager userId={user?.id || ''} />
+            </TabsContent>
+          )}
+
+          {/* Conteúdo de Avisos no Culto */}
+          {canSeeAvisos && (
+            <TabsContent value="avisos">
+              <AnnouncementsManager />
             </TabsContent>
           )}
 
