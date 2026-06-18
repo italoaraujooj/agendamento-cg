@@ -32,7 +32,8 @@ import {
   Trash2,
   RefreshCw,
   Plus,
-  X
+  X,
+  FileText,
 } from "lucide-react"
 import {
   Dialog,
@@ -414,6 +415,10 @@ export default function PeriodoDetalhePage() {
   const [deleteEventId, setDeleteEventId] = useState<string | null>(null)
   const [deleteEventLoading, setDeleteEventLoading] = useState(false)
 
+  // Report state
+  const [reportDialogOpen, setReportDialogOpen] = useState(false)
+  const [reportText, setReportText] = useState("")
+
   useEffect(() => {
     setMode("escalas")
   }, [setMode])
@@ -692,6 +697,34 @@ export default function PeriodoDetalhePage() {
     toast.success("Link copiado!")
   }
 
+  const handleOpenReport = () => {
+    if (!period || !period.events?.length) return
+
+    const monthLabel = format(new Date(period.year, period.month - 1), "MMMM 'de' yyyy", { locale: ptBR })
+    const header = `*${period.ministry?.name?.toUpperCase()} - ${monthLabel.toUpperCase()}*`
+
+    const grouped = period.events.reduce((acc, event) => {
+      if (!acc[event.event_date]) acc[event.event_date] = []
+      acc[event.event_date].push(event)
+      return acc
+    }, {} as Record<string, ScheduleEvent[]>)
+
+    const body = Object.entries(grouped)
+      .sort(([a], [b]) => a.localeCompare(b))
+      .map(([date, events]) => {
+        const dayLabel = format(new Date(date + "T12:00:00"), "EEEE, dd/MM", { locale: ptBR })
+        const lines = events
+          .sort((a, b) => a.event_time.localeCompare(b.event_time))
+          .map((e) => `• ${e.event_time.slice(0, 5)} - ${e.title}`)
+          .join("\n")
+        return `📅 *${dayLabel.toUpperCase()}*\n${lines}`
+      })
+      .join("\n\n")
+
+    setReportText(`${header}\n\n${body}`)
+    setReportDialogOpen(true)
+  }
+
   const openCreateEvent = () => {
     if (!period) return
     setNewEvent({
@@ -867,6 +900,17 @@ export default function PeriodoDetalhePage() {
                   Compartilhar com Servos
                 </Button>
               </>
+            )}
+
+            {(period.events?.length ?? 0) > 0 && (
+              <Button
+                variant="outline"
+                onClick={handleOpenReport}
+                className="w-full sm:w-auto"
+              >
+                <FileText className="mr-2 h-4 w-4" />
+                Relatório
+              </Button>
             )}
 
             {period.status !== "published" && period.status !== "closed" && (
@@ -1179,6 +1223,37 @@ export default function PeriodoDetalhePage() {
             <Button onClick={handleCreateEvent} disabled={createEventLoading}>
               {createEventLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
               Criar Evento
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Relatório WhatsApp */}
+      <Dialog open={reportDialogOpen} onOpenChange={setReportDialogOpen}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Relatório de Eventos</DialogTitle>
+          </DialogHeader>
+          <p className="text-sm text-muted-foreground">
+            Texto formatado para enviar no WhatsApp. Copie e cole no chat.
+          </p>
+          <Textarea
+            readOnly
+            value={reportText}
+            className="font-mono text-sm min-h-[260px] resize-none"
+          />
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setReportDialogOpen(false)}>
+              Fechar
+            </Button>
+            <Button
+              onClick={() => {
+                navigator.clipboard.writeText(reportText)
+                toast.success("Relatório copiado!")
+              }}
+            >
+              <Copy className="mr-2 h-4 w-4" />
+              Copiar
             </Button>
           </DialogFooter>
         </DialogContent>
