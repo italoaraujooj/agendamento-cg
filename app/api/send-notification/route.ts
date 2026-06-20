@@ -378,15 +378,17 @@ export async function POST(request: NextRequest) {
 
     switch (type) {
       case 'new_booking': {
-        console.log('📋 Buscando administradores...')
-        
-        // Buscar todos os perfis que são admin
-        const { data: admins, error: adminError } = await supabase
-          .from('profiles')
-          .select('id, email, full_name')
-          .eq('is_admin', true)
+        console.log('📋 Buscando administradores e aprovadores...')
 
-        console.log(`👥 Administradores encontrados: ${admins?.length || 0}`)
+        // Buscar admins e usuários com permissão de aprovar reservas em paralelo
+        const [{ data: admins, error: adminError }, { data: approvers, error: approverError }] =
+          await Promise.all([
+            supabase.from('profiles').select('email').eq('is_admin', true),
+            supabase
+              .from('user_permissions')
+              .select('profiles(email)')
+              .eq('permission', 'approve_bookings'),
+          ])
 
         if (adminError) {
           console.error('❌ Erro ao buscar administradores:', adminError)
@@ -396,26 +398,32 @@ export async function POST(request: NextRequest) {
           )
         }
 
-        if (!admins || admins.length === 0) {
-          console.warn('⚠️ Nenhum administrador cadastrado para receber notificações')
+        if (approverError) {
+          console.error('❌ Erro ao buscar aprovadores:', approverError)
+        }
+
+        // Unir e deduplicar emails
+        const emailSet = new Set<string>()
+        for (const a of admins ?? []) {
+          if (a.email?.includes('@')) emailSet.add(a.email)
+        }
+        for (const p of approvers ?? []) {
+          const email = (p.profiles as { email?: string } | null)?.email
+          if (email?.includes('@')) emailSet.add(email)
+        }
+
+        const adminEmails = Array.from(emailSet)
+
+        console.log(`👥 Destinatários encontrados: ${adminEmails.length}`)
+
+        if (adminEmails.length === 0) {
+          console.warn('⚠️ Nenhum destinatário com email válido encontrado')
           return NextResponse.json(
-            { warning: 'Nenhum administrador cadastrado', sent: 0 }
+            { warning: 'Nenhum destinatário com email válido', sent: 0 }
           )
         }
 
-        // Filtrar apenas os que tem email válido
-        const adminEmails = admins
-          .map(a => a.email)
-          .filter((email): email is string => Boolean(email && email.includes('@')))
-        
-        if (adminEmails.length === 0) {
-          console.warn('⚠️ Nenhum administrador com email válido encontrado')
-          return NextResponse.json(
-            { warning: 'Nenhum administrador com email válido', sent: 0 }
-          )
-        }
-        
-        console.log(`📤 Enviando email para ${adminEmails.length} administrador(es)`)
+        console.log(`📤 Enviando email para ${adminEmails.length} destinatário(s)`)
         
         const { data, error } = await resend.emails.send({
           from: FROM_EMAIL,
