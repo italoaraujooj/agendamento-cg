@@ -380,13 +380,13 @@ export async function POST(request: NextRequest) {
       case 'new_booking': {
         console.log('📋 Buscando administradores e aprovadores...')
 
-        // Buscar admins e usuários com permissão de aprovar reservas em paralelo
-        const [{ data: admins, error: adminError }, { data: approvers, error: approverError }] =
+        // Buscar admins e user_ids com approve_bookings em paralelo
+        const [{ data: admins, error: adminError }, { data: approverIds, error: approverError }] =
           await Promise.all([
             supabase.from('profiles').select('email').eq('is_admin', true),
             supabase
               .from('user_permissions')
-              .select('profiles(email)')
+              .select('user_id')
               .eq('permission', 'approve_bookings'),
           ])
 
@@ -402,14 +402,19 @@ export async function POST(request: NextRequest) {
           console.error('❌ Erro ao buscar aprovadores:', approverError)
         }
 
+        // Buscar emails dos aprovadores via profiles (user_permissions → auth.users, não profiles)
+        const approverUserIds = (approverIds ?? []).map((r) => r.user_id).filter(Boolean)
+        const { data: approverProfiles } = approverUserIds.length > 0
+          ? await supabase.from('profiles').select('email').in('id', approverUserIds)
+          : { data: [] }
+
         // Unir e deduplicar emails
         const emailSet = new Set<string>()
         for (const a of admins ?? []) {
           if (a.email?.includes('@')) emailSet.add(a.email)
         }
-        for (const p of approvers ?? []) {
-          const email = (p.profiles as { email?: string } | null)?.email
-          if (email?.includes('@')) emailSet.add(email)
+        for (const p of approverProfiles ?? []) {
+          if (p.email?.includes('@')) emailSet.add(p.email)
         }
 
         const adminEmails = Array.from(emailSet)
