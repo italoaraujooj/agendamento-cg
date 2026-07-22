@@ -106,24 +106,34 @@ function AvailabilityTab({
   periodLabel: string
   onRefresh: () => void
 }) {
-  // Get unique servants who responded
-  const servantsMap = new Map<string, { name: string; area: string; submittedAt: string }>()
+  // Get unique servants who responded — deduplicated by name because a
+  // servant registered in multiple areas has one servant_id per area, and
+  // the availability API propagates a single submission across all of them
+  const servantsMap = new Map<string, { name: string; area: string; submittedAt: string; ids: string[] }>()
   for (const record of availabilityData) {
     if (!record.servant) continue
-    const existing = servantsMap.get(record.servant_id)
-    if (!existing || record.submitted_at > existing.submittedAt) {
-      servantsMap.set(record.servant_id, {
+    const key = record.servant.name.toLowerCase().trim()
+    const existing = servantsMap.get(key)
+    if (!existing) {
+      servantsMap.set(key, {
         name: record.servant.name,
         area: record.servant.area?.name || "",
         submittedAt: record.submitted_at,
+        ids: [record.servant_id],
       })
+    } else {
+      if (!existing.ids.includes(record.servant_id)) {
+        existing.ids.push(record.servant_id)
+      }
+      if (record.submitted_at > existing.submittedAt) {
+        existing.submittedAt = record.submitted_at
+        existing.area = record.servant.area?.name || existing.area
+      }
     }
   }
 
   // Names of servants who already responded (for deduplication by name)
-  const respondedNames = new Set(
-    Array.from(servantsMap.values()).map((s) => s.name.toLowerCase().trim())
-  )
+  const respondedNames = new Set(servantsMap.keys())
 
   // Servants who haven't responded yet — deduplicated by name to handle
   // servants registered in multiple areas with different IDs
@@ -137,19 +147,19 @@ function AvailabilityTab({
     })
     .sort((a, b) => a.name.localeCompare(b.name))
 
-  // Group availability by event
+  // Group availability by event — deduplicated by servant name, since a
+  // propagated submission creates one record per area/servant_id sharing that name
   const availByEvent = new Map<string, { available: AvailabilityRecord[]; unavailable: AvailabilityRecord[] }>()
   for (const record of availabilityData) {
-    if (!record.event_id) continue
+    if (!record.event_id || !record.servant) continue
     if (!availByEvent.has(record.event_id)) {
       availByEvent.set(record.event_id, { available: [], unavailable: [] })
     }
     const group = availByEvent.get(record.event_id)!
-    if (record.is_available) {
-      group.available.push(record)
-    } else {
-      group.unavailable.push(record)
-    }
+    const list = record.is_available ? group.available : group.unavailable
+    const key = record.servant.name.toLowerCase().trim()
+    if (list.some((r) => r.servant?.name.toLowerCase().trim() === key)) continue
+    list.push(record)
   }
 
   // Group events by date
@@ -195,11 +205,11 @@ function AvailabilityTab({
     )
     const headers = ["Servo", "Área", "Respondeu", ...eventHeaders]
 
-    const respondedRows = Array.from(servantsMap.entries()).map(([id, s]) => [
+    const respondedRows = Array.from(servantsMap.values()).map((s) => [
       s.name,
       s.area || "",
       "Sim",
-      ...sortedEvents.map((e) => getCell(id, e.id)),
+      ...sortedEvents.map((e) => getCell(s.ids[0], e.id)),
     ])
 
     const notRespondedRows = notRespondedServants.map((s) => [
