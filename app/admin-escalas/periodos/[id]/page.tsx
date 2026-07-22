@@ -109,26 +109,17 @@ function AvailabilityTab({
   // Get unique servants who responded — deduplicated by name because a
   // servant registered in multiple areas has one servant_id per area, and
   // the availability API propagates a single submission across all of them
-  const servantsMap = new Map<string, { name: string; area: string; submittedAt: string; ids: string[] }>()
+  const servantsMap = new Map<string, { name: string; area: string; submittedAt: string }>()
   for (const record of availabilityData) {
     if (!record.servant) continue
     const key = record.servant.name.toLowerCase().trim()
     const existing = servantsMap.get(key)
-    if (!existing) {
+    if (!existing || record.submitted_at > existing.submittedAt) {
       servantsMap.set(key, {
         name: record.servant.name,
         area: record.servant.area?.name || "",
         submittedAt: record.submitted_at,
-        ids: [record.servant_id],
       })
-    } else {
-      if (!existing.ids.includes(record.servant_id)) {
-        existing.ids.push(record.servant_id)
-      }
-      if (record.submitted_at > existing.submittedAt) {
-        existing.submittedAt = record.submitted_at
-        existing.area = record.servant.area?.name || existing.area
-      }
     }
   }
 
@@ -147,19 +138,32 @@ function AvailabilityTab({
     })
     .sort((a, b) => a.name.localeCompare(b.name))
 
-  // Group availability by event — deduplicated by servant name, since a
-  // propagated submission creates one record per area/servant_id sharing that name
-  const availByEvent = new Map<string, { available: AvailabilityRecord[]; unavailable: AvailabilityRecord[] }>()
+  // Resolve, per event + servant name, the single authoritative record (most
+  // recent submission) — a propagated submission can create one record per
+  // area/servant_id sharing that name, and those can disagree if one area's
+  // servant had answered independently before the propagation ran
+  const canonicalByEventAndName = new Map<string, AvailabilityRecord>()
   for (const record of availabilityData) {
     if (!record.event_id || !record.servant) continue
+    const key = `${record.event_id}::${record.servant.name.toLowerCase().trim()}`
+    const existing = canonicalByEventAndName.get(key)
+    if (!existing || record.submitted_at > existing.submitted_at) {
+      canonicalByEventAndName.set(key, record)
+    }
+  }
+
+  // Group availability by event, using only the canonical (deduplicated) record per servant
+  const availByEvent = new Map<string, { available: AvailabilityRecord[]; unavailable: AvailabilityRecord[] }>()
+  for (const record of canonicalByEventAndName.values()) {
     if (!availByEvent.has(record.event_id)) {
       availByEvent.set(record.event_id, { available: [], unavailable: [] })
     }
     const group = availByEvent.get(record.event_id)!
-    const list = record.is_available ? group.available : group.unavailable
-    const key = record.servant.name.toLowerCase().trim()
-    if (list.some((r) => r.servant?.name.toLowerCase().trim() === key)) continue
-    list.push(record)
+    if (record.is_available) {
+      group.available.push(record)
+    } else {
+      group.unavailable.push(record)
+    }
   }
 
   // Group events by date
@@ -170,34 +174,21 @@ function AvailabilityTab({
   }, {} as Record<string, ScheduleEvent[]>)
 
   const totalResponded = servantsMap.size
-  const totalRegistered = servants.length
+  const totalRegistered = new Set(servants.map((s) => s.name.toLowerCase().trim())).size
+
+  const getCell = (servantName: string, eventId: string): string => {
+    const record = canonicalByEventAndName.get(`${eventId}::${servantName.toLowerCase().trim()}`)
+    if (!record) return "Sem resposta"
+    if (record.is_available) {
+      return record.notes?.includes("automaticamente") ? "Disponível (automático)" : "Disponível"
+    }
+    return record.notes ? `Indisponível (${record.notes})` : "Indisponível"
+  }
 
   const exportToCSV = () => {
     const sortedEvents = [...events].sort((a, b) =>
       `${a.event_date}${a.event_time}`.localeCompare(`${b.event_date}${b.event_time}`)
     )
-
-    // Mapa: servant_id → event_id → disponibilidade
-    const servantEventMap = new Map<string, Map<string, { is_available: boolean; notes: string | null }>>()
-    for (const record of availabilityData) {
-      if (!servantEventMap.has(record.servant_id)) {
-        servantEventMap.set(record.servant_id, new Map())
-      }
-      servantEventMap.get(record.servant_id)!.set(record.event_id, {
-        is_available: record.is_available,
-        notes: record.notes,
-      })
-    }
-
-    const getCell = (servantId: string, eventId: string): string => {
-      const eventMap = servantEventMap.get(servantId)
-      if (!eventMap || !eventMap.has(eventId)) return "Sem resposta"
-      const avail = eventMap.get(eventId)!
-      if (avail.is_available) {
-        return avail.notes?.includes("automaticamente") ? "Disponível (automático)" : "Disponível"
-      }
-      return avail.notes ? `Indisponível (${avail.notes})` : "Indisponível"
-    }
 
     const eventHeaders = sortedEvents.map(
       (e) =>
@@ -209,14 +200,14 @@ function AvailabilityTab({
       s.name,
       s.area || "",
       "Sim",
-      ...sortedEvents.map((e) => getCell(s.ids[0], e.id)),
+      ...sortedEvents.map((e) => getCell(s.name, e.id)),
     ])
 
     const notRespondedRows = notRespondedServants.map((s) => [
       s.name,
       s.area?.name || "",
       "Não",
-      ...sortedEvents.map((e) => getCell(s.id, e.id)),
+      ...sortedEvents.map((e) => getCell(s.name, e.id)),
     ])
 
     const allRows = [...respondedRows, ...notRespondedRows].sort((a, b) =>
