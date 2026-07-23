@@ -15,7 +15,8 @@ import {
   MoreHorizontal,
   Crown,
   Save,
-  UserX
+  UserX,
+  UserCheck
 } from "lucide-react"
 import {
   DropdownMenu,
@@ -115,10 +116,11 @@ export default function MinisterioDetalhePage() {
   }, [fetchMinistry])
 
   // Build servantsByAreaId from servant_areas junction (so servants appear in all their areas)
+  // Includes inactive servants (temporarily on leave) so they can be shown and reactivated
   const servantsByAreaId = useMemo(() => {
     const map = new Map<string, ServantWithAreas[]>()
     ministry?.areas?.forEach((area) => {
-      area.servants?.filter(s => s.is_active).forEach((servant) => {
+      area.servants?.forEach((servant) => {
         // Collect all area IDs this servant belongs to
         const areaIds = new Set<string>([servant.area_id])
         servant.servant_areas?.forEach((sa) => areaIds.add(sa.area_id))
@@ -194,21 +196,39 @@ export default function MinisterioDetalhePage() {
     setServantFormOpen(true)
   }
 
+  const handleReactivateServant = async (servant: ServantWithAreas) => {
+    try {
+      const response = await fetch(`/api/escalas/servants/${servant.id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ is_active: true }),
+      })
+      if (!response.ok) throw new Error("Erro ao reativar servo")
+      toast.success(`${servant.name} reativado(a)!`)
+      fetchMinistry()
+    } catch (error) {
+      console.error("Erro ao reativar servo:", error)
+      toast.error(error instanceof Error ? error.message : "Erro ao reativar servo")
+    }
+  }
+
   const handleDelete = async () => {
     const { type, id } = deleteDialog
-    
-    try {
-      const url = type === "area" 
-        ? `/api/escalas/areas/${id}`
-        : `/api/escalas/servants/${id}`
-      
-      const response = await fetch(url, { method: "DELETE" })
-      
-      if (!response.ok) {
-        throw new Error(`Erro ao excluir ${type === "area" ? "área" : "servo"}`)
-      }
 
-      toast.success(`${type === "area" ? "Área" : "Servo"} removido(a)!`)
+    try {
+      if (type === "servant") {
+        const response = await fetch(`/api/escalas/servants/${id}`, {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ is_active: false }),
+        })
+        if (!response.ok) throw new Error("Erro ao marcar servo como inativo")
+        toast.success("Servo marcado como inativo!")
+      } else {
+        const response = await fetch(`/api/escalas/areas/${id}`, { method: "DELETE" })
+        if (!response.ok) throw new Error("Erro ao excluir área")
+        toast.success("Área removida!")
+      }
       fetchMinistry()
     } catch (error) {
       console.error("Erro ao excluir:", error)
@@ -345,7 +365,7 @@ export default function MinisterioDetalhePage() {
                   .filter(a => a.is_active)
                   .sort((a, b) => a.name.localeCompare(b.name))
                   .map((area) => {
-                    const count = servantsByAreaId.get(area.id)?.length || 0
+                    const count = servantsByAreaId.get(area.id)?.filter(s => s.is_active).length || 0
                     return (
                       <Badge key={area.id} variant="secondary">
                         {area.name}: {count}
@@ -396,7 +416,7 @@ export default function MinisterioDetalhePage() {
                   .filter(a => a.is_active)
                   .sort((a, b) => a.name.localeCompare(b.name))
                   .map((area) => {
-                    const count = servantsByAreaId.get(area.id)?.length || 0
+                    const count = servantsByAreaId.get(area.id)?.filter(s => s.is_active).length || 0
                     return (
                       <Badge key={area.id} variant="secondary">
                         {area.name}: {count}
@@ -487,21 +507,29 @@ export default function MinisterioDetalhePage() {
                   </CardHeader>
                   <CardContent>
                     <div className="space-y-3">
-                      <div className="flex items-center justify-between">
-                        <span className="text-sm font-medium text-muted-foreground">
-                          Servos ({servantsByAreaId.get(area.id)?.length || 0})
-                        </span>
-                        {canEdit && (
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => handleAddServant(area.id)}
-                          >
-                            <Plus className="mr-1 h-3 w-3" />
-                            Adicionar
-                          </Button>
-                        )}
-                      </div>
+                      {(() => {
+                        const areaServants = servantsByAreaId.get(area.id) ?? []
+                        const activeCount = areaServants.filter((s) => s.is_active).length
+                        const inactiveCount = areaServants.length - activeCount
+                        return (
+                          <div className="flex items-center justify-between">
+                            <span className="text-sm font-medium text-muted-foreground">
+                              Servos ({activeCount}
+                              {inactiveCount > 0 ? ` + ${inactiveCount} inativo(s)` : ""})
+                            </span>
+                            {canEdit && (
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => handleAddServant(area.id)}
+                              >
+                                <Plus className="mr-1 h-3 w-3" />
+                                Adicionar
+                              </Button>
+                            )}
+                          </div>
+                        )
+                      })()}
 
                       {(servantsByAreaId.get(area.id)?.length || 0) === 0 ? (
                         <p className="text-sm text-muted-foreground italic">
@@ -510,15 +538,29 @@ export default function MinisterioDetalhePage() {
                       ) : (
                         <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
                           {(servantsByAreaId.get(area.id) ?? [])
-                            .sort((a, b) => a.name.localeCompare(b.name))
+                            .slice()
+                            .sort((a, b) => {
+                              if (a.is_active !== b.is_active) return a.is_active ? -1 : 1
+                              return a.name.localeCompare(b.name)
+                            })
                             .map((servant) => (
                               <div
                                 key={servant.id}
-                                className="flex items-center justify-between p-2 rounded-md bg-muted/50"
+                                className={`flex items-center justify-between p-2 rounded-md ${
+                                  servant.is_active ? "bg-muted/50" : "bg-muted/20 opacity-70"
+                                }`}
                               >
                                 <div className="flex items-center gap-2 min-w-0">
                                   <span className="text-sm truncate">{servant.name}</span>
-                                  {canEdit && servant.email && !servant.has_account && (
+                                  {!servant.is_active && (
+                                    <Badge
+                                      variant="outline"
+                                      className="text-xs text-muted-foreground border-dashed flex-shrink-0"
+                                    >
+                                      Inativo
+                                    </Badge>
+                                  )}
+                                  {canEdit && servant.is_active && servant.email && !servant.has_account && (
                                     <Badge
                                       variant="outline"
                                       className="text-xs text-amber-600 border-amber-300 bg-amber-50 dark:bg-amber-950/30 flex-shrink-0 gap-1"
@@ -536,24 +578,30 @@ export default function MinisterioDetalhePage() {
                                       </Button>
                                     </DropdownMenuTrigger>
                                     <DropdownMenuContent align="end">
-                                      <DropdownMenuItem 
+                                      <DropdownMenuItem
                                         onClick={() => handleEditServant(servant, area.id)}
                                       >
                                         <Pencil className="mr-2 h-4 w-4" />
                                         Editar
                                       </DropdownMenuItem>
-                                      <DropdownMenuItem 
-                                        className="text-destructive"
-                                        onClick={() => setDeleteDialog({
-                                          open: true,
-                                          type: "servant",
-                                          id: servant.id,
-                                          name: servant.name
-                                        })}
-                                      >
-                                        <Trash2 className="mr-2 h-4 w-4" />
-                                        Remover
-                                      </DropdownMenuItem>
+                                      {servant.is_active ? (
+                                        <DropdownMenuItem
+                                          onClick={() => setDeleteDialog({
+                                            open: true,
+                                            type: "servant",
+                                            id: servant.id,
+                                            name: servant.name
+                                          })}
+                                        >
+                                          <UserX className="mr-2 h-4 w-4" />
+                                          Marcar como inativo
+                                        </DropdownMenuItem>
+                                      ) : (
+                                        <DropdownMenuItem onClick={() => handleReactivateServant(servant)}>
+                                          <UserCheck className="mr-2 h-4 w-4" />
+                                          Reativar
+                                        </DropdownMenuItem>
+                                      )}
                                     </DropdownMenuContent>
                                   </DropdownMenu>
                                 )}
@@ -592,21 +640,36 @@ export default function MinisterioDetalhePage() {
       }>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Confirmar Exclusão</AlertDialogTitle>
+            <AlertDialogTitle>
+              {deleteDialog.type === "area" ? "Confirmar Exclusão" : "Marcar Servo como Inativo"}
+            </AlertDialogTitle>
             <AlertDialogDescription>
-              Tem certeza que deseja remover {deleteDialog.type === "area" ? "a área" : "o servo"}{" "}
-              <strong>{deleteDialog.name}</strong>?
-              {deleteDialog.type === "area" && (
-                <span className="block mt-2 text-destructive">
-                  Todos os servos desta área também serão removidos.
-                </span>
+              {deleteDialog.type === "area" ? (
+                <>
+                  Tem certeza que deseja remover a área <strong>{deleteDialog.name}</strong>?
+                  <span className="block mt-2 text-destructive">
+                    Todos os servos desta área também serão removidos.
+                  </span>
+                </>
+              ) : (
+                <>
+                  Tem certeza que deseja marcar <strong>{deleteDialog.name}</strong> como inativo?
+                  <span className="block mt-2">
+                    Ele deixará de aparecer nas coletas de disponibilidade até ser reativado —
+                    manualmente por aqui, ou automaticamente caso ele responda a um formulário de
+                    disponibilidade enquanto o link ainda estiver ativo.
+                  </span>
+                </>
               )}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancelar</AlertDialogCancel>
-            <AlertDialogAction onClick={handleDelete} className="bg-destructive hover:bg-destructive/90">
-              Remover
+            <AlertDialogAction
+              onClick={handleDelete}
+              className={deleteDialog.type === "area" ? "bg-destructive hover:bg-destructive/90" : ""}
+            >
+              {deleteDialog.type === "area" ? "Remover" : "Marcar como inativo"}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
