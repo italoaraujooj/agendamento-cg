@@ -87,6 +87,15 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: insertError.message }, { status: 500 })
     }
 
+    // Reativar o servo automaticamente: se estava marcado como inativo
+    // (ex: férias/afastamento) e respondeu ao formulário, ele volta a
+    // aparecer normalmente nas próximas coletas de disponibilidade
+    await supabase
+      .from("servants")
+      .update({ is_active: true })
+      .eq("id", servant_id)
+      .eq("is_active", false)
+
     // Propagar disponibilidade para outros servos com mesmo nome no mesmo ministério
     const { data: periodData } = await supabase
       .from("schedule_periods")
