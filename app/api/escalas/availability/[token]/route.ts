@@ -66,7 +66,9 @@ export async function GET(
       return NextResponse.json({ error: "Erro ao carregar eventos" }, { status: 500 })
     }
 
-    // Buscar servos do ministério
+    // Buscar servos do ministério (inclui inativos — um servo marcado como
+    // inativo temporariamente ainda pode se identificar e responder; ao
+    // responder, ele é reativado automaticamente em /api/escalas/availability)
     const { data: servants, error: servantsError } = await supabase
       .from("servants")
       .select(`
@@ -77,7 +79,6 @@ export async function GET(
         area:areas!servants_area_id_fkey(id, name, ministry_id),
         servant_areas(area_id, area:areas(id, name, ministry_id))
       `)
-      .eq("is_active", true)
 
     if (servantsError) {
       console.error("Erro ao buscar servos:", servantsError)

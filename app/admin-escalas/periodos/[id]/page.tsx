@@ -93,6 +93,11 @@ interface ServantSummary {
   area: { id: string; name: string } | null
 }
 
+// Registros de auto-preenchimento (quem não respondeu até o prazo) carregam essa marca nas notes
+function isAutoFilled(notes: string | null): boolean {
+  return !!notes?.includes("automaticamente")
+}
+
 function AvailabilityTab({
   availabilityData,
   events,
@@ -109,7 +114,7 @@ function AvailabilityTab({
   // Get unique servants who responded — deduplicated by name because a
   // servant registered in multiple areas has one servant_id per area, and
   // the availability API propagates a single submission across all of them
-  const servantsMap = new Map<string, { name: string; area: string; submittedAt: string }>()
+  const servantsMap = new Map<string, { name: string; area: string; submittedAt: string; autoFilled: boolean }>()
   for (const record of availabilityData) {
     if (!record.servant) continue
     const key = record.servant.name.toLowerCase().trim()
@@ -119,6 +124,7 @@ function AvailabilityTab({
         name: record.servant.name,
         area: record.servant.area?.name || "",
         submittedAt: record.submitted_at,
+        autoFilled: isAutoFilled(record.notes),
       })
     }
   }
@@ -180,7 +186,7 @@ function AvailabilityTab({
     const record = canonicalByEventAndName.get(`${eventId}::${servantName.toLowerCase().trim()}`)
     if (!record) return "Sem resposta"
     if (record.is_available) {
-      return record.notes?.includes("automaticamente") ? "Disponível (automático)" : "Disponível"
+      return isAutoFilled(record.notes) ? "Disponível (automático)" : "Disponível"
     }
     return record.notes ? `Indisponível (${record.notes})` : "Indisponível"
   }
@@ -261,10 +267,17 @@ function AvailabilityTab({
               {Array.from(servantsMap.entries())
                 .sort(([, a], [, b]) => a.name.localeCompare(b.name))
                 .map(([id, servant]) => (
-                  <Badge key={id} variant="secondary" className="text-xs">
+                  <Badge
+                    key={id}
+                    variant="secondary"
+                    className={`text-xs ${servant.autoFilled ? "text-amber-700 dark:text-amber-400" : ""}`}
+                  >
                     {servant.name}
                     {servant.area && (
                       <span className="text-muted-foreground ml-1">({servant.area})</span>
+                    )}
+                    {servant.autoFilled && (
+                      <span className="ml-1 italic">— não respondeu</span>
                     )}
                   </Badge>
                 ))}
@@ -335,6 +348,9 @@ function AvailabilityTab({
                                 .map((r) => (
                                   <Badge key={r.id} variant="outline" className="text-xs border-green-200 bg-green-50 text-green-700">
                                     {r.servant?.name}
+                                    {isAutoFilled(r.notes) && (
+                                      <span className="ml-1 italic text-amber-600">(não respondeu)</span>
+                                    )}
                                   </Badge>
                                 ))}
                             </div>
