@@ -108,84 +108,29 @@ export async function findMinistryServants(
     }))
 }
 
-const norm = (v: string | null | undefined) => (v ?? "").toLowerCase().trim()
-
-/**
- * Todos os registros de servo que representam a mesma pessoa no ministério
- * (o cadastro atual cria uma linha por área). Casa por user_id, e-mail ou nome.
- */
-export function samePersonIds(servants: MinistryServant[], target: MinistryServant): string[] {
-  return servants
-    .filter(
-      (s) =>
-        s.id === target.id ||
-        (target.user_id && s.user_id === target.user_id) ||
-        (norm(target.email) && norm(s.email) === norm(target.email)) ||
-        norm(s.name) === norm(target.name)
-    )
-    .map((s) => s.id)
-}
-
-export interface Person {
-  /** Registro usado no link pessoal (prefere ativo e com e-mail) */
-  primary: MinistryServant
-  ids: string[]
-  email: string | null
-  isActive: boolean
-}
-
-/** Agrupa os registros de servo do ministério por pessoa. */
-export function groupPeople(servants: MinistryServant[]): Person[] {
-  const seen = new Set<string>()
-  const people: Person[] = []
-  for (const s of servants) {
-    if (seen.has(s.id)) continue
-    const ids = samePersonIds(servants, s)
-    ids.forEach((id) => seen.add(id))
-    const records = servants.filter((x) => ids.includes(x.id))
-    const primary =
-      records.find((r) => r.is_active && r.email) ??
-      records.find((r) => r.email) ??
-      records.find((r) => r.is_active) ??
-      records[0]
-    people.push({
-      primary,
-      ids,
-      email: records.find((r) => r.email)?.email ?? null,
-      isActive: records.some((r) => r.is_active),
-    })
-  }
-  return people
-}
-
 export interface SavedAnswers {
   answers: { event_id: string; is_available: boolean; notes: string | null }[]
   submitted_at: string | null
 }
 
-/** Última resposta registrada entre os registros da mesma pessoa. */
+/** Respostas salvas do servo no período (um registro de servo por pessoa/ministério). */
 export async function loadSavedAnswers(
   supabase: SupabaseClient,
   periodId: string,
-  servantIds: string[]
+  servantId: string
 ): Promise<SavedAnswers> {
   const { data } = await supabase
     .from("servant_availability")
-    .select("servant_id, event_id, is_available, notes, submitted_at")
+    .select("event_id, is_available, notes, submitted_at")
     .eq("period_id", periodId)
-    .in("servant_id", servantIds)
+    .eq("servant_id", servantId)
     .order("submitted_at", { ascending: false })
 
   const rows = data ?? []
-  if (rows.length === 0) return { answers: [], submitted_at: null }
-
-  // Usa o conjunto de respostas do registro enviado mais recentemente
-  const latestServant = rows[0].servant_id
-  const answers = rows
-    .filter((r: any) => r.servant_id === latestServant)
-    .map((r: any) => ({ event_id: r.event_id, is_available: r.is_available, notes: r.notes }))
-
-  return { answers, submitted_at: rows[0].submitted_at }
+  return {
+    answers: rows.map((r: any) => ({ event_id: r.event_id, is_available: r.is_available, notes: r.notes })),
+    submitted_at: rows[0]?.submitted_at ?? null,
+  }
 }
 
 /** Link pessoal: abre o formulário já identificado, sem pedir e-mail. */
@@ -220,8 +165,7 @@ export async function sendAvailabilityInvites(
   const ministry = period?.ministry as unknown as { id: string; name: string } | null
   if (!period || !ministry) return { sent: 0, failed: 0, withoutEmail: [], recipients: 0 }
 
-  const servants = await findMinistryServants(supabase, ministry.id)
-  let people = groupPeople(servants).filter((p) => p.isActive)
+  let servants = (await findMinistryServants(supabase, ministry.id)).filter((s) => s.is_active)
 
   if (mode === "pending") {
     const { data: rows } = await supabase
@@ -229,22 +173,22 @@ export async function sendAvailabilityInvites(
       .select("servant_id")
       .eq("period_id", periodId)
     const responded = new Set((rows ?? []).map((r: { servant_id: string }) => r.servant_id))
-    people = people.filter((p) => !p.ids.some((id) => responded.has(id)))
+    servants = servants.filter((s) => !responded.has(s.id))
   }
 
-  const withoutEmail = people.filter((p) => !p.email).map((p) => p.primary.name)
-  const messages: EmailMessage[] = people
-    .filter((p) => p.email)
-    .map((p) => {
+  const withoutEmail = servants.filter((s) => !s.email).map((s) => s.name)
+  const messages: EmailMessage[] = servants
+    .filter((s) => s.email)
+    .map((s) => {
       const { subject, html } = availabilityInviteEmail({
-        name: p.primary.name,
+        name: s.name,
         ministryName: ministry.name,
         monthLabel: monthLabel(period.month, period.year),
         deadlineLabel: deadlineLabel(period.availability_deadline),
-        link: personalAvailabilityLink(period.availability_token, p.primary.id, period.id),
+        link: personalAvailabilityLink(period.availability_token, s.id, period.id),
         reminder: mode === "pending",
       })
-      return { to: p.email!, subject, html }
+      return { to: s.email!, subject, html }
     })
 
   const result = await sendEmails(messages)

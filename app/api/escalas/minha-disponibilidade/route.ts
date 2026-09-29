@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server"
 import { requireAuthenticated } from "@/lib/escalas/auth"
 import { signAvailabilityToken } from "@/lib/escalas/availability-token"
-import { checkPeriodOpen, findMinistryServants, samePersonIds } from "@/lib/escalas/availability"
+import { checkPeriodOpen, findMinistryServants } from "@/lib/escalas/availability"
 
 // GET - Coletas de disponibilidade abertas para o usuário logado
 export async function GET() {
@@ -57,13 +57,12 @@ export async function GET() {
       const servants = await findMinistryServants(supabase, period.ministry.id)
       const me = servants.find((s) => myIds.has(s.id))
       if (!me) continue
-      const personIds = samePersonIds(servants, me)
 
       const { data: last } = await supabase
         .from("servant_availability")
         .select("submitted_at")
         .eq("period_id", period.id)
-        .in("servant_id", personIds)
+        .eq("servant_id", me.id)
         .order("submitted_at", { ascending: false })
         .limit(1)
         .maybeSingle()

@@ -85,6 +85,29 @@ export async function POST(request: NextRequest) {
     if (!auth.ok) return auth.response
     const { supabase } = auth
 
+    // Uma pessoa = um registro por ministério. Se já existe alguém com este
+    // e-mail no ministério, a área é adicionada a esse registro.
+    if (email) {
+      const { data: area } = await supabase.from("areas").select("ministry_id").eq("id", area_id).single()
+      const { data: sameEmail } = await supabase
+        .from("servants")
+        .select("*, area:areas!servants_area_id_fkey(ministry_id)")
+        .ilike("email", email.trim())
+      const existing = (sameEmail ?? []).find(
+        (s: any) =>
+          s.area?.ministry_id === area?.ministry_id &&
+          s.email?.toLowerCase().trim() === email.toLowerCase().trim()
+      )
+      if (existing) {
+        await supabase
+          .from("servant_areas")
+          .upsert({ servant_id: existing.id, area_id }, { onConflict: "servant_id,area_id", ignoreDuplicates: true })
+          .throwOnError()
+        const { area: _area, ...servant } = existing
+        return NextResponse.json({ ...servant, merged: true }, { status: 200 })
+      }
+    }
+
     const { data, error } = await supabase
       .from("servants")
       .insert({
@@ -100,6 +123,9 @@ export async function POST(request: NextRequest) {
 
     if (error) {
       console.error("Erro ao criar servo:", error)
+      if (error.code === "23505") {
+        return NextResponse.json({ error: "Já existe um servo com este e-mail neste ministério" }, { status: 409 })
+      }
       return NextResponse.json({ error: error.message }, { status: 500 })
     }
 

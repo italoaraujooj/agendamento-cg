@@ -120,17 +120,14 @@ function AvailabilityTab({
   const isLate = (submittedAt: string) =>
     !!deadline && new Date(submittedAt) > new Date(deadline)
 
-  // Get unique servants who responded — deduplicated by name because a
-  // servant registered in multiple areas has one servant_id per area, and
-  // the availability API propagates a single submission across all of them
+  // Servos que responderam (um registro de servo por pessoa no ministério)
   const servantsMap = new Map<string, { name: string; area: string; submittedAt: string; autoFilled: boolean; late: boolean }>()
   for (const record of availabilityData) {
     if (!record.servant) continue
-    const key = record.servant.name.toLowerCase().trim()
-    const existing = servantsMap.get(key)
+    const existing = servantsMap.get(record.servant_id)
     if (!existing || record.submitted_at > existing.submittedAt) {
       const autoFilled = isAutoFilled(record.notes)
-      servantsMap.set(key, {
+      servantsMap.set(record.servant_id, {
         name: record.servant.name,
         area: record.servant.area?.name || "",
         submittedAt: record.submitted_at,
@@ -140,38 +137,20 @@ function AvailabilityTab({
     }
   }
 
-  // Names of servants who already responded (for deduplication by name)
-  const respondedNames = new Set(servantsMap.keys())
-
-  // Servants who haven't responded yet — deduplicated by name to handle
-  // servants registered in multiple areas with different IDs
-  const seenNames = new Set<string>()
   const notRespondedServants = servants
-    .filter((s) => {
-      const key = s.name.toLowerCase().trim()
-      if (seenNames.has(key)) return false
-      seenNames.add(key)
-      return !respondedNames.has(key)
-    })
+    .filter((s) => !servantsMap.has(s.id))
     .sort((a, b) => a.name.localeCompare(b.name))
 
-  // Resolve, per event + servant name, the single authoritative record (most
-  // recent submission) — a propagated submission can create one record per
-  // area/servant_id sharing that name, and those can disagree if one area's
-  // servant had answered independently before the propagation ran
-  const canonicalByEventAndName = new Map<string, AvailabilityRecord>()
+  const recordByEventAndServant = new Map<string, AvailabilityRecord>()
   for (const record of availabilityData) {
-    if (!record.event_id || !record.servant) continue
-    const key = `${record.event_id}::${record.servant.name.toLowerCase().trim()}`
-    const existing = canonicalByEventAndName.get(key)
-    if (!existing || record.submitted_at > existing.submitted_at) {
-      canonicalByEventAndName.set(key, record)
+    if (record.event_id && record.servant) {
+      recordByEventAndServant.set(`${record.event_id}::${record.servant_id}`, record)
     }
   }
 
-  // Group availability by event, using only the canonical (deduplicated) record per servant
+  // Group availability by event
   const availByEvent = new Map<string, { available: AvailabilityRecord[]; unavailable: AvailabilityRecord[] }>()
-  for (const record of canonicalByEventAndName.values()) {
+  for (const record of recordByEventAndServant.values()) {
     if (!availByEvent.has(record.event_id)) {
       availByEvent.set(record.event_id, { available: [], unavailable: [] })
     }
@@ -191,10 +170,10 @@ function AvailabilityTab({
   }, {} as Record<string, ScheduleEvent[]>)
 
   const totalResponded = servantsMap.size
-  const totalRegistered = new Set(servants.map((s) => s.name.toLowerCase().trim())).size
+  const totalRegistered = servants.length
 
-  const getCell = (servantName: string, eventId: string): string => {
-    const record = canonicalByEventAndName.get(`${eventId}::${servantName.toLowerCase().trim()}`)
+  const getCell = (servantId: string, eventId: string): string => {
+    const record = recordByEventAndServant.get(`${eventId}::${servantId}`)
     if (!record) return "Sem resposta"
     if (record.is_available) {
       return isAutoFilled(record.notes) ? "Disponível (automático)" : "Disponível"
@@ -213,18 +192,18 @@ function AvailabilityTab({
     )
     const headers = ["Servo", "Área", "Respondeu", ...eventHeaders]
 
-    const respondedRows = Array.from(servantsMap.values()).map((s) => [
+    const respondedRows = Array.from(servantsMap.entries()).map(([servantId, s]) => [
       s.name,
       s.area || "",
       "Sim",
-      ...sortedEvents.map((e) => getCell(s.name, e.id)),
+      ...sortedEvents.map((e) => getCell(servantId, e.id)),
     ])
 
     const notRespondedRows = notRespondedServants.map((s) => [
       s.name,
       s.area?.name || "",
       "Não",
-      ...sortedEvents.map((e) => getCell(s.name, e.id)),
+      ...sortedEvents.map((e) => getCell(s.id, e.id)),
     ])
 
     const allRows = [...respondedRows, ...notRespondedRows].sort((a, b) =>

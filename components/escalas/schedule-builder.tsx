@@ -40,6 +40,7 @@ import {
   Plus,
   HelpCircle,
   Clock3,
+  AlertTriangle,
 } from "lucide-react"
 import { format, parseISO } from "date-fns"
 import { ptBR } from "date-fns/locale"
@@ -49,7 +50,8 @@ import type {
   Servant,
   Area,
   ServantAvailability,
-  ScheduleAssignment
+  ScheduleAssignment,
+  ServantConflict,
 } from "@/types/escalas"
 
 interface ScheduleBuilderProps {
@@ -57,6 +59,8 @@ interface ScheduleBuilderProps {
   periodLabel?: string
   /** Respostas enviadas depois deste momento são marcadas como tardias */
   availabilityDeadline?: string | null
+  /** Mesma pessoa escalada em outro evento no mesmo horário (inclusive outros ministérios) */
+  conflicts?: ServantConflict[]
   events: ScheduleEvent[]
   areas: Area[]
   servants: Servant[]
@@ -69,6 +73,7 @@ export function ScheduleBuilder({
   periodId,
   periodLabel,
   availabilityDeadline,
+  conflicts = [],
   events,
   areas,
   servants,
@@ -82,7 +87,7 @@ export function ScheduleBuilder({
   const [loading, setLoading] = useState<string | null>(null)
   const [addingAreaId, setAddingAreaId] = useState<string | null>(null)
   const [summarySort, setSummarySort] = useState<"name" | "available" | "area">("name")
-  const [filteredServantName, setFilteredServantName] = useState<string | null>(null)
+  const [filteredServantId, setFilteredServantId] = useState<string | null>(null)
   const [previewOpen, setPreviewOpen] = useState(false)
   const [exporting, setExporting] = useState(false)
   const [summaryOpen, setSummaryOpen] = useState(false)
@@ -116,6 +121,27 @@ export function ScheduleBuilder({
     })
     return { respondedSet: responded, lateSet: late, unavailableReason: reasons }
   }, [availabilities, availabilityDeadline])
+
+  // Conflitos por servo+evento: "Ministério · Evento (Área)" já escalado no mesmo horário
+  const conflictMap = useMemo(() => {
+    const map = new Map<string, ServantConflict["other"][]>()
+    conflicts.forEach((c) => {
+      const key = `${c.servant_id}-${c.event_id}`
+      map.set(key, [...(map.get(key) ?? []), c.other])
+    })
+    return map
+  }, [conflicts])
+
+  const describeConflicts = (others: ServantConflict["other"][]) =>
+    others
+      .map((o) => `${o.same_ministry ? "" : `${o.ministry} · `}${o.title}${o.area ? ` (${o.area})` : ""}`)
+      .join("; ")
+
+  // Atribuições já feitas que batem com outro compromisso no mesmo horário
+  const assignedConflictCount = useMemo(
+    () => assignments.filter((a) => conflictMap.has(`${a.servant_id}-${a.schedule_event_id}`)).length,
+    [assignments, conflictMap]
+  )
 
   const getEventAssignments = useMemo(() => {
     const assignmentMap = new Map<string, ScheduleAssignment[]>()
@@ -173,45 +199,27 @@ export function ScheduleBuilder({
     return countMap
   }, [servants, events, unavailableSet])
 
-  // Resumo desduplicado por nome para o painel de visão geral
+  // Resumo por servo (um registro por pessoa no ministério) para o painel de visão geral
   const servantSummary = useMemo(() => {
-    const groups = new Map<string, { servants: Servant[]; areas: string[] }>()
-
-    servants.forEach((s) => {
-      const key = s.name.toLowerCase().trim()
-      if (!groups.has(key)) groups.set(key, { servants: [], areas: [] })
-      const group = groups.get(key)!
-      group.servants.push(s)
-      if (s.area?.name && !group.areas.includes(s.area.name)) {
-        group.areas.push(s.area.name)
-      }
-    })
-
-    return Array.from(groups.values())
-      .map(({ servants: group, areas }) => {
-        const ids = group.map((s) => s.id)
-        // Disponível no evento se pelo menos um dos IDs estiver disponível
-        const availCount = events.filter((e) =>
-          ids.some((id) => !unavailableSet.has(`${id}-${e.id}`))
-        ).length
-        // Atribuições somadas de todos os IDs
-        const assignCount = ids.reduce(
-          (sum, id) => sum + (servantAssignmentCount.get(id) || 0),
-          0
-        )
+    const areaNameById = new Map(areas.map((a) => [a.id, a.name]))
+    return servants
+      .map((s) => {
+        const areaIds = new Set([s.area_id, ...(s.servant_areas ?? []).map((sa) => sa.area_id)])
         return {
-          name: group[0].name,
-          areas,
-          isLeader: group.some((s) => s.is_leader),
-          availCount,
-          assignCount,
-          ids,
-          responded: ids.some((id) => respondedSet.has(id)),
-          late: ids.some((id) => lateSet.has(id)),
+          id: s.id,
+          name: s.name,
+          areas: [...areaIds].map((id) => areaNameById.get(id)).filter((n): n is string => !!n),
+          isLeader: !!s.is_leader,
+          availCount: servantAvailableEventCount.get(s.id) ?? 0,
+          assignCount: servantAssignmentCount.get(s.id) ?? 0,
+          responded: respondedSet.has(s.id),
+          late: lateSet.has(s.id),
         }
       })
       .sort((a, b) => a.name.localeCompare(b.name)) // ordenação base sempre por nome
-  }, [servants, events, unavailableSet, servantAssignmentCount, respondedSet, lateSet])
+  }, [servants, areas, servantAvailableEventCount, servantAssignmentCount, respondedSet, lateSet])
+
+  const filteredServantName = servantSummary.find((s) => s.id === filteredServantId)?.name ?? null
 
   const sortedSummary = useMemo(() => {
     const copy = [...servantSummary]
@@ -229,13 +237,9 @@ export function ScheduleBuilder({
   }, [servantSummary, summarySort])
 
   const filteredEvents = useMemo(() => {
-    if (!filteredServantName) return events
-    const summary = servantSummary.find(
-      (s) => s.name.toLowerCase().trim() === filteredServantName.toLowerCase().trim()
-    )
-    if (!summary) return events
-    return events.filter((e) => summary.ids.some((id) => !unavailableSet.has(`${id}-${e.id}`)))
-  }, [filteredServantName, servantSummary, events, unavailableSet])
+    if (!filteredServantId) return events
+    return events.filter((e) => !unavailableSet.has(`${filteredServantId}-${e.id}`))
+  }, [filteredServantId, events, unavailableSet])
 
   const sortedFilteredEvents = useMemo(
     () =>
@@ -260,22 +264,19 @@ export function ScheduleBuilder({
     }
   }
 
-  const handleServantFilter = (name: string) => {
-    if (filteredServantName === name) {
-      setFilteredServantName(null)
+  const handleServantFilter = (servantId: string) => {
+    if (filteredServantId === servantId) {
+      setFilteredServantId(null)
     } else {
-      setFilteredServantName(name)
-      const summary = servantSummary.find((s) => s.name === name)
-      if (summary) {
-        const available = events
-          .filter((e) => summary.ids.some((id) => !unavailableSet.has(`${id}-${e.id}`)))
-          .sort((a, b) => {
-            const dc = a.event_date.localeCompare(b.event_date)
-            return dc !== 0 ? dc : a.event_time.localeCompare(b.event_time)
-          })
-        if (!selectedEventId || !available.some((e) => e.id === selectedEventId)) {
-          setSelectedEventId(available.length > 0 ? available[0].id : null)
-        }
+      setFilteredServantId(servantId)
+      const available = events
+        .filter((e) => !unavailableSet.has(`${servantId}-${e.id}`))
+        .sort((a, b) => {
+          const dc = a.event_date.localeCompare(b.event_date)
+          return dc !== 0 ? dc : a.event_time.localeCompare(b.event_time)
+        })
+      if (!selectedEventId || !available.some((e) => e.id === selectedEventId)) {
+        setSelectedEventId(available.length > 0 ? available[0].id : null)
       }
     }
   }
@@ -332,6 +333,25 @@ export function ScheduleBuilder({
     } finally {
       setLoading(null)
     }
+  }
+
+  // Conflito de horário: pede confirmação antes de escalar
+  const [pendingConflict, setPendingConflict] = useState<{
+    eventId: string
+    servantId: string
+    areaId: string
+    servantName: string
+    others: ServantConflict["other"][]
+  } | null>(null)
+
+  const requestAssignment = (eventId: string, servantId: string, areaId: string) => {
+    const others = conflictMap.get(`${servantId}-${eventId}`)
+    if (others?.length) {
+      const servantName = servants.find((s) => s.id === servantId)?.name ?? "Este servo"
+      setPendingConflict({ eventId, servantId, areaId, servantName, others })
+      return
+    }
+    handleAddAssignment(eventId, servantId, areaId)
   }
 
   const handleRemoveAssignmentById = async (assignmentId: string) => {
@@ -424,7 +444,17 @@ export function ScheduleBuilder({
   return (
     <div className="space-y-4">
       {/* Toolbar */}
-      <div className="flex justify-end">
+      <div className="flex items-center justify-end gap-2">
+        {assignedConflictCount > 0 && (
+          <Badge
+            variant="outline"
+            className="border-amber-400 text-amber-700 dark:text-amber-400 gap-1"
+            title="Pessoas escaladas em outro evento no mesmo horário (inclusive em outros ministérios)"
+          >
+            <AlertTriangle className="h-3 w-3" />
+            {assignedConflictCount} conflito(s) de horário
+          </Badge>
+        )}
         <Button variant="outline" size="sm" onClick={() => setPreviewOpen(true)}>
           <Eye className="mr-2 h-4 w-4" />
           Ver Prévia da Escala
@@ -477,7 +507,7 @@ export function ScheduleBuilder({
                         <span className="ml-1.5 text-primary font-medium">
                           · {filteredServantName.split(" ")[0]}
                           <button
-                            onClick={(e) => { e.stopPropagation(); setFilteredServantName(null) }}
+                            onClick={(e) => { e.stopPropagation(); setFilteredServantId(null) }}
                             className="ml-1 hover:opacity-70"
                           >
                             <X className="inline h-3 w-3" />
@@ -517,7 +547,7 @@ export function ScheduleBuilder({
                     <Badge variant="secondary" className="text-xs flex items-center gap-1 max-w-[110px]">
                       <span className="truncate">{filteredServantName.split(" ")[0]}</span>
                       <button
-                        onClick={() => setFilteredServantName(null)}
+                        onClick={() => setFilteredServantId(null)}
                         className="flex-shrink-0 hover:opacity-70"
                       >
                         <X className="h-3 w-3" />
@@ -682,18 +712,32 @@ export function ScheduleBuilder({
                           {/* Chips de servos atribuídos */}
                           {areaAssignments.map((assignment) => {
                             const isRemoving = loading === `remove-${assignment.id}`
+                            const chipConflicts = conflictMap.get(`${assignment.servant_id}-${assignment.schedule_event_id}`)
                             return (
                               <div
                                 key={assignment.id}
-                                className="flex items-center justify-between px-2.5 py-1.5 rounded-md border border-green-500 bg-green-50 dark:bg-green-950"
+                                className={`flex items-center justify-between px-2.5 py-1.5 rounded-md border ${
+                                  chipConflicts
+                                    ? "border-amber-400 bg-amber-50 dark:bg-amber-950"
+                                    : "border-green-500 bg-green-50 dark:bg-green-950"
+                                }`}
+                                title={chipConflicts ? `Mesmo horário: ${describeConflicts(chipConflicts)}` : undefined}
                               >
                                 <div className="flex items-center gap-1.5 text-sm min-w-0">
+                                  {chipConflicts && (
+                                    <AlertTriangle className="h-3 w-3 text-amber-500 flex-shrink-0" />
+                                  )}
                                   {(assignment.servant as { is_leader?: boolean } | null)?.is_leader && (
                                     <Crown className="h-3 w-3 text-yellow-500 flex-shrink-0" />
                                   )}
                                   <span className="font-medium truncate">
                                     {(assignment.servant as { name?: string } | null)?.name ?? "—"}
                                   </span>
+                                  {chipConflicts && (
+                                    <span className="text-xs text-amber-700 dark:text-amber-400 truncate">
+                                      também em {describeConflicts(chipConflicts)}
+                                    </span>
+                                  )}
                                 </div>
                                 <Button
                                   variant="ghost"
@@ -718,7 +762,7 @@ export function ScheduleBuilder({
                               <Select
                                 value=""
                                 onValueChange={(servantId) => {
-                                  handleAddAssignment(selectedEvent.id, servantId, area.id)
+                                  requestAssignment(selectedEvent.id, servantId, area.id)
                                   setAddingAreaId(null)
                                 }}
                                 disabled={isAreaLoading}
@@ -752,25 +796,42 @@ export function ScheduleBuilder({
                                         const reason = unavailableReason.get(`${servant.id}-${selectedEvent.id}`)
                                         const assignCount = servantAssignmentCount.get(servant.id) || 0
                                         const availEventCount = servantAvailableEventCount.get(servant.id) ?? 0
+                                        // Já escalado em outra área deste mesmo evento
+                                        const otherAreaId = eventAssignments.find(
+                                          (a) => a.servant_id === servant.id && a.area_id !== area.id
+                                        )?.area_id
+                                        const otherAreaName = otherAreaId
+                                          ? areas.find((a) => a.id === otherAreaId)?.name ?? "outra área"
+                                          : null
+                                        const conflictOthers = conflictMap.get(`${servant.id}-${selectedEvent.id}`)
+                                        const selectable = available && !otherAreaName
                                         return (
                                           <SelectItem
                                             key={servant.id}
                                             value={servant.id}
-                                            disabled={!available}
-                                            className={!available ? "opacity-50" : ""}
+                                            disabled={!selectable}
+                                            className={!selectable ? "opacity-50" : ""}
                                           >
                                             <div
                                               className="flex items-center gap-2 w-full"
                                               title={
-                                                !available
-                                                  ? `Indisponível${reason ? `: ${reason}` : ""}`
-                                                  : !responded
-                                                    ? "Não respondeu a disponibilidade (considerado disponível)"
-                                                    : undefined
+                                                otherAreaName
+                                                  ? `Já escalado em ${otherAreaName} neste evento`
+                                                  : !available
+                                                    ? `Indisponível${reason ? `: ${reason}` : ""}`
+                                                    : conflictOthers
+                                                      ? `Mesmo horário: ${describeConflicts(conflictOthers)}`
+                                                      : !responded
+                                                        ? "Não respondeu a disponibilidade (considerado disponível)"
+                                                        : undefined
                                               }
                                             >
-                                              {!available ? (
+                                              {otherAreaName ? (
+                                                <CircleMinus className="h-3 w-3 text-muted-foreground flex-shrink-0" />
+                                              ) : !available ? (
                                                 <AlertCircle className="h-3 w-3 text-red-500 flex-shrink-0" />
+                                              ) : conflictOthers ? (
+                                                <AlertTriangle className="h-3 w-3 text-amber-500 flex-shrink-0" />
                                               ) : responded ? (
                                                 <Check className="h-3 w-3 text-green-500 flex-shrink-0" />
                                               ) : (
@@ -781,9 +842,15 @@ export function ScheduleBuilder({
                                                 {servant.is_leader && (
                                                   <Crown className="inline h-3 w-3 text-yellow-500 ml-1 flex-shrink-0" />
                                                 )}
-                                                {!available && reason && (
+                                                {otherAreaName ? (
+                                                  <span className="ml-1 text-xs text-muted-foreground">(já em {otherAreaName})</span>
+                                                ) : !available && reason ? (
                                                   <span className="ml-1 text-xs text-muted-foreground">({reason})</span>
-                                                )}
+                                                ) : available && conflictOthers ? (
+                                                  <span className="ml-1 text-xs text-amber-700 dark:text-amber-400">
+                                                    (mesmo horário: {describeConflicts(conflictOthers)})
+                                                  </span>
+                                                ) : null}
                                                 {lateSet.has(servant.id) && (
                                                   <Clock3
                                                     className="inline h-3 w-3 text-amber-500 ml-1 flex-shrink-0"
@@ -888,10 +955,10 @@ export function ScheduleBuilder({
 
                 return (
                   <div
-                    key={servant.name}
-                    onClick={() => handleServantFilter(servant.name)}
+                    key={servant.id}
+                    onClick={() => handleServantFilter(servant.id)}
                     className={`flex items-center justify-between gap-2 p-2 rounded-md cursor-pointer transition-colors ${
-                      filteredServantName === servant.name
+                      filteredServantId === servant.id
                         ? "bg-primary/10 ring-1 ring-primary"
                         : "bg-muted/50 hover:bg-muted"
                     }`}
@@ -955,6 +1022,47 @@ export function ScheduleBuilder({
           </CardContent>
         </Card>
       )}
+
+      {/* Confirmação: conflito de horário */}
+      <Dialog open={!!pendingConflict} onOpenChange={(open) => !open && setPendingConflict(null)}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <AlertTriangle className="h-5 w-5 text-amber-500" />
+              Conflito de horário
+            </DialogTitle>
+            <DialogDescription>
+              {pendingConflict?.servantName} já está escalado(a) no mesmo horário em:
+            </DialogDescription>
+          </DialogHeader>
+          <ul className="space-y-1.5 text-sm">
+            {pendingConflict?.others.map((o) => (
+              <li key={o.event_id} className="rounded-md border px-3 py-2">
+                <span className="font-medium">{o.title}</span>
+                <span className="text-muted-foreground">
+                  {" "}· {o.same_ministry ? "este ministério" : o.ministry}
+                  {o.area ? ` · ${o.area}` : ""} · {o.time}
+                </span>
+              </li>
+            ))}
+          </ul>
+          <div className="flex justify-end gap-2 pt-2">
+            <Button variant="outline" onClick={() => setPendingConflict(null)}>
+              Cancelar
+            </Button>
+            <Button
+              onClick={() => {
+                if (pendingConflict) {
+                  handleAddAssignment(pendingConflict.eventId, pendingConflict.servantId, pendingConflict.areaId)
+                }
+                setPendingConflict(null)
+              }}
+            >
+              Escalar mesmo assim
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
 
       {/* Prévia da Escala */}
       <Dialog open={previewOpen} onOpenChange={setPreviewOpen}>
