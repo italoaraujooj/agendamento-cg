@@ -113,6 +113,9 @@ export async function PUT(
       if (error.code === "PGRST116") {
         return NextResponse.json({ error: "Servo não encontrado" }, { status: 404 })
       }
+      if (error.code === "23505") {
+        return NextResponse.json({ error: "Já existe um servo com este e-mail neste ministério" }, { status: 409 })
+      }
       console.error("Erro ao atualizar servo:", error)
       return NextResponse.json({ error: error.message }, { status: 500 })
     }

@@ -149,7 +149,13 @@ export function ServantForm({ areaId, servant, areas, open, onOpenChange, onSucc
         throw new Error(data.error || "Erro ao salvar servo")
       }
 
-      toast.success(isEditing ? "Servo atualizado!" : "Servo adicionado!")
+      toast.success(
+        isEditing
+          ? "Servo atualizado!"
+          : data.merged
+            ? `${data.name} já está no ministério — área adicionada ao cadastro existente.`
+            : "Servo adicionado!"
+      )
       onOpenChange(false)
       onSuccess()
 

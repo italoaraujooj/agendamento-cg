@@ -7,7 +7,6 @@ import {
   findMinistryServants,
   findOpenPeriodByToken,
   loadSavedAnswers,
-  samePersonIds,
   type MinistryServant,
   type OpenPeriod,
   type PeriodLookup,
@@ -25,10 +24,9 @@ function lookupError(lookup: Exclude<PeriodLookup, { ok: true }>) {
 async function identifiedPayload(
   supabase: SupabaseClient,
   period: OpenPeriod,
-  servants: MinistryServant[],
   servant: MinistryServant
 ) {
-  const saved = await loadSavedAnswers(supabase, period.id, samePersonIds(servants, servant))
+  const saved = await loadSavedAnswers(supabase, period.id, servant.id)
   return {
     servant: { id: servant.id, name: servant.name },
     access_token: signAvailabilityToken(servant.id, period.id),
@@ -72,7 +70,7 @@ export async function GET(
     if (caller && period.ministry) {
       const servants = await findMinistryServants(supabase, period.ministry.id)
       const mine = servants.find((s) => s.user_id === caller.userId)
-      if (mine) me = await identifiedPayload(supabase, period, servants, mine)
+      if (mine) me = await identifiedPayload(supabase, period, mine)
     }
 
     return NextResponse.json({
@@ -128,9 +126,7 @@ export async function POST(
     let servant: MinistryServant | undefined
     if ("email" in body) {
       const email = body.email.toLowerCase()
-      const matches = servants.filter((s) => s.email?.toLowerCase().trim() === email)
-      // Prefere um registro ativo quando a pessoa tem mais de um
-      servant = matches.find((s) => s.is_active) ?? matches[0]
+      servant = servants.find((s) => s.email?.toLowerCase().trim() === email)
     } else if (verifyAvailabilityToken(body.servant_id, period.id, body.access_token)) {
       servant = servants.find((s) => s.id === body.servant_id)
     }
@@ -142,7 +138,7 @@ export async function POST(
       )
     }
 
-    return NextResponse.json(await identifiedPayload(supabase, period, servants, servant))
+    return NextResponse.json(await identifiedPayload(supabase, period, servant))
   } catch (error) {
     console.error("Erro ao identificar servo:", error)
     return NextResponse.json({ error: "Erro interno do servidor" }, { status: 500 })

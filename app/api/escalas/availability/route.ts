@@ -7,7 +7,6 @@ import {
   findMinistryServants,
   loadSavedAnswers,
   notifyLateAvailabilityChange,
-  samePersonIds,
 } from "@/lib/escalas/availability"
 
 const availabilitySubmissionSchema = z.object({
@@ -75,29 +74,24 @@ export async function POST(request: NextRequest) {
     const validEventIds = new Set((periodEvents ?? []).map((e: { id: string }) => e.id))
     const answers = availabilities.filter((a) => validEventIds.has(a.event_id))
 
-    // Aplicar a resposta a todos os registros da mesma pessoa no ministério
-    // (o cadastro atual cria um registro de servo por área)
     const servants = await findMinistryServants(supabase, period.ministry_id)
     const servant = servants.find((s) => s.id === servant_id)
     if (!servant) {
       return NextResponse.json({ error: "Servo não encontrado" }, { status: 404 })
     }
-    const personIds = samePersonIds(servants, servant)
 
     // Alteração tardia: guarda o estado anterior para avisar o líder do que mudou
-    const previous = open.late ? await loadSavedAnswers(supabase, period_id, personIds) : null
+    const previous = open.late ? await loadSavedAnswers(supabase, period_id, servant_id) : null
 
     const submittedAt = new Date().toISOString()
-    const records = personIds.flatMap((id) =>
-      answers.map((a) => ({
-        servant_id: id,
-        period_id,
-        event_id: a.event_id,
-        is_available: a.is_available,
-        notes: a.notes?.trim() || null,
-        submitted_at: submittedAt,
-      }))
-    )
+    const records = answers.map((a) => ({
+      servant_id,
+      period_id,
+      event_id: a.event_id,
+      is_available: a.is_available,
+      notes: a.notes?.trim() || null,
+      submitted_at: submittedAt,
+    }))
 
     // Upsert evita perder a resposta anterior caso a gravação falhe no meio
     const { error: upsertError } = await supabase

@@ -34,7 +34,8 @@ import type {
   Servant, 
   ServantAvailability,
   ScheduleAssignment,
-  Ministry 
+  ServantConflict,
+  Ministry
 } from "@/types/escalas"
 import { PERIOD_STATUS_LABELS } from "@/types/escalas"
 import { format } from "date-fns"
@@ -58,6 +59,7 @@ export default function MontarEscalaPage() {
   const [servants, setServants] = useState<Servant[]>([])
   const [availabilities, setAvailabilities] = useState<ServantAvailability[]>([])
   const [assignments, setAssignments] = useState<ScheduleAssignment[]>([])
+  const [conflicts, setConflicts] = useState<ServantConflict[]>([])
   const [loading, setLoading] = useState(true)
   const [publishDialog, setPublishDialog] = useState(false)
   const [publishing, setPublishing] = useState(false)
@@ -157,6 +159,10 @@ export default function MontarEscalaPage() {
           .in("schedule_event_id", eventIds)
 
         setAssignments(assignData || [])
+
+        // Mesma pessoa escalada em outro evento no mesmo horário (inclusive outros ministérios)
+        const conflictsRes = await fetch(`/api/escalas/schedule-periods/${periodId}/conflicts`)
+        setConflicts(conflictsRes.ok ? await conflictsRes.json() : [])
       }
     } catch (error) {
       console.error("Erro ao buscar dados:", error)
@@ -296,6 +302,7 @@ export default function MontarEscalaPage() {
           periodId={periodId}
           periodLabel={`${period.ministry?.name} · ${format(new Date(period.year, period.month - 1), "MMMM 'de' yyyy", { locale: ptBR })}`}
           availabilityDeadline={period.availability_deadline}
+          conflicts={conflicts}
           events={events}
           areas={areas}
           servants={servants}

@@ -145,7 +145,7 @@ export default function MinisterioDetalhePage() {
       .sort((a, b) => a.name.localeCompare(b.name))
   }, [ministry])
 
-  const uniqueServantCount = new Set(allServants.map(s => s.name.toLowerCase().trim())).size
+  const uniqueServantCount = allServants.length
 
   const handleSaveLeaders = async () => {
     setSavingLeaders(true)

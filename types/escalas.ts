@@ -147,6 +147,23 @@ export interface ScheduleAssignment {
   event?: ScheduleEvent
 }
 
+/** Mesma pessoa escalada em outro evento no mesmo dia/horário */
+export interface ServantConflict {
+  /** Servo deste ministério */
+  servant_id: string
+  /** Evento deste período no mesmo dia/horário */
+  event_id: string
+  other: {
+    event_id: string
+    title: string
+    date: string
+    time: string
+    ministry: string
+    area: string | null
+    same_ministry: boolean
+  }
+}
+
 // Tipos auxiliares para formulários
 export interface MinistryFormData {
   name: string
