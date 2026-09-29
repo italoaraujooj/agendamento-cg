@@ -4,6 +4,7 @@ import { useAuth } from './auth-provider'
 import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabase/client'
 import { toast } from 'sonner'
+import { plural } from "@/lib/plural"
 
 interface MigrationResult {
   user_id: string
@@ -46,7 +47,7 @@ export function AutoMigrateBookings() {
         // Mostrar notificação apenas se reservas foram migradas
         if (result.reservas_migradas > 0) {
           toast.success(
-            `Encontradas e associadas ${result.reservas_migradas} reserva(s) existente(s) à sua conta!`,
+            `${plural(result.reservas_migradas, "reserva existente foi associada", "reservas existentes foram associadas")} à sua conta!`,
             {
               description: 'Suas reservas antigas agora estão disponíveis para edição.',
               duration: 6000,

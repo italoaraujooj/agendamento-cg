@@ -11,6 +11,7 @@ import { supabase } from "@/lib/supabase/client"
 import { toast } from "sonner"
 import Link from "next/link"
 import type { Ministry, Area } from "@/types/escalas"
+import { plural } from "@/lib/plural"
 
 interface MinistryWithAreas extends Ministry {
   areas: Area[]
@@ -126,7 +127,7 @@ export default function MinisteriosPage() {
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
                       <Badge variant="secondary">
-                        {ministry.areas?.length || 0} área(s)
+                        {plural(ministry.areas?.length || 0, "área", "áreas")}
                       </Badge>
                     </div>
                     <span className="text-sm text-muted-foreground">

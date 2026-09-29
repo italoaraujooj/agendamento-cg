@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server"
 import { createServerClient } from "@/lib/supabase/server"
 import { requireEscalasAdmin } from "@/lib/escalas/auth"
 import { z } from "zod"
+import { plural } from "@/lib/plural"
 
 const regularEventSchema = z.object({
   ministry_id: z.string().uuid("Ministério inválido").optional(),
@@ -145,7 +146,7 @@ export async function POST(request: NextRequest) {
       { 
         event: eventData,
         ministries: ministriesToCreate.length,
-        message: `Evento criado e associado a ${ministriesToCreate.length} ministério(s)`
+        message: `Evento criado e associado a ${plural(ministriesToCreate.length, "ministério", "ministérios")}`
       },
       { status: 201 }
     )

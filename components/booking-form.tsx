@@ -20,6 +20,7 @@ import { format } from "date-fns"
 import { toast } from "sonner"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
 import { Info } from "lucide-react"
+import { plural } from "@/lib/plural"
 
 interface Environment {
   id: string
@@ -818,7 +819,7 @@ export default function BookingForm({ environments, preselectedEnvironment }: Bo
         setError(
           `Sem disponibilidade no ambiente para: ${invalidByAvailability
             .slice(0, 5)
-            .join(", ")} ${invalidByAvailability.length > 5 ? `+${invalidByAvailability.length - 5} dia(s)` : ""}`,
+            .join(", ")} ${invalidByAvailability.length > 5 ? `+${plural(invalidByAvailability.length - 5, "dia", "dias")}` : ""}`,
         )
         setIsSubmitting(false)
         return
@@ -854,7 +855,7 @@ export default function BookingForm({ environments, preselectedEnvironment }: Bo
         setError(
           `Conflito com reservas existentes em: ${conflicting
             .slice(0, 5)
-            .join(", ")} ${conflicting.length > 5 ? `+${conflicting.length - 5} dia(s)` : ""}`,
+            .join(", ")} ${conflicting.length > 5 ? `+${plural(conflicting.length - 5, "dia", "dias")}` : ""}`,
         )
         setIsSubmitting(false)
         return
@@ -893,7 +894,7 @@ export default function BookingForm({ environments, preselectedEnvironment }: Bo
         setError(
           `Conflito com locações externas em: ${externalConflicts
             .slice(0, 5)
-            .join(", ")} ${externalConflicts.length > 5 ? `+${externalConflicts.length - 5} dia(s)` : ""}. Este horário já está reservado para um evento externo.`,
+            .join(", ")} ${externalConflicts.length > 5 ? `+${plural(externalConflicts.length - 5, "dia", "dias")}` : ""}. Este horário já está reservado para um evento externo.`,
         )
         setIsSubmitting(false)
         return
@@ -1025,7 +1026,7 @@ export default function BookingForm({ environments, preselectedEnvironment }: Bo
                 `✅ Reserva criada e sincronizada!`,
                 { 
                   duration: 8000,
-                  description: `${successfulCalendarEvents} evento(s) adicionado(s) ao seu Google Calendar`,
+                  description: `${plural(successfulCalendarEvents, "evento adicionado", "eventos adicionados")} ao seu Google Calendar`,
                   action: eventLinks.length > 0 ? {
                     label: 'Ver no Google Calendar',
                     onClick: () => window.open(eventLinks[0], '_blank')

@@ -23,6 +23,7 @@ import { toast } from "sonner"
 import { sundaysBetween, formatSunday } from "@/lib/announcements"
 import { format, parseISO, isAfter, startOfDay, addDays } from "date-fns"
 import { ptBR } from "date-fns/locale"
+import { plural } from "@/lib/plural"
 
 interface Announcement {
   id: string
@@ -344,7 +345,7 @@ export function AnnouncementsManager() {
             <div className="space-y-3">
               <p className="text-sm font-medium">
                 {format(parseISO(sundayFilter), "dd 'de' MMMM 'de' yyyy", { locale: ptBR })}
-                <span className="text-muted-foreground ml-1">— {filteredSunday?.length ?? 0} aviso(s)</span>
+                <span className="text-muted-foreground ml-1">— {plural(filteredSunday?.length ?? 0, "aviso", "avisos")}</span>
               </p>
               {filteredSunday?.length === 0 ? (
                 <p className="text-sm text-muted-foreground">Nenhum aviso programado para este domingo.</p>

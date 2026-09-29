@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
 import { requireManagerOf } from "@/lib/escalas/auth"
+import { plural } from "@/lib/plural"
 
 // GET - Buscar agendamentos aprovados do salão principal no período
 export async function GET(
@@ -119,7 +120,7 @@ export async function POST(
     return NextResponse.json({
       success: true,
       imported: events.length,
-      message: `${events.length} evento(s) importado(s) do sistema de agendamentos`,
+      message: `${plural(events.length, "evento importado", "eventos importados")} do sistema de agendamentos`,
     })
   } catch (error) {
     console.error("Erro na API de importação:", error)

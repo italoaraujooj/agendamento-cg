@@ -16,6 +16,7 @@ import { format, parseISO } from "date-fns"
 import { ptBR } from "date-fns/locale"
 import { toast } from "sonner"
 import type { Area, ScheduleEvent, Servant } from "@/types/escalas"
+import { plural } from "@/lib/plural"
 
 export interface AssignmentProposal {
   event_id: string
@@ -102,9 +103,9 @@ export function ProposalsDialog({
       })
       const data = await res.json()
       if (!res.ok) throw new Error(data.error || "Erro ao aplicar")
-      toast.success(`${data.created} atribuição(ões) criada(s)`, {
+      toast.success(plural(data.created, "atribuição criada", "atribuições criadas"), {
         description: data.skipped?.length
-          ? `${data.skipped.length} ignorada(s): ${[...new Set(data.skipped.map((s: { reason: string }) => s.reason))].join(", ")}`
+          ? `${plural(data.skipped.length, "ignorada", "ignoradas")}: ${[...new Set(data.skipped.map((s: { reason: string }) => s.reason))].join(", ")}`
           : undefined,
       })
       onOpenChange(false)
@@ -135,7 +136,7 @@ export function ProposalsDialog({
           )}
           {byEvent.map(([eventId, items]) => (
             <div key={eventId} className="space-y-1.5">
-              <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground capitalize">
+              <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
                 {eventLabel(eventId)}
               </p>
               {items.map((p) => {

@@ -87,7 +87,7 @@ export function HistoryDialog({ open, onOpenChange, periodId, events }: HistoryD
                       ) : null}
                       {entry.area_name && <span className="text-muted-foreground"> · {entry.area_name}</span>}
                     </p>
-                    <p className="text-xs text-muted-foreground capitalize">
+                    <p className="text-xs text-muted-foreground first-letter:uppercase">
                       {eventLabel(entry.schedule_event_id)}
                       {entry.details && <span className="normal-case"> · {entry.details}</span>}
                     </p>

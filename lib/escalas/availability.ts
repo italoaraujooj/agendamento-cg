@@ -11,6 +11,7 @@ import {
   type EmailMessage,
 } from "@/lib/escalas/email"
 import type { Blockout } from "@/lib/escalas/blockouts"
+import { plural } from "@/lib/plural"
 
 /**
  * Helpers do fluxo de disponibilidade (/disponibilidade/[token]).
@@ -360,7 +361,7 @@ export async function notifyLateAvailabilityChange(
     sendEmails(recipients.map((to) => ({ to, subject, html }))),
     sendPushToEmails(supabase, recipients, {
       title: `${params.servantName} alterou a disponibilidade`,
-      body: `${ministry.name} · ${changes.length} evento(s) alterado(s) após o prazo`,
+      body: `${ministry.name} · ${plural(changes.length, "evento alterado", "eventos alterados")} após o prazo`,
       url: `${APP_URL}/admin-escalas/montar/${period.id}`,
     }),
   ])

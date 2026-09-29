@@ -58,6 +58,7 @@ import type { SchedulePeriod, ScheduleEvent, Ministry, ServantAvailability } fro
 import { PERIOD_STATUS_LABELS, PERIOD_STATUS_COLORS, EVENT_SOURCE_LABELS } from "@/types/escalas"
 import { format } from "date-fns"
 import { ptBR } from "date-fns/locale"
+import { plural } from "@/lib/plural"
 
 interface PeriodWithDetails extends SchedulePeriod {
   ministry: Ministry
@@ -227,7 +228,8 @@ function AvailabilityTab({
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <p className="text-sm text-muted-foreground">
-          {totalResponded}{totalRegistered > 0 ? ` de ${totalRegistered}` : ""} servo(s) responderam até o momento
+          {totalResponded}{totalRegistered > 0 ? ` de ${totalRegistered}` : ""}{" "}
+          {(totalRegistered || totalResponded) === 1 ? "servo respondeu" : "servos responderam"} até o momento
         </p>
         <div className="flex items-center gap-2">
           <Button variant="outline" size="sm" onClick={exportToCSV} disabled={totalResponded === 0 && servants.length === 0}>
@@ -693,7 +695,7 @@ export default function PeriodoDetalhePage() {
         toast.info(mode === "pending" ? "Todos já responderam." : "Nenhum servo ativo para convidar.")
         return
       }
-      toast.success(`${data.sent} e-mail(s) enviado(s)`, {
+      toast.success(plural(data.sent, "e-mail enviado", "e-mails enviados"), {
         description: [
           data.failed > 0 ? `${data.failed} falharam.` : null,
           data.withoutEmail.length > 0
@@ -1448,9 +1450,9 @@ export default function PeriodoDetalhePage() {
             <>
               <div className="flex items-center justify-between mb-2">
                 <span className="text-sm text-muted-foreground">
-                  {availableBookings.length} agendamento(s) encontrado(s)
+                  {plural(availableBookings.length, "agendamento encontrado", "agendamentos encontrados")}
                   {availableBookings.some((b) => b.already_imported) &&
-                    ` (${availableBookings.filter((b) => b.already_imported).length} já importado(s))`}
+                    ` (${plural(availableBookings.filter((b) => b.already_imported).length, "já importado", "já importados")})`}
                 </span>
                 {importableBookings.length > 0 && (
                   <Button variant="ghost" size="sm" onClick={toggleAllBookings}>

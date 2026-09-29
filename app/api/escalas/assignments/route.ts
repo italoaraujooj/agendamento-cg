@@ -6,6 +6,7 @@ import { areaCapacity } from "@/lib/escalas/staffing"
 import { actorFromUser, logAssignmentChanges, type LogActor } from "@/lib/escalas/history"
 import type { SupabaseClient } from "@supabase/supabase-js"
 import { z } from "zod"
+import { plural } from "@/lib/plural"
 
 const REMOVED_FIELDS = "servant_id, schedule_event_id, area_id, notified_at"
 
@@ -117,7 +118,7 @@ export async function POST(request: NextRequest) {
           .neq("status", "declined")
         if ((count ?? 0) >= capacity) {
           return NextResponse.json(
-            { error: `${area!.name} já está com o máximo de ${capacity} pessoa(s) neste evento` },
+            { error: `${area!.name} já está com o máximo de ${plural(capacity, "pessoa", "pessoas")} neste evento` },
             { status: 409 }
           )
         }
