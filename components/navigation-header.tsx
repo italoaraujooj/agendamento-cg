@@ -4,7 +4,7 @@ import { useState } from "react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { Button } from "@/components/ui/button"
-import { Calendar, MapPin, Users, Home, Shield, Users2, CalendarDays, ClipboardList, Menu, Megaphone } from "lucide-react"
+import { Calendar, CalendarCheck, MapPin, Users, Home, Shield, Users2, CalendarDays, ClipboardList, Menu, Megaphone } from "lucide-react"
 import { ModeToggle } from "@/components/mode-toggle"
 import { AuthButton } from "@/components/auth/auth-button"
 import { CalendarStatusIndicator } from "@/components/calendar-status-indicator"
@@ -79,7 +79,7 @@ export default function NavigationHeader() {
   // Selecionar menu baseado no modo
   const baseNavItems = isEscalas ? escalasNavItems : agendamentosNavItems
 
-  // Mostrar Admin (agendamentos) se tiver qualquer permissão de gestão; escalas apenas para admin
+  // Admin de agendamentos: qualquer permissão de gestão
   const canSeeAgendamentosAdmin = isAuthenticated && (isAdmin || hasPermission('approve_bookings') || hasPermission('manage_external_rentals') || hasPermission('manage_avisos'))
   // Admin ou líder de algum ministério (as telas e APIs limitam aos ministérios que ele gerencia)
   const canSeeEscalasAdmin = isAuthenticated && (isAdmin || ministryRoles.length > 0)
@@ -94,8 +94,22 @@ export default function NavigationHeader() {
     ? { href: "/avisos", label: "Avisos", icon: Megaphone, active: pathname === "/avisos" }
     : null
 
+  // Página do servo: visível para todos, nos dois modos — quem não tem acesso ao
+  // módulo de Escalas (a maioria dos servos) não teria outro caminho até ela.
+  // Sem login, a página busca a escala pelo e-mail.
+  const minhaEscalaNavItem = {
+    href: "/minha-escala",
+    label: "Minha Escala",
+    icon: CalendarCheck,
+    active: pathname === "/minha-escala",
+  }
+
+  // Logo após "Início"/"Dashboard": no celular a barra rola para o lado sem
+  // indicador, e no fim da lista o item ficaria fora da tela
   const allNavItems = [
-    ...baseNavItems,
+    baseNavItems[0],
+    minhaEscalaNavItem,
+    ...baseNavItems.slice(1),
     ...(avisosNavItem ? [avisosNavItem] : []),
     ...(adminNavItem ? [adminNavItem] : []),
   ]
