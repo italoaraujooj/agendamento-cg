@@ -10,6 +10,7 @@ import Link from "next/link"
 import { AssignmentResponse } from "@/components/escalas/assignment-response"
 import { CalendarSubscribe } from "@/components/escalas/calendar-subscribe"
 import { PushOptIn } from "@/components/pwa/push-opt-in"
+import { BlockoutsCard } from "@/components/escalas/blockouts-card"
 import type { AssignmentStatus } from "@/types/escalas"
 import { format, parseISO } from "date-fns"
 import { ptBR } from "date-fns/locale"
@@ -251,6 +252,9 @@ export default function MinhaEscalaPage() {
             </CardContent>
           </Card>
         )}
+
+        {/* Datas bloqueadas (férias, viagens) — só para quem está logado */}
+        {loggedInUser && <BlockoutsCard />}
 
         {/* Formulário — oculto quando já carregou automaticamente */}
         {!(loggedInUser && data) && (

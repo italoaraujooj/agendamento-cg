@@ -12,6 +12,7 @@ import { format, parseISO } from "date-fns"
 import { ptBR } from "date-fns/locale"
 import { toast } from "sonner"
 import type { Ministry } from "@/types/escalas"
+import { blockoutFor, type Blockout } from "@/lib/escalas/blockouts"
 
 export interface AvailabilityEvent {
   id: string
@@ -27,6 +28,8 @@ export interface IdentifiedServant {
   access_token: string
   answers: { event_id: string; is_available: boolean; notes: string | null }[]
   submitted_at: string | null
+  /** Datas bloqueadas da pessoa no mês (pré-marcam "Não posso" nos eventos sem resposta) */
+  blockouts?: Blockout[]
 }
 
 interface AvailabilityFormProps {
@@ -106,6 +109,12 @@ export function AvailabilityForm({ periodToken, period, events, initialIdentity 
       const answer = saved.get(e.id)
       nextAvailability[e.id] = answer?.is_available
       if (answer?.notes) nextNotes[e.id] = answer.notes
+      // Sem resposta e dentro de uma data bloqueada: já vem como "Não posso"
+      const blocked = !answer ? blockoutFor(e.event_date, data.blockouts ?? []) : undefined
+      if (blocked) {
+        nextAvailability[e.id] = false
+        nextNotes[e.id] = blocked.reason ?? "Data bloqueada"
+      }
     })
     setAvailabilities(nextAvailability)
     setNotes(nextNotes)

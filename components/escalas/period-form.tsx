@@ -24,6 +24,8 @@ import { ptBR } from "date-fns/locale"
 interface PeriodFormProps {
   period?: SchedulePeriod
   onSuccess?: () => void
+  /** Líder: só os ministérios que ele gerencia (admin: undefined = todos) */
+  allowedMinistryIds?: string[]
 }
 
 const MONTHS = [
@@ -41,7 +43,7 @@ const MONTHS = [
   { value: "12", label: "Dezembro" },
 ]
 
-export function PeriodForm({ period, onSuccess }: PeriodFormProps) {
+export function PeriodForm({ period, onSuccess, allowedMinistryIds }: PeriodFormProps) {
   const router = useRouter()
   const isEditing = !!period
 
@@ -78,10 +80,13 @@ export function PeriodForm({ period, onSuccess }: PeriodFormProps) {
           .order("name")
 
         if (error) throw error
-        setMinistries(data || [])
-        
-        if (!formData.ministry_id && data && data.length > 0) {
-          setFormData(prev => ({ ...prev, ministry_id: data[0].id }))
+        const allowed = (data || []).filter(
+          (m) => !allowedMinistryIds || allowedMinistryIds.includes(m.id)
+        )
+        setMinistries(allowed)
+
+        if (!formData.ministry_id && allowed.length > 0) {
+          setFormData(prev => ({ ...prev, ministry_id: allowed[0].id }))
         }
       } catch (error) {
         console.error("Erro ao buscar ministérios:", error)
@@ -92,7 +97,8 @@ export function PeriodForm({ period, onSuccess }: PeriodFormProps) {
     }
 
     fetchMinistries()
-  }, [formData.ministry_id])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [formData.ministry_id, allowedMinistryIds?.join(",")])
 
   // Atualizar deadline sugerido quando mês/ano mudar
   useEffect(() => {

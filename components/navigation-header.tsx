@@ -22,7 +22,7 @@ import {
 
 export default function NavigationHeader() {
   const pathname = usePathname()
-  const { isAdmin, isAuthenticated, hasPermission, canAccessEscalas } = useAuth()
+  const { isAdmin, isAuthenticated, hasPermission, canAccessEscalas, ministryRoles } = useAuth()
   const { isEscalas } = useSystemMode()
   const [open, setOpen] = useState(false)
 
@@ -81,7 +81,8 @@ export default function NavigationHeader() {
 
   // Mostrar Admin (agendamentos) se tiver qualquer permissão de gestão; escalas apenas para admin
   const canSeeAgendamentosAdmin = isAuthenticated && (isAdmin || hasPermission('approve_bookings') || hasPermission('manage_external_rentals') || hasPermission('manage_avisos'))
-  const canSeeEscalasAdmin = isAuthenticated && isAdmin
+  // Admin ou líder de algum ministério (as telas e APIs limitam aos ministérios que ele gerencia)
+  const canSeeEscalasAdmin = isAuthenticated && (isAdmin || ministryRoles.length > 0)
 
   const adminNavItem = isEscalas && canSeeEscalasAdmin
     ? { href: "/admin-escalas", label: "Admin", icon: Shield, active: pathname === "/admin-escalas" || pathname.startsWith("/admin-escalas/") }

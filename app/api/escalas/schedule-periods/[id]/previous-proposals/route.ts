@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { requireManagerOf } from "@/lib/escalas/auth"
-import { findMinistryServants } from "@/lib/escalas/availability"
+import { findMinistryServants, loadBlockoutsForServants } from "@/lib/escalas/availability"
+import { isDateBlocked } from "@/lib/escalas/blockouts"
 
 /**
  * GET - Propõe copiar a escala do mês anterior do mesmo ministério.
@@ -89,6 +90,18 @@ export async function GET(
     const unavailable = new Set(
       (availability ?? []).filter((a: any) => !a.is_available).map((a: any) => `${a.servant_id}-${a.event_id}`)
     )
+    // Datas bloqueadas (férias, viagens) valem quando não há resposta explícita no evento
+    const answered = new Set((availability ?? []).map((a: any) => `${a.servant_id}-${a.event_id}`))
+    const curDates = (curEvents ?? []).map((e: EventRow) => e.event_date).sort()
+    if (curDates.length) {
+      const blockouts = await loadBlockoutsForServants(supabase, servants, curDates[0], curDates[curDates.length - 1])
+      for (const [servantId, list] of Object.entries(blockouts)) {
+        for (const e of (curEvents ?? []) as EventRow[]) {
+          const key = `${servantId}-${e.id}`
+          if (!answered.has(key) && isDateBlocked(e.event_date, list)) unavailable.add(key)
+        }
+      }
+    }
     const responded = new Set((availability ?? []).map((a: any) => a.servant_id))
     const taken = new Set((curAssignments ?? []).map((a: any) => `${a.servant_id}-${a.schedule_event_id}`))
 

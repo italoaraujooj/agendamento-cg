@@ -12,8 +12,10 @@ import { toast } from "sonner"
 
 export default function NovoPeriodoPage() {
   const router = useRouter()
-  const { isAuthenticated, isAdmin, adminChecked, loading: authLoading } = useAuth()
+  const { isAuthenticated, isAdmin, ministryRoles, adminChecked, loading: authLoading } = useAuth()
   const { setMode } = useSystemMode()
+  // Admin ou líder: o líder só cria períodos dos ministérios que gerencia
+  const canManage = isAdmin || ministryRoles.length > 0
 
   useEffect(() => {
     setMode("escalas")
@@ -21,12 +23,12 @@ export default function NovoPeriodoPage() {
 
   useEffect(() => {
     if (!authLoading && adminChecked) {
-      if (!isAuthenticated || !isAdmin) {
+      if (!isAuthenticated || !canManage) {
         toast.error("Acesso negado")
         router.push("/escalas")
       }
     }
-  }, [authLoading, isAuthenticated, isAdmin, adminChecked, router])
+  }, [authLoading, isAuthenticated, canManage, adminChecked, router])
 
   if (authLoading || !adminChecked) {
     return (
@@ -53,7 +55,7 @@ export default function NovoPeriodoPage() {
         </p>
       </div>
 
-      <PeriodForm />
+      <PeriodForm allowedMinistryIds={isAdmin ? undefined : ministryRoles.map((r) => r.ministry_id)} />
     </div>
   )
 }
