@@ -294,7 +294,7 @@ export default function MinisterioDetalhePage() {
         <Card>
           <CardHeader className="pb-3">
             <CardTitle className="text-lg flex items-center gap-2">
-              <Crown className="h-5 w-5 text-yellow-500" />
+              <Crown className="h-5 w-5 text-primary" />
               Liderança do Ministério
             </CardTitle>
           </CardHeader>
@@ -383,7 +383,7 @@ export default function MinisterioDetalhePage() {
         <Card>
           <CardHeader className="pb-3">
             <CardTitle className="text-lg flex items-center gap-2">
-              <Crown className="h-5 w-5 text-yellow-500" />
+              <Crown className="h-5 w-5 text-primary" />
               Liderança do Ministério
             </CardTitle>
           </CardHeader>
@@ -563,7 +563,7 @@ export default function MinisterioDetalhePage() {
                                   {canEdit && servant.is_active && servant.email && !servant.has_account && (
                                     <Badge
                                       variant="outline"
-                                      className="text-xs text-amber-600 border-amber-300 bg-amber-50 dark:bg-amber-950/30 flex-shrink-0 gap-1"
+                                      className="text-xs text-warning border-warning/30 bg-warning/10 flex-shrink-0 gap-1"
                                     >
                                       <UserX className="h-3 w-3" />
                                       Sem conta

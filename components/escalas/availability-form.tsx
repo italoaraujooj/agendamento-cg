@@ -280,11 +280,11 @@ export function AvailabilityForm({ periodToken, period, events, initialIdentity 
     format(new Date(iso), "dd/MM 'às' HH:mm", { locale: ptBR })
 
   const lateNotice = period.late && (
-    <Card className="bg-amber-50 dark:bg-amber-950 border-amber-200 dark:border-amber-800">
+    <Card className="bg-warning/10 border-warning/30">
       <CardContent className="pt-4">
         <div className="flex gap-3">
-          <AlertTriangle className="h-5 w-5 text-amber-600 dark:text-amber-400 flex-shrink-0 mt-0.5" />
-          <p className="text-sm text-amber-800 dark:text-amber-200">
+          <AlertTriangle className="h-5 w-5 text-warning flex-shrink-0 mt-0.5" />
+          <p className="text-sm text-warning">
             O prazo para responder já encerrou. Você ainda pode enviar ou alterar sua
             disponibilidade, e o líder do ministério será avisado da mudança.
           </p>
@@ -360,7 +360,7 @@ export function AvailabilityForm({ periodToken, period, events, initialIdentity 
     return (
       <Card className="max-w-md mx-auto">
         <CardContent className="pt-8 text-center">
-          <CheckCircle className="h-16 w-16 text-green-500 mx-auto mb-4" />
+          <CheckCircle className="h-16 w-16 text-success mx-auto mb-4" />
           <h2 className="text-2xl font-bold mb-2">Enviado com Sucesso!</h2>
           <p className="text-muted-foreground mb-4">
             {period.late
@@ -417,15 +417,15 @@ export function AvailabilityForm({ periodToken, period, events, initialIdentity 
       {lateNotice}
 
       {/* Instruções + ações em lote */}
-      <Card className="bg-blue-50 dark:bg-blue-950 border-blue-200 dark:border-blue-800">
+      <Card className="bg-info/10 border-info/30">
         <CardContent className="pt-4 space-y-3">
           <div className="flex gap-3">
-            <AlertCircle className="h-5 w-5 text-blue-600 dark:text-blue-400 flex-shrink-0 mt-0.5" />
+            <AlertCircle className="h-5 w-5 text-info flex-shrink-0 mt-0.5" />
             <div className="text-sm">
-              <p className="font-medium text-blue-900 dark:text-blue-100">
+              <p className="font-medium text-info">
                 {isEditing ? "Editando sua resposta" : "Como preencher"}
               </p>
-              <p className="text-blue-700 dark:text-blue-300">
+              <p className="text-info">
                 {isEditing && identity?.submitted_at && (
                   <>Última atualização em {formatSubmittedAt(identity.submitted_at)}. </>
                 )}
@@ -435,11 +435,11 @@ export function AvailabilityForm({ periodToken, period, events, initialIdentity 
           </div>
           <div className="flex flex-wrap gap-2 pl-8">
             <Button type="button" size="sm" variant="outline" className="bg-background" onClick={() => setAll(true)}>
-              <Check className="mr-1.5 h-3.5 w-3.5 text-green-600" />
+              <Check className="mr-1.5 h-3.5 w-3.5 text-success" />
               Posso em todos
             </Button>
             <Button type="button" size="sm" variant="outline" className="bg-background" onClick={() => setAll(false)}>
-              <X className="mr-1.5 h-3.5 w-3.5 text-red-600" />
+              <X className="mr-1.5 h-3.5 w-3.5 text-destructive" />
               Não posso em nenhum
             </Button>
           </div>
@@ -466,9 +466,9 @@ export function AvailabilityForm({ periodToken, period, events, initialIdentity 
                       key={event.id}
                       className={`p-3 rounded-lg border transition-colors ${
                         answer === true
-                          ? "bg-green-50 dark:bg-green-950 border-green-200 dark:border-green-800"
+                          ? "bg-success/10 border-success/30"
                           : answer === false
-                            ? "bg-red-50 dark:bg-red-950 border-red-200 dark:border-red-800"
+                            ? "bg-destructive/10 border-destructive/30"
                             : "bg-background"
                       }`}
                     >
@@ -489,7 +489,7 @@ export function AvailabilityForm({ periodToken, period, events, initialIdentity 
                             role="radio"
                             aria-checked={answer === true}
                             variant={answer === true ? "default" : "outline"}
-                            className={answer === true ? "bg-green-600 hover:bg-green-700 text-white" : ""}
+                            className={answer === true ? "bg-success hover:bg-success/90 text-success-foreground" : ""}
                             onClick={() => setAnswer(event.id, true)}
                           >
                             <Check className="mr-1 h-3.5 w-3.5" />
@@ -501,7 +501,7 @@ export function AvailabilityForm({ periodToken, period, events, initialIdentity 
                             role="radio"
                             aria-checked={answer === false}
                             variant={answer === false ? "default" : "outline"}
-                            className={answer === false ? "bg-red-600 hover:bg-red-700 text-white" : ""}
+                            className={answer === false ? "bg-destructive hover:bg-destructive/90 text-destructive-foreground" : ""}
                             onClick={() => setAnswer(event.id, false)}
                           >
                             <X className="mr-1 h-3.5 w-3.5" />
@@ -520,7 +520,7 @@ export function AvailabilityForm({ periodToken, period, events, initialIdentity 
                                 onClick={() => toggleReasonChip(event.id, chip)}
                                 className={`text-xs px-2.5 py-1 rounded-full border transition-colors ${
                                   notes[event.id] === chip
-                                    ? "bg-red-600 border-red-600 text-white"
+                                    ? "bg-destructive border-destructive/60 text-destructive-foreground"
                                     : "bg-background hover:bg-muted"
                                 }`}
                               >
@@ -553,7 +553,7 @@ export function AvailabilityForm({ periodToken, period, events, initialIdentity 
             <div className="flex items-center justify-between gap-4">
               <div className="text-sm">
                 {missingCount > 0 ? (
-                  <span className="text-amber-700 dark:text-amber-400">
+                  <span className="text-warning">
                     <span className="font-medium">{answeredCount}</span> de{" "}
                     <span className="font-medium">{totalCount}</span> respondidos
                   </span>

@@ -165,7 +165,7 @@ export default function PeriodosPage() {
                   <div className="flex items-center gap-3">
                     <Badge
                       variant="secondary"
-                      className={`${PERIOD_STATUS_COLORS[period.status]} text-white`}
+                      className={PERIOD_STATUS_COLORS[period.status]}
                     >
                       {getStatusIcon(period.status)}
                       <span className="ml-1">{PERIOD_STATUS_LABELS[period.status]}</span>

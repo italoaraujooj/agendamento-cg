@@ -20,8 +20,8 @@ export default function HomePage() {
         <Card className="hover:shadow-lg transition-shadow">
           <CardHeader>
             <div className="flex items-center gap-3">
-              <div className="p-2 rounded-lg bg-blue-100 dark:bg-blue-900">
-                <Calendar className="h-6 w-6 text-blue-600 dark:text-blue-400" />
+              <div className="p-2 rounded-lg bg-brand/15">
+                <Calendar className="h-6 w-6 text-primary" />
               </div>
               <div>
                 <CardTitle>Fazer Reserva</CardTitle>
@@ -45,8 +45,8 @@ export default function HomePage() {
         <Card className="hover:shadow-lg transition-shadow">
           <CardHeader>
             <div className="flex items-center gap-3">
-              <div className="p-2 rounded-lg bg-green-100 dark:bg-green-900">
-                <MapPin className="h-6 w-6 text-green-600 dark:text-green-400" />
+              <div className="p-2 rounded-lg bg-brand/15">
+                <MapPin className="h-6 w-6 text-primary" />
               </div>
               <div>
                 <CardTitle>Ver Ambientes</CardTitle>
@@ -70,8 +70,8 @@ export default function HomePage() {
         <Card className="hover:shadow-lg transition-shadow">
           <CardHeader>
             <div className="flex items-center gap-3">
-              <div className="p-2 rounded-lg bg-orange-100 dark:bg-orange-900">
-                <Users className="h-6 w-6 text-orange-600 dark:text-orange-400" />
+              <div className="p-2 rounded-lg bg-brand/15">
+                <Users className="h-6 w-6 text-primary" />
               </div>
               <div>
                 <CardTitle>Ver Reservas</CardTitle>
@@ -95,8 +95,8 @@ export default function HomePage() {
         <Card className="hover:shadow-lg transition-shadow">
           <CardHeader>
             <div className="flex items-center gap-3">
-              <div className="p-2 rounded-lg bg-purple-100 dark:bg-purple-900">
-                <LogIn className="h-6 w-6 text-purple-600 dark:text-purple-400" />
+              <div className="p-2 rounded-lg bg-brand/15">
+                <LogIn className="h-6 w-6 text-primary" />
               </div>
               <div>
                 <CardTitle>Meu Perfil</CardTitle>

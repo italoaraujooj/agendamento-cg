@@ -98,8 +98,8 @@ export function ScheduleMatrix({
                         !applies
                           ? "bg-muted/40 text-muted-foreground"
                           : complete
-                            ? "bg-green-50 dark:bg-green-950/40 hover:bg-green-100 dark:hover:bg-green-950"
-                            : "bg-amber-50 dark:bg-amber-950/40 hover:bg-amber-100 dark:hover:bg-amber-950"
+                            ? "bg-success/10 hover:bg-success/15"
+                            : "bg-warning/10 hover:bg-warning/15"
                       } ${e.id === selectedEventId ? "ring-1 ring-inset ring-primary/40" : ""}`}
                     >
                       {!applies ? (
@@ -112,13 +112,13 @@ export function ScheduleMatrix({
                             return (
                               <div key={a.id} className="flex items-center gap-1 text-xs">
                                 {declined ? (
-                                  <X className="h-3 w-3 text-red-500 flex-shrink-0" />
+                                  <X className="h-3 w-3 text-destructive flex-shrink-0" />
                                 ) : a.status === "accepted" ? (
-                                  <CheckCheck className="h-3 w-3 text-green-600 flex-shrink-0" />
+                                  <CheckCheck className="h-3 w-3 text-success flex-shrink-0" />
                                 ) : a.notified_at ? (
-                                  <Clock className="h-3 w-3 text-amber-500 flex-shrink-0" />
+                                  <Clock className="h-3 w-3 text-warning flex-shrink-0" />
                                 ) : null}
-                                {conflict && <AlertTriangle className="h-3 w-3 text-amber-500 flex-shrink-0" />}
+                                {conflict && <AlertTriangle className="h-3 w-3 text-warning flex-shrink-0" />}
                                 <span className={`truncate max-w-[110px] ${declined ? "line-through text-muted-foreground" : ""}`}>
                                   {firstName(a)}
                                 </span>
@@ -126,7 +126,7 @@ export function ScheduleMatrix({
                             )
                           })}
                           {!complete && (
-                            <span className="block text-xs text-amber-700 dark:text-amber-400">
+                            <span className="block text-xs text-warning">
                               {filled}/{need}
                             </span>
                           )}

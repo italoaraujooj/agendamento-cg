@@ -260,7 +260,7 @@ function AvailabilityTab({
                   <Badge
                     key={id}
                     variant="secondary"
-                    className={`text-xs ${servant.autoFilled ? "text-amber-700 dark:text-amber-400" : ""}`}
+                    className={`text-xs ${servant.autoFilled ? "text-warning" : ""}`}
                   >
                     {servant.name}
                     {servant.area && (
@@ -271,7 +271,7 @@ function AvailabilityTab({
                     )}
                     {servant.late && (
                       <span
-                        className="ml-1 inline-flex items-center gap-0.5 text-amber-700 dark:text-amber-400"
+                        className="ml-1 inline-flex items-center gap-0.5 text-warning"
                         title={`Alterou em ${format(new Date(servant.submittedAt), "dd/MM 'às' HH:mm")}, depois do prazo`}
                       >
                         <Clock3 className="h-3 w-3" />
@@ -291,7 +291,7 @@ function AvailabilityTab({
           <CardHeader className="pb-2">
             <CardTitle className="text-base flex items-center gap-2">
               Quem ainda não respondeu
-              <Badge variant="outline" className="text-xs font-normal text-amber-600 border-amber-300">{notRespondedServants.length}</Badge>
+              <Badge variant="outline" className="text-xs font-normal text-warning border-warning/30">{notRespondedServants.length}</Badge>
             </CardTitle>
           </CardHeader>
           <CardContent>
@@ -340,15 +340,15 @@ function AvailabilityTab({
 
                         {availableCount > 0 && (
                           <div className="ml-16 space-y-1">
-                            <p className="text-xs font-medium text-green-600">Disponíveis:</p>
+                            <p className="text-xs font-medium text-success">Disponíveis:</p>
                             <div className="flex flex-wrap gap-1">
                               {data!.available
                                 .sort((a, b) => (a.servant?.name || "").localeCompare(b.servant?.name || ""))
                                 .map((r) => (
-                                  <Badge key={r.id} variant="outline" className="text-xs border-green-200 bg-green-50 text-green-700">
+                                  <Badge key={r.id} variant="outline" className="text-xs border-success/30 bg-success/10 text-success">
                                     {r.servant?.name}
                                     {isAutoFilled(r.notes) && (
-                                      <span className="ml-1 italic text-amber-600">(não respondeu)</span>
+                                      <span className="ml-1 italic text-warning">(não respondeu)</span>
                                     )}
                                   </Badge>
                                 ))}
@@ -358,13 +358,13 @@ function AvailabilityTab({
 
                         {unavailableCount > 0 && (
                           <div className="ml-16 space-y-1">
-                            <p className="text-xs font-medium text-red-600">Indisponíveis:</p>
+                            <p className="text-xs font-medium text-destructive">Indisponíveis:</p>
                             <div className="flex flex-wrap gap-1">
                               {data!.unavailable
                                 .sort((a, b) => (a.servant?.name || "").localeCompare(b.servant?.name || ""))
                                 .map((r) => (
                                   <span key={r.id} className="inline-flex items-center gap-1">
-                                    <Badge variant="outline" className="text-xs border-red-200 bg-red-50 text-red-700">
+                                    <Badge variant="outline" className="text-xs border-destructive/30 bg-destructive/10 text-destructive">
                                       {r.servant?.name}
                                     </Badge>
                                     {r.notes && (
@@ -891,7 +891,7 @@ export default function PeriodoDetalhePage() {
               <p className="text-muted-foreground">{period.ministry?.name}</p>
               <Badge
                 variant="secondary"
-                className={`mt-2 ${PERIOD_STATUS_COLORS[period.status]} text-white`}
+                className={`mt-2 ${PERIOD_STATUS_COLORS[period.status]}`}
               >
                 {PERIOD_STATUS_LABELS[period.status]}
               </Badge>
@@ -1496,7 +1496,7 @@ export default function PeriodoDetalhePage() {
                             {booking.environments?.name && ` — ${booking.environments.name}`}
                           </div>
                           {booking.already_imported && (
-                            <span className="text-xs text-amber-600 font-medium">Já importado</span>
+                            <span className="text-xs text-warning font-medium">Já importado</span>
                           )}
                         </div>
                       </label>

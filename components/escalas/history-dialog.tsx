@@ -14,10 +14,10 @@ import { ptBR } from "date-fns/locale"
 import type { AssignmentLogAction, AssignmentLogEntry, ScheduleEvent } from "@/types/escalas"
 
 const ACTION_META: Record<AssignmentLogAction, { label: string; icon: typeof Plus; className: string }> = {
-  added: { label: "escalou", icon: Plus, className: "text-emerald-600" },
+  added: { label: "escalou", icon: Plus, className: "text-success" },
   removed: { label: "removeu", icon: Minus, className: "text-muted-foreground" },
-  accepted: { label: "confirmou", icon: Check, className: "text-green-600" },
-  declined: { label: "recusou", icon: X, className: "text-red-600" },
+  accepted: { label: "confirmou", icon: Check, className: "text-success" },
+  declined: { label: "recusou", icon: X, className: "text-destructive" },
 }
 
 interface HistoryDialogProps {

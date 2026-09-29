@@ -64,8 +64,8 @@ export default function EscalasDashboardPage() {
         <Card className="hover:shadow-lg transition-shadow">
           <CardHeader>
             <div className="flex items-center gap-3">
-              <div className="p-2 rounded-lg bg-blue-100 dark:bg-blue-900">
-                <Users2 className="h-6 w-6 text-blue-600 dark:text-blue-400" />
+              <div className="p-2 rounded-lg bg-info/15">
+                <Users2 className="h-6 w-6 text-info" />
               </div>
               <div>
                 <CardTitle>Ministérios</CardTitle>
@@ -90,8 +90,8 @@ export default function EscalasDashboardPage() {
         <Card className="hover:shadow-lg transition-shadow">
           <CardHeader>
             <div className="flex items-center gap-3">
-              <div className="p-2 rounded-lg bg-green-100 dark:bg-green-900">
-                <CalendarDays className="h-6 w-6 text-green-600 dark:text-green-400" />
+              <div className="p-2 rounded-lg bg-success/15">
+                <CalendarDays className="h-6 w-6 text-success" />
               </div>
               <div>
                 <CardTitle>Calendário Regular</CardTitle>
@@ -117,8 +117,8 @@ export default function EscalasDashboardPage() {
           <Card className="hover:shadow-lg transition-shadow">
             <CardHeader>
               <div className="flex items-center gap-3">
-                <div className="p-2 rounded-lg bg-purple-100 dark:bg-purple-900">
-                  <ClipboardList className="h-6 w-6 text-purple-600 dark:text-purple-400" />
+                <div className="p-2 rounded-lg bg-brand/15">
+                  <ClipboardList className="h-6 w-6 text-primary" />
                 </div>
                 <div>
                   <CardTitle>Períodos de Escala</CardTitle>

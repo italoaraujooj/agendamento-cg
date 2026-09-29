@@ -16,20 +16,20 @@ const todayBr = () => new Date(Date.now() - 3 * 3600 * 1000).toISOString().slice
 export function AssignmentStatusBadge({ status }: { status: AssignmentStatus }) {
   if (status === "accepted") {
     return (
-      <Badge className="bg-green-600 hover:bg-green-600 text-white gap-1">
+      <Badge className="bg-success hover:bg-success/90 text-success-foreground gap-1">
         <Check className="h-3 w-3" /> Confirmado
       </Badge>
     )
   }
   if (status === "declined") {
     return (
-      <Badge variant="outline" className="border-red-300 text-red-700 dark:text-red-400 gap-1">
+      <Badge variant="outline" className="border-destructive/30 text-destructive gap-1">
         <X className="h-3 w-3" /> Não poderei
       </Badge>
     )
   }
   return (
-    <Badge variant="outline" className="border-amber-300 text-amber-700 dark:text-amber-400 gap-1">
+    <Badge variant="outline" className="border-warning/30 text-warning gap-1">
       <Clock className="h-3 w-3" /> Aguardando confirmação
     </Badge>
   )
@@ -84,7 +84,7 @@ export function AssignmentResponse({ assignmentId, status, eventDate, token, onC
               type="button"
               onClick={() => setReason(reason === chip ? "" : chip)}
               className={`text-xs px-2.5 py-1 rounded-full border transition-colors ${
-                reason === chip ? "bg-red-600 border-red-600 text-white" : "bg-background hover:bg-muted"
+                reason === chip ? "bg-destructive border-destructive/60 text-destructive-foreground" : "bg-background hover:bg-muted"
               }`}
             >
               {chip}
@@ -117,7 +117,7 @@ export function AssignmentResponse({ assignmentId, status, eventDate, token, onC
       {status !== "accepted" && (
         <Button
           size="sm"
-          className="bg-green-600 hover:bg-green-700 text-white h-8"
+          className="bg-success hover:bg-success/90 text-success-foreground h-8"
           onClick={() => respond("accepted")}
           disabled={!!loading}
         >

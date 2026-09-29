@@ -607,7 +607,7 @@ export function ScheduleBuilder({
         {declinedCount > 0 && (
           <Badge
             variant="outline"
-            className="border-red-300 text-red-700 dark:text-red-400 gap-1"
+            className="border-destructive/30 text-destructive gap-1"
             title="Servos que recusaram — a vaga precisa de substituto"
           >
             <X className="h-3 w-3" />
@@ -623,7 +623,7 @@ export function ScheduleBuilder({
         {assignedConflictCount > 0 && (
           <Badge
             variant="outline"
-            className="border-amber-400 text-amber-700 dark:text-amber-400 gap-1"
+            className="border-warning/60 text-warning gap-1"
             title="Pessoas escaladas em outro evento no mesmo horário (inclusive em outros ministérios)"
           >
             <AlertTriangle className="h-3 w-3" />
@@ -676,7 +676,7 @@ export function ScheduleBuilder({
                       {(() => {
                         const c = completionOf(selectedEvent.id)
                         return c.complete ? (
-                          <Check className="h-4 w-4 text-green-500 flex-shrink-0" />
+                          <Check className="h-4 w-4 text-success flex-shrink-0" />
                         ) : (
                           <Badge variant="outline" className="text-xs flex-shrink-0">
                             {c.filledAreas}/{c.requiredAreas}
@@ -784,7 +784,7 @@ export function ScheduleBuilder({
                             </p>
                           </div>
                           {isComplete ? (
-                            <Check className="h-4 w-4 text-green-500 flex-shrink-0" />
+                            <Check className="h-4 w-4 text-success flex-shrink-0" />
                           ) : (
                             <Badge
                               variant="outline"
@@ -861,7 +861,7 @@ export function ScheduleBuilder({
                           {isRequired && showCount && (
                             <Badge
                               variant="outline"
-                              className={`text-xs ${filledHere < need ? "border-amber-300 text-amber-700 dark:text-amber-400" : ""}`}
+                              className={`text-xs ${filledHere < need ? "border-warning/30 text-warning" : ""}`}
                               title={
                                 capacity !== null
                                   ? `Mínimo ${need}, máximo ${capacity} pessoa(s)`
@@ -883,7 +883,7 @@ export function ScheduleBuilder({
                               onClick={() => setAddingAreaId(isAdding ? null : area.id)}
                               disabled={isToggling || !!loading}
                             >
-                              <Plus className="h-3.5 w-3.5 text-emerald-600" />
+                              <Plus className="h-3.5 w-3.5 text-success" />
                             </Button>
                           )}
                           {/* Excluir/restaurar área */}
@@ -900,7 +900,7 @@ export function ScheduleBuilder({
                             ) : isRequired ? (
                               <CircleMinus className="h-3.5 w-3.5 text-muted-foreground" />
                             ) : (
-                              <CirclePlus className="h-3.5 w-3.5 text-emerald-600" />
+                              <CirclePlus className="h-3.5 w-3.5 text-success" />
                             )}
                           </Button>
                         </div>
@@ -925,10 +925,10 @@ export function ScheduleBuilder({
                                 key={assignment.id}
                                 className={`flex items-center justify-between px-2.5 py-1.5 rounded-md border ${
                                   declined
-                                    ? "border-red-300 bg-red-50 dark:bg-red-950"
+                                    ? "border-destructive/30 bg-destructive/10"
                                     : chipConflicts
-                                      ? "border-amber-400 bg-amber-50 dark:bg-amber-950"
-                                      : "border-green-500 bg-green-50 dark:bg-green-950"
+                                      ? "border-warning/60 bg-warning/10"
+                                      : "border-success/60 bg-success/10"
                                 }`}
                                 title={
                                   declined
@@ -940,28 +940,28 @@ export function ScheduleBuilder({
                               >
                                 <div className="flex items-center gap-1.5 text-sm min-w-0">
                                   {declined ? (
-                                    <X className="h-3 w-3 text-red-500 flex-shrink-0" />
+                                    <X className="h-3 w-3 text-destructive flex-shrink-0" />
                                   ) : assignment.status === "accepted" ? (
-                                    <CheckCheck className="h-3 w-3 text-green-600 flex-shrink-0" aria-label="Confirmou" />
+                                    <CheckCheck className="h-3 w-3 text-success flex-shrink-0" aria-label="Confirmou" />
                                   ) : assignment.notified_at ? (
-                                    <Clock className="h-3 w-3 text-amber-500 flex-shrink-0" aria-label="Aguardando confirmação" />
+                                    <Clock className="h-3 w-3 text-warning flex-shrink-0" aria-label="Aguardando confirmação" />
                                   ) : null}
                                   {chipConflicts && (
-                                    <AlertTriangle className="h-3 w-3 text-amber-500 flex-shrink-0" />
+                                    <AlertTriangle className="h-3 w-3 text-warning flex-shrink-0" />
                                   )}
                                   {(assignment.servant as { is_leader?: boolean } | null)?.is_leader && (
-                                    <Crown className="h-3 w-3 text-yellow-500 flex-shrink-0" />
+                                    <Crown className="h-3 w-3 text-primary flex-shrink-0" />
                                   )}
                                   <span className={`font-medium truncate ${declined ? "line-through text-muted-foreground" : ""}`}>
                                     {(assignment.servant as { name?: string } | null)?.name ?? "—"}
                                   </span>
                                   {declined && (
-                                    <span className="text-xs text-red-700 dark:text-red-400 truncate">
+                                    <span className="text-xs text-destructive truncate">
                                       recusou{declineReason ? `: ${declineReason}` : ""}
                                     </span>
                                   )}
                                   {chipConflicts && (
-                                    <span className="text-xs text-amber-700 dark:text-amber-400 truncate">
+                                    <span className="text-xs text-warning truncate">
                                       também em {describeConflicts(chipConflicts)}
                                     </span>
                                   )}
@@ -1059,35 +1059,35 @@ export function ScheduleBuilder({
                                               {otherAreaName ? (
                                                 <CircleMinus className="h-3 w-3 text-muted-foreground flex-shrink-0" />
                                               ) : !available ? (
-                                                <AlertCircle className="h-3 w-3 text-red-500 flex-shrink-0" />
+                                                <AlertCircle className="h-3 w-3 text-destructive flex-shrink-0" />
                                               ) : conflictOthers ? (
-                                                <AlertTriangle className="h-3 w-3 text-amber-500 flex-shrink-0" />
+                                                <AlertTriangle className="h-3 w-3 text-warning flex-shrink-0" />
                                               ) : responded ? (
-                                                <Check className="h-3 w-3 text-green-500 flex-shrink-0" />
+                                                <Check className="h-3 w-3 text-success flex-shrink-0" />
                                               ) : (
                                                 <HelpCircle className="h-3 w-3 text-muted-foreground flex-shrink-0" />
                                               )}
                                               <span className="flex-1 truncate">
                                                 {servant.name}
                                                 {servant.is_leader && (
-                                                  <Crown className="inline h-3 w-3 text-yellow-500 ml-1 flex-shrink-0" />
+                                                  <Crown className="inline h-3 w-3 text-primary ml-1 flex-shrink-0" />
                                                 )}
                                                 {otherAreaName ? (
                                                   <span className="ml-1 text-xs text-muted-foreground">(já em {otherAreaName})</span>
                                                 ) : !available && reason ? (
                                                   <span className="ml-1 text-xs text-muted-foreground">({reason})</span>
                                                 ) : available && conflictOthers ? (
-                                                  <span className="ml-1 text-xs text-amber-700 dark:text-amber-400">
+                                                  <span className="ml-1 text-xs text-warning">
                                                     (mesmo horário: {describeConflicts(conflictOthers)})
                                                   </span>
                                                 ) : available && overLimit ? (
-                                                  <span className="ml-1 text-xs text-amber-700 dark:text-amber-400">
+                                                  <span className="ml-1 text-xs text-warning">
                                                     (limite de {monthlyLimit}/mês atingido)
                                                   </span>
                                                 ) : null}
                                                 {lateSet.has(servant.id) && (
                                                   <Clock3
-                                                    className="inline h-3 w-3 text-amber-500 ml-1 flex-shrink-0"
+                                                    className="inline h-3 w-3 text-warning ml-1 flex-shrink-0"
                                                     aria-label="Alterou a disponibilidade após o prazo"
                                                   />
                                                 )}
@@ -1199,7 +1199,7 @@ export function ScheduleBuilder({
                   >
                     <div className="flex items-center gap-1.5 min-w-0">
                       {servant.isLeader && (
-                        <Crown className="h-3 w-3 text-yellow-500 flex-shrink-0" />
+                        <Crown className="h-3 w-3 text-primary flex-shrink-0" />
                       )}
                       <span className="text-sm font-medium truncate">
                         {servant.name}
@@ -1213,7 +1213,7 @@ export function ScheduleBuilder({
                     <div className="flex items-center gap-1.5 flex-shrink-0">
                       {servant.late && (
                         <Clock3
-                          className="h-3.5 w-3.5 text-amber-500"
+                          className="h-3.5 w-3.5 text-warning"
                           aria-label="Alterou a disponibilidade após o prazo"
                         />
                       )}
@@ -1222,10 +1222,10 @@ export function ScheduleBuilder({
                           variant="outline"
                           className={`text-xs ${
                             availRatio < 0.5
-                              ? "border-red-300 text-red-600"
+                              ? "border-destructive/30 text-destructive"
                               : availRatio < 0.8
-                              ? "border-amber-300 text-amber-600"
-                              : "border-green-300 text-green-600"
+                              ? "border-warning/30 text-warning"
+                              : "border-success/30 text-success"
                           }`}
                           title={`Disponível em ${servant.availCount} de ${events.length} eventos`}
                         >
@@ -1285,7 +1285,7 @@ export function ScheduleBuilder({
         <DialogContent className="max-w-md">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
-              <AlertTriangle className="h-5 w-5 text-amber-500" />
+              <AlertTriangle className="h-5 w-5 text-warning" />
               Conflito de horário
             </DialogTitle>
             <DialogDescription>
@@ -1376,7 +1376,7 @@ export function ScheduleBuilder({
                           key={event.id}
                           className={`rounded-lg border px-4 py-3 ${
                             !isComplete
-                              ? "border-amber-300 bg-amber-50/60 dark:border-amber-800 dark:bg-amber-950/20"
+                              ? "border-warning/30 bg-warning/10"
                               : "bg-muted/30"
                           }`}
                         >
@@ -1389,9 +1389,9 @@ export function ScheduleBuilder({
                               <span className="font-semibold text-sm">{event.title}</span>
                             </div>
                             {isComplete ? (
-                              <Check className="h-4 w-4 text-green-500 flex-shrink-0" />
+                              <Check className="h-4 w-4 text-success flex-shrink-0" />
                             ) : (
-                              <span className="text-xs font-medium text-amber-600 dark:text-amber-400 flex-shrink-0">
+                              <span className="text-xs font-medium text-warning flex-shrink-0">
                                 {completion.filledAreas}/{completion.requiredAreas} áreas
                               </span>
                             )}
@@ -1418,7 +1418,7 @@ export function ScheduleBuilder({
                                       {areaList.map((a, i) => (
                                         <p key={i} className="text-sm flex items-center gap-1">
                                           {(a.servant as { is_leader?: boolean } | null)?.is_leader && (
-                                            <Crown className="h-3 w-3 text-yellow-500 flex-shrink-0" />
+                                            <Crown className="h-3 w-3 text-primary flex-shrink-0" />
                                           )}
                                           {(a.servant as { name?: string } | null)?.name ?? "—"}
                                         </p>
