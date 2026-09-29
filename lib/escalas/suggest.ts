@@ -13,11 +13,13 @@ import {
  * Preenche as vagas que faltam para atingir o mínimo de cada área, evento a
  * evento em ordem cronológica, escolhendo entre quem é da área, está ativo,
  * não marcou indisponibilidade e não está escalado em outro compromisso no
- * mesmo horário. Critérios, em ordem:
+ * mesmo horário e não atingiu o próprio limite de escalas no mês.
+ * Critérios, em ordem:
  *   1. não servir duas vezes no mesmo dia
- *   2. menos escalas no mês (equilíbrio de carga)
- *   3. quem respondeu a disponibilidade antes de quem não respondeu
- *   4. ordem alfabética (resultado estável)
+ *   2. quem tem a dupla ("servir junto com") já escalada neste evento
+ *   3. menos escalas no mês (equilíbrio de carga)
+ *   4. quem respondeu a disponibilidade antes de quem não respondeu
+ *   5. ordem alfabética (resultado estável)
  * Áreas com menos candidatos são preenchidas primeiro para não esgotá-los.
  */
 
@@ -39,6 +41,10 @@ export interface SuggestServant {
   is_active: boolean
   area_id: string
   servant_areas?: { area_id: string }[]
+  /** Limite de escalas no mês (null = sem limite) */
+  max_per_month?: number | null
+  /** Prefere servir no mesmo evento que esta pessoa */
+  serve_with_servant_id?: string | null
 }
 
 export interface SuggestAssignment {
@@ -100,7 +106,21 @@ export function suggestAssignments(input: {
   }
 
   const eligible = (s: SuggestServant, ev: SuggestEvent) =>
-    !inEvent.has(`${s.id}-${ev.id}`) && !unavailable.has(`${s.id}-${ev.id}`) && !conflicts.has(`${s.id}-${ev.id}`)
+    !inEvent.has(`${s.id}-${ev.id}`) &&
+    !unavailable.has(`${s.id}-${ev.id}`) &&
+    !conflicts.has(`${s.id}-${ev.id}`) &&
+    (s.max_per_month == null || (load.get(s.id) ?? 0) < s.max_per_month)
+
+  // Dupla "servir junto": vale nos dois sentidos (A escolheu B ou B escolheu A)
+  const partnersOf = new Map<string, Set<string>>()
+  for (const s of servants) {
+    if (!s.serve_with_servant_id) continue
+    partnersOf.set(s.id, (partnersOf.get(s.id) ?? new Set()).add(s.serve_with_servant_id))
+    partnersOf.set(s.serve_with_servant_id, (partnersOf.get(s.serve_with_servant_id) ?? new Set()).add(s.id))
+  }
+  const partnerInEvent = (s: SuggestServant, ev: SuggestEvent) =>
+    [...(partnersOf.get(s.id) ?? [])].find((p) => inEvent.has(`${p}-${ev.id}`))
+  const nameOf = new Map(servants.map((s) => [s.id, s.name]))
 
   const proposals: Proposal[] = []
   const unfilled: UnfilledSlot[] = []
@@ -127,6 +147,8 @@ export function suggestAssignments(input: {
           .sort((a, b) => {
             const sameDay = Number(dayLoad.has(`${a.id}-${ev.event_date}`)) - Number(dayLoad.has(`${b.id}-${ev.event_date}`))
             if (sameDay) return sameDay
+            const byPartner = Number(!partnerInEvent(a, ev)) - Number(!partnerInEvent(b, ev))
+            if (byPartner) return byPartner
             const byLoad = (load.get(a.id) ?? 0) - (load.get(b.id) ?? 0)
             if (byLoad) return byLoad
             const byResponse = Number(!responded.has(a.id)) - Number(!responded.has(b.id))
@@ -143,6 +165,8 @@ export function suggestAssignments(input: {
         const notes: string[] = []
         if (!responded.has(pick.id)) notes.push("não respondeu a disponibilidade")
         if (dayLoad.has(`${pick.id}-${ev.event_date}`)) notes.push("já serve neste dia")
+        const partner = partnerInEvent(pick, ev)
+        if (partner) notes.push(`junto com ${nameOf.get(partner) ?? "a dupla"}`)
 
         proposals.push({ event_id: ev.id, area_id: area.id, servant_id: pick.id, notes })
         inEvent.add(`${pick.id}-${ev.id}`)

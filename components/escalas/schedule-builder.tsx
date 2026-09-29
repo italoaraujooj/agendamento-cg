@@ -45,6 +45,7 @@ import {
   LayoutGrid,
   Sparkles,
   Copy as CopyIcon,
+  History,
 } from "lucide-react"
 import { format, parseISO } from "date-fns"
 import { ptBR } from "date-fns/locale"
@@ -67,6 +68,7 @@ import {
 import { suggestAssignments } from "@/lib/escalas/suggest"
 import { ProposalsDialog, type AssignmentProposal } from "@/components/escalas/proposals-dialog"
 import { ScheduleMatrix } from "@/components/escalas/schedule-matrix"
+import { HistoryDialog } from "@/components/escalas/history-dialog"
 
 interface ScheduleBuilderProps {
   periodId: string
@@ -111,7 +113,9 @@ export function ScheduleBuilder({
   const exportRef = useRef<HTMLDivElement>(null)
   // "event": montagem evento a evento; "month": grade do mês (áreas × eventos)
   const [view, setView] = useState<"event" | "month">("event")
+  const [historyOpen, setHistoryOpen] = useState(false)
   const [proposalState, setProposalState] = useState<{
+    source: "suggest" | "copy"
     title: string
     description: string
     proposals: AssignmentProposal[]
@@ -479,6 +483,7 @@ export function ScheduleBuilder({
       return
     }
     setProposalState({
+      source: "suggest",
       title: "Sugestão de escala",
       description:
         "Preenche as vagas que faltam equilibrando quantas vezes cada um serve, respeitando indisponibilidades e conflitos de horário. Revise e desmarque o que não quiser.",
@@ -502,6 +507,7 @@ export function ScheduleBuilder({
         skipped.unmatchedEvent && `${skipped.unmatchedEvent} sem evento equivalente`,
       ].filter(Boolean).join(", ")
       setProposalState({
+        source: "copy",
         title: `Copiar escala de ${prevLabel}`,
         description: `Eventos pareados pelo dia da semana e horário (ex.: 1º domingo 19h).${skippedText ? ` Ficaram de fora: ${skippedText}.` : ""}`,
         proposals: data.proposals,
@@ -568,6 +574,10 @@ export function ScheduleBuilder({
         <Button variant="outline" size="sm" onClick={handleCopyPrevious} disabled={loadingCopy || events.length === 0}>
           {loadingCopy ? <Loader2 className="mr-1.5 h-4 w-4 animate-spin" /> : <CopyIcon className="mr-1.5 h-4 w-4" />}
           Copiar mês anterior
+        </Button>
+        <Button variant="ghost" size="sm" onClick={() => setHistoryOpen(true)}>
+          <History className="mr-1.5 h-4 w-4" />
+          Histórico
         </Button>
       </div>
 
@@ -1001,6 +1011,8 @@ export function ScheduleBuilder({
                                           ? areas.find((a) => a.id === otherAreaId)?.name ?? "outra área"
                                           : null
                                         const conflictOthers = conflictMap.get(`${servant.id}-${selectedEvent.id}`)
+                                        const monthlyLimit = servant.max_per_month ?? null
+                                        const overLimit = monthlyLimit !== null && assignCount >= monthlyLimit
                                         const selectable = available && !otherAreaName
                                         return (
                                           <SelectItem
@@ -1046,6 +1058,10 @@ export function ScheduleBuilder({
                                                 ) : available && conflictOthers ? (
                                                   <span className="ml-1 text-xs text-amber-700 dark:text-amber-400">
                                                     (mesmo horário: {describeConflicts(conflictOthers)})
+                                                  </span>
+                                                ) : available && overLimit ? (
+                                                  <span className="ml-1 text-xs text-amber-700 dark:text-amber-400">
+                                                    (limite de {monthlyLimit}/mês atingido)
                                                   </span>
                                                 ) : null}
                                                 {lateSet.has(servant.id) && (
@@ -1232,7 +1248,15 @@ export function ScheduleBuilder({
         events={events}
         areas={areas}
         servants={servants}
+        source={proposalState?.source}
         onApplied={onAssignmentChange}
+      />
+
+      <HistoryDialog
+        open={historyOpen}
+        onOpenChange={setHistoryOpen}
+        periodId={periodId}
+        events={events}
       />
 
       {/* Confirmação: conflito de horário */}

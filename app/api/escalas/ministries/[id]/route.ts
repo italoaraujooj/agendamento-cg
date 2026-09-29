@@ -52,6 +52,8 @@ export async function GET(
             is_active,
             is_leader,
             area_id,
+            max_per_month,
+            serve_with_servant_id,
             servant_areas(area_id)
           )
         )

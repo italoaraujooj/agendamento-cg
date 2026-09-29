@@ -36,6 +36,8 @@ interface ProposalsDialogProps {
   events: ScheduleEvent[]
   areas: Area[]
   servants: Servant[]
+  /** Origem das propostas, registrada no histórico */
+  source?: "suggest" | "copy"
   onApplied: () => void
 }
 
@@ -53,6 +55,7 @@ export function ProposalsDialog({
   events,
   areas,
   servants,
+  source,
   onApplied,
 }: ProposalsDialogProps) {
   const [selected, setSelected] = useState<Set<string>>(new Set())
@@ -94,6 +97,7 @@ export function ProposalsDialog({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           assignments: chosen.map((p) => ({ schedule_event_id: p.event_id, servant_id: p.servant_id, area_id: p.area_id })),
+          source,
         }),
       })
       const data = await res.json()

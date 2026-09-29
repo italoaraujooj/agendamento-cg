@@ -3,6 +3,7 @@ import { z } from "zod"
 import { requireManagerOf } from "@/lib/escalas/auth"
 import { findMinistryServants } from "@/lib/escalas/availability"
 import { areaCapacity, countByEventArea } from "@/lib/escalas/staffing"
+import { actorFromUser, logAssignmentChanges } from "@/lib/escalas/history"
 
 const schema = z.object({
   assignments: z
@@ -15,7 +16,11 @@ const schema = z.object({
     )
     .min(1)
     .max(500),
+  /** Origem, registrada no histórico */
+  source: z.enum(["suggest", "copy"]).optional(),
 })
+
+const SOURCE_LABEL = { suggest: "sugestão automática", copy: "cópia do mês anterior" } as const
 
 // POST - Cria várias atribuições do período de uma vez (sugestão / cópia do mês anterior).
 // Itens inválidos são ignorados e devolvidos em `skipped` com o motivo.
@@ -85,6 +90,12 @@ export async function POST(
         console.error("Erro ao criar atribuições em lote:", error)
         return NextResponse.json({ error: "Erro ao salvar atribuições" }, { status: 500 })
       }
+      const source = parsed.data.source
+      await logAssignmentChanges(
+        supabase,
+        toInsert.map((a) => ({ ...a, action: "added" as const, details: source ? SOURCE_LABEL[source] : null })),
+        await actorFromUser(supabase, auth.caller.userId)
+      )
     }
 
     return NextResponse.json({ created: toInsert.length, skipped })
