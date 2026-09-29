@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server"
 import { createServerClient } from "@/lib/supabase/server"
 import { requireAuthenticated, requireManagerOf } from "@/lib/escalas/auth"
 import { recordRemovalIfNotified } from "@/lib/escalas/schedule-notifications"
+import { areaCapacity } from "@/lib/escalas/staffing"
 import type { SupabaseClient } from "@supabase/supabase-js"
 import { z } from "zod"
 
@@ -96,6 +97,24 @@ export async function POST(request: NextRequest) {
         .eq("area_id", area_id)
         .select(REMOVED_FIELDS)
       await recordRemovals(supabase, replaced)
+    } else {
+      // Respeita o máximo de pessoas da área (quem recusou não ocupa a vaga)
+      const { data: area } = await supabase.from("areas").select("name, min_servants, max_servants").eq("id", area_id).single()
+      const capacity = area ? areaCapacity(area) : null
+      if (capacity !== null) {
+        const { count } = await supabase
+          .from("schedule_assignments")
+          .select("id", { count: "exact", head: true })
+          .eq("schedule_event_id", schedule_event_id)
+          .eq("area_id", area_id)
+          .neq("status", "declined")
+        if ((count ?? 0) >= capacity) {
+          return NextResponse.json(
+            { error: `${area!.name} já está com o máximo de ${capacity} pessoa(s) neste evento` },
+            { status: 409 }
+          )
+        }
+      }
     }
 
     // Criar nova atribuição
