@@ -17,6 +17,7 @@ import { Checkbox } from "@/components/ui/checkbox"
 import { toast } from "sonner"
 import { maskPhone } from "@/lib/masks"
 import type { Servant, Area, Ministry } from "@/types/escalas"
+import { plural } from "@/lib/plural"
 
 interface ServantWithArea extends Servant {
   area?: Area & { ministry?: Ministry }
@@ -257,7 +258,7 @@ export function ServantForm({ areaId, servant, areas, ministryServants = [], ope
                 )}
                 {!isEditing && allServants.length > 0 && (
                   <p className="text-xs text-muted-foreground">
-                    Digite pelo menos 2 caracteres para buscar entre {allServants.length} servo(s) de outras áreas.
+                    Digite pelo menos 2 caracteres para buscar entre {plural(allServants.length, "servo", "servos")} de outras áreas.
                   </p>
                 )}
               </div>

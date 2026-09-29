@@ -40,6 +40,7 @@ import type {
 import { PERIOD_STATUS_LABELS } from "@/types/escalas"
 import { format } from "date-fns"
 import { ptBR } from "date-fns/locale"
+import { plural } from "@/lib/plural"
 
 interface PeriodWithDetails extends SchedulePeriod {
   ministry: Ministry
@@ -147,8 +148,8 @@ export default function MontarEscalaPage() {
         {
           description: n
             ? [
-                n.sent > 0 ? `${n.sent} servo(s) avisado(s) por e-mail sobre as mudanças.` : "Nenhuma mudança para avisar.",
-                n.failed > 0 ? `${n.failed} e-mail(s) falharam — clique em Atualizar de novo para reenviar.` : null,
+                n.sent > 0 ? `${plural(n.sent, "servo avisado", "servos avisados")} por e-mail sobre as mudanças.` : "Nenhuma mudança para avisar.",
+                n.failed > 0 ? `${plural(n.failed, "e-mail falhou", "e-mails falharam")} — clique em Atualizar de novo para reenviar.` : null,
                 n.withoutEmail.length > 0 ? `Sem e-mail: ${n.withoutEmail.join(", ")}.` : null,
               ].filter(Boolean).join(" ")
             : undefined,
@@ -308,7 +309,7 @@ export default function MontarEscalaPage() {
           <AlertDialogHeader>
             <AlertDialogTitle>Eventos sem preenchimento</AlertDialogTitle>
             <AlertDialogDescription>
-              <strong>{incompleteCount} evento(s)</strong> ainda possuem áreas obrigatórias sem servo atribuído.
+              <strong>{plural(incompleteCount, "evento", "eventos")}</strong> {incompleteCount === 1 ? "ainda possui" : "ainda possuem"} áreas obrigatórias sem servo atribuído.
               <br />
               <br />
               Deseja publicar a escala mesmo assim? Os eventos incompletos ficarão visíveis com as áreas em branco.

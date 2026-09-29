@@ -26,6 +26,7 @@ import { toast } from "sonner"
 import { supabase } from "@/lib/supabase/client"
 import type { RegularEvent, Ministry } from "@/types/escalas"
 import { DAY_OF_WEEK_LABELS, WEEK_OF_MONTH_LABELS } from "@/types/escalas"
+import { plural } from "@/lib/plural"
 
 interface RegularEventFormProps {
   event?: RegularEvent
@@ -230,7 +231,7 @@ export function RegularEventForm({ event, open, onOpenChange, onSuccess }: Regul
           throw new Error(data.error || "Erro ao criar eventos")
         }
 
-        toast.success(`Evento criado e associado a ${formData.ministry_ids.length} ministério(s)!`)
+        toast.success(`Evento criado e associado a ${plural(formData.ministry_ids.length, "ministério", "ministérios")}!`)
         onOpenChange(false)
         onSuccess()
       }
@@ -298,7 +299,7 @@ export function RegularEventForm({ event, open, onOpenChange, onSuccess }: Regul
                   </ScrollArea>
                   {formData.ministry_ids.length > 0 && (
                     <p className="text-xs text-muted-foreground mt-2">
-                      {formData.ministry_ids.length} ministério(s) selecionado(s)
+                      {plural(formData.ministry_ids.length, "ministério selecionado", "ministérios selecionados")}
                     </p>
                   )}
                 </div>

@@ -3,6 +3,7 @@ import { requireManagerOf } from "@/lib/escalas/auth"
 import { countByEventArea, eventCompletion } from "@/lib/escalas/staffing"
 import { notifyPublishedChanges } from "@/lib/escalas/schedule-notifications"
 import { isEmailConfigured } from "@/lib/escalas/email"
+import { plural } from "@/lib/plural"
 
 // POST - Publicar escala
 export async function POST(
@@ -58,7 +59,7 @@ export async function POST(
     if (incompleteEvents.length > 0 && !force) {
       return NextResponse.json(
         {
-          error: `Existem ${incompleteEvents.length} evento(s) com áreas abaixo do mínimo de pessoas.`,
+          error: `${incompleteEvents.length === 1 ? "Existe" : "Existem"} ${plural(incompleteEvents.length, "evento", "eventos")} com áreas abaixo do mínimo de pessoas.`,
           incompleteEvents: incompleteEvents.length,
         },
         { status: 400 }

@@ -70,6 +70,7 @@ import { blockoutFor, blockoutReason, type Blockout } from "@/lib/escalas/blocko
 import { ProposalsDialog, type AssignmentProposal } from "@/components/escalas/proposals-dialog"
 import { ScheduleMatrix } from "@/components/escalas/schedule-matrix"
 import { HistoryDialog } from "@/components/escalas/history-dialog"
+import { plural } from "@/lib/plural"
 
 interface ScheduleBuilderProps {
   periodId: string
@@ -438,8 +439,11 @@ export function ScheduleBuilder({
     }
   }
 
-  const formatEventDate = (dateStr: string) =>
-    format(parseISO(dateStr), "EEE, dd/MM", { locale: ptBR })
+  // Só a primeira letra maiúscula ("Domingo, 06/12")
+  const formatEventDate = (dateStr: string) => {
+    const label = format(parseISO(dateStr), "EEE, dd/MM", { locale: ptBR })
+    return label.charAt(0).toUpperCase() + label.slice(1)
+  }
 
   const handleToggleAreaRequirement = async (event: ScheduleEvent, areaId: string) => {
     const allAreaIds = areas.map((a) => a.id)
@@ -522,9 +526,9 @@ export function ScheduleBuilder({
       const prevLabel = format(new Date(data.previous.year, data.previous.month - 1), "MMMM", { locale: ptBR })
       const skipped = data.skipped as Record<string, number>
       const skippedText = [
-        skipped.unavailable && `${skipped.unavailable} indisponível(is) agora`,
-        skipped.inactiveOrLeftArea && `${skipped.inactiveOrLeftArea} inativo(s) ou fora da área`,
-        skipped.alreadyAssigned && `${skipped.alreadyAssigned} já escalado(s)`,
+        skipped.unavailable && `${plural(skipped.unavailable, "indisponível", "indisponíveis")} agora`,
+        skipped.inactiveOrLeftArea && `${plural(skipped.inactiveOrLeftArea, "inativo", "inativos")} ou fora da área`,
+        skipped.alreadyAssigned && plural(skipped.alreadyAssigned, "já escalado", "já escalados"),
         skipped.unmatchedEvent && `${skipped.unmatchedEvent} sem evento equivalente`,
       ].filter(Boolean).join(", ")
       setProposalState({
@@ -611,7 +615,7 @@ export function ScheduleBuilder({
             title="Servos que recusaram — a vaga precisa de substituto"
           >
             <X className="h-3 w-3" />
-            {declinedCount} recusa(s)
+            {plural(declinedCount, "recusa", "recusas")}
           </Badge>
         )}
         {awaitingCount > 0 && (
@@ -627,7 +631,7 @@ export function ScheduleBuilder({
             title="Pessoas escaladas em outro evento no mesmo horário (inclusive em outros ministérios)"
           >
             <AlertTriangle className="h-3 w-3" />
-            {assignedConflictCount} conflito(s) de horário
+            {plural(assignedConflictCount, "conflito", "conflitos")} de horário
           </Badge>
         )}
         <Button variant="outline" size="sm" onClick={() => setPreviewOpen(true)}>
@@ -670,7 +674,7 @@ export function ScheduleBuilder({
                 {selectedEvent ? (
                   <>
                     <div className="flex items-center justify-center gap-2">
-                      <p className="text-sm font-semibold capitalize">
+                      <p className="text-sm font-semibold first-letter:uppercase">
                         {format(parseISO(selectedEvent.event_date), "EEE, dd/MM", { locale: ptBR })}
                       </p>
                       {(() => {
@@ -789,7 +793,7 @@ export function ScheduleBuilder({
                             <Badge
                               variant="outline"
                               className="text-xs flex-shrink-0"
-                              title={`Faltam ${completion.missingSlots} pessoa(s)`}
+                              title={`${completion.missingSlots === 1 ? "Falta" : "Faltam"} ${plural(completion.missingSlots, "pessoa", "pessoas")}`}
                             >
                               {completion.filledAreas}/{completion.requiredAreas}
                             </Badge>
@@ -812,7 +816,7 @@ export function ScheduleBuilder({
                 <div className="flex items-center gap-3">
                   <Calendar className="h-5 w-5 text-muted-foreground" />
                   <div>
-                    <CardTitle>
+                    <CardTitle className="first-letter:uppercase">
                       {format(parseISO(selectedEvent.event_date), "EEEE, dd 'de' MMMM", {
                         locale: ptBR,
                       })}
@@ -821,7 +825,7 @@ export function ScheduleBuilder({
                       <Clock className="h-4 w-4" />
                       {selectedEvent.event_time.slice(0, 5)} — {selectedEvent.title}
                       <span className="ml-1 text-xs">
-                        · {eventAvailableServantCount.get(selectedEvent.id) ?? 0} servo(s) disponível(is)
+                        · {plural(eventAvailableServantCount.get(selectedEvent.id) ?? 0, "servo disponível", "servos disponíveis")}
                       </span>
                     </p>
                   </div>
@@ -864,8 +868,8 @@ export function ScheduleBuilder({
                               className={`text-xs ${filledHere < need ? "border-warning/30 text-warning" : ""}`}
                               title={
                                 capacity !== null
-                                  ? `Mínimo ${need}, máximo ${capacity} pessoa(s)`
-                                  : `Mínimo ${need} pessoa(s)`
+                                  ? `Mínimo ${need}, máximo ${plural(capacity, "pessoa", "pessoas")}`
+                                  : `Mínimo ${plural(need, "pessoa", "pessoas")}`
                               }
                             >
                               {filledHere}/{capacity !== null && capacity !== need ? `${need}–${capacity}` : need}
@@ -1103,7 +1107,7 @@ export function ScheduleBuilder({
                                                 <Badge
                                                   variant={assignCount > 0 ? "secondary" : "outline"}
                                                   className="text-xs"
-                                                  title={`Atribuído em ${assignCount} evento(s)`}
+                                                  title={`Atribuído em ${plural(assignCount, "evento", "eventos")}`}
                                                 >
                                                   {assignCount}×
                                                 </Badge>
@@ -1244,7 +1248,7 @@ export function ScheduleBuilder({
                       <Badge
                         variant={servant.assignCount > 0 ? "secondary" : "outline"}
                         className="text-xs"
-                        title={`Atribuído em ${servant.assignCount} evento(s)`}
+                        title={`Atribuído em ${plural(servant.assignCount, "evento", "eventos")}`}
                       >
                         ×{servant.assignCount}
                       </Badge>

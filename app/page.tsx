@@ -1,174 +1,68 @@
 import Link from "next/link"
-import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Badge } from "@/components/ui/badge"
-import { Calendar, MapPin, Users, LogIn, ArrowRight, Clock } from "lucide-react"
+import type { LucideIcon } from "lucide-react"
+import { Calendar, CalendarCheck, MapPin, Users, ChevronRight } from "lucide-react"
+
+interface Shortcut {
+  href: string
+  title: string
+  description: string
+  icon: LucideIcon
+  primary?: boolean
+}
+
+const SHORTCUTS: Shortcut[] = [
+  { href: "/booking", title: "Agendar espaço", description: "Reserve um ambiente para seu ministério ou evento", icon: Calendar, primary: true },
+  { href: "/minha-escala", title: "Minha Escala", description: "Veja quando você serve e confirme sua presença", icon: CalendarCheck },
+  { href: "/reservations", title: "Reservas", description: "Agenda de todos os ambientes", icon: Users },
+  { href: "/environments", title: "Ambientes", description: "Espaços disponíveis e capacidades", icon: MapPin },
+]
 
 export default function HomePage() {
   return (
-    <div className="container mx-auto p-6 space-y-8">
-      {/* Header */}
-      <div className="space-y-2">
-        <h1 className="text-3xl font-bold">Sistema de Agendamento de Espaços</h1>
-        <p className="text-muted-foreground">
-          Reserve os espaços da igreja de forma simples e organizada
-        </p>
+    <div className="container mx-auto px-4 py-8 space-y-6 max-w-5xl">
+      <div className="space-y-1">
+        <h1 className="text-2xl sm:text-3xl font-bold">Agendamentos</h1>
+        <p className="text-muted-foreground">Reserve os espaços da igreja e acompanhe sua escala.</p>
       </div>
 
-      {/* Cards de Acesso Rápido */}
-      <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
-        <Card className="hover:shadow-lg transition-shadow">
-          <CardHeader>
-            <div className="flex items-center gap-3">
-              <div className="p-2 rounded-lg bg-brand/15">
-                <Calendar className="h-6 w-6 text-primary" />
-              </div>
-              <div>
-                <CardTitle>Fazer Reserva</CardTitle>
-                <CardDescription>Agende um espaço</CardDescription>
-              </div>
-            </div>
-          </CardHeader>
-          <CardContent>
-            <p className="text-sm text-muted-foreground mb-4">
-              Agende um espaço para seu ministério ou evento da igreja.
-            </p>
-            <Button asChild className="w-full">
-              <Link href="/booking">
-                Agendar Agora
-                <ArrowRight className="ml-2 h-4 w-4" />
-              </Link>
-            </Button>
-          </CardContent>
-        </Card>
-
-        <Card className="hover:shadow-lg transition-shadow">
-          <CardHeader>
-            <div className="flex items-center gap-3">
-              <div className="p-2 rounded-lg bg-brand/15">
-                <MapPin className="h-6 w-6 text-primary" />
-              </div>
-              <div>
-                <CardTitle>Ver Ambientes</CardTitle>
-                <CardDescription>Espaços disponíveis</CardDescription>
-              </div>
-            </div>
-          </CardHeader>
-          <CardContent>
-            <p className="text-sm text-muted-foreground mb-4">
-              Conheça os espaços disponíveis e suas capacidades.
-            </p>
-            <Button asChild variant="outline" className="w-full">
-              <Link href="/environments">
-                Ver Espaços
-                <ArrowRight className="ml-2 h-4 w-4" />
-              </Link>
-            </Button>
-          </CardContent>
-        </Card>
-
-        <Card className="hover:shadow-lg transition-shadow">
-          <CardHeader>
-            <div className="flex items-center gap-3">
-              <div className="p-2 rounded-lg bg-brand/15">
-                <Users className="h-6 w-6 text-primary" />
-              </div>
-              <div>
-                <CardTitle>Ver Reservas</CardTitle>
-                <CardDescription>Agenda completa</CardDescription>
-              </div>
-            </div>
-          </CardHeader>
-          <CardContent>
-            <p className="text-sm text-muted-foreground mb-4">
-              Visualize todas as reservas agendadas nos ambientes.
-            </p>
-            <Button asChild variant="outline" className="w-full">
-              <Link href="/reservations">
-                Ver Agenda
-                <ArrowRight className="ml-2 h-4 w-4" />
-              </Link>
-            </Button>
-          </CardContent>
-        </Card>
-
-        <Card className="hover:shadow-lg transition-shadow">
-          <CardHeader>
-            <div className="flex items-center gap-3">
-              <div className="p-2 rounded-lg bg-brand/15">
-                <LogIn className="h-6 w-6 text-primary" />
-              </div>
-              <div>
-                <CardTitle>Meu Perfil</CardTitle>
-                <CardDescription>Conta e integrações</CardDescription>
-              </div>
-            </div>
-          </CardHeader>
-          <CardContent>
-            <p className="text-sm text-muted-foreground mb-4">
-              Gerencie suas reservas e integrações de calendário.
-            </p>
-            <Button asChild variant="outline" className="w-full">
-              <Link href="/profile">
-                Acessar Perfil
-                <ArrowRight className="ml-2 h-4 w-4" />
-              </Link>
-            </Button>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Seção de Informações */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Clock className="h-5 w-5" />
-            Funcionalidades do Sistema
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-            <div className="space-y-2">
-              <Badge variant="outline" className="mb-2">Simples</Badge>
-              <h4 className="font-medium">Agendamento Rápido</h4>
-              <p className="text-sm text-muted-foreground">
-                Formulário completo com todos os dados necessários para a reserva.
-              </p>
-            </div>
-            <div className="space-y-2">
-              <Badge variant="outline" className="mb-2">Inteligente</Badge>
-              <h4 className="font-medium">Controle de Conflitos</h4>
-              <p className="text-sm text-muted-foreground">
-                Sistema evita sobreposição de horários automaticamente.
-              </p>
-            </div>
-            <div className="space-y-2">
-              <Badge variant="outline" className="mb-2">Organizado</Badge>
-              <h4 className="font-medium">Blocos de 1 Hora</h4>
-              <p className="text-sm text-muted-foreground">
-                Agendamentos organizados em blocos de uma hora.
-              </p>
-            </div>
-            <div className="space-y-2">
-              <Badge variant="outline" className="mb-2">Completo</Badge>
-              <h4 className="font-medium">Visualização Geral</h4>
-              <p className="text-sm text-muted-foreground">
-                Veja reservas por ambiente ou em visão geral.
-              </p>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Link para Política de Privacidade */}
-      <div className="text-center">
-        <p className="text-sm text-muted-foreground">
-          Ao utilizar este sistema, você concorda com nossa{" "}
-          <Link href="/privacy" className="text-primary hover:underline font-medium">
-            Política de Privacidade
+      {/* Atalhos: cartões inteiros clicáveis, em lista no celular e grade no desktop */}
+      <div className="grid gap-3 sm:grid-cols-2">
+        {SHORTCUTS.map(({ href, title, description, icon: Icon, primary }) => (
+          <Link
+            key={href}
+            href={href}
+            className={
+              primary
+                ? "group flex items-center gap-4 rounded-xl p-4 bg-brand text-brand-foreground shadow-sm hover:bg-brand/90 transition-colors"
+                : "group flex items-center gap-4 rounded-xl border bg-card p-4 shadow-sm hover:border-primary/40 hover:bg-muted/40 transition-colors"
+            }
+          >
+            <span
+              className={
+                primary
+                  ? "flex h-11 w-11 shrink-0 items-center justify-center rounded-lg bg-brand-foreground/10"
+                  : "flex h-11 w-11 shrink-0 items-center justify-center rounded-lg bg-brand/15 text-primary"
+              }
+            >
+              <Icon className="h-5 w-5" />
+            </span>
+            <span className="min-w-0 flex-1">
+              <span className="block font-semibold">{title}</span>
+              <span className={primary ? "block text-sm text-brand-foreground/80" : "block text-sm text-muted-foreground"}>
+                {description}
+              </span>
+            </span>
+            <ChevronRight className="h-5 w-5 shrink-0 opacity-60 transition-transform group-hover:translate-x-0.5" />
           </Link>
-        </p>
+        ))}
       </div>
+
+      <p className="text-center text-xs text-muted-foreground">
+        Ao utilizar este sistema, você concorda com nossa{" "}
+        <Link href="/privacy" className="text-primary hover:underline font-medium">
+          Política de Privacidade
+        </Link>
+      </p>
     </div>
   )
 }

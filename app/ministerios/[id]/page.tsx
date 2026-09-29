@@ -48,6 +48,7 @@ import { ServantForm } from "@/components/escalas/servant-form"
 import { toast } from "sonner"
 import Link from "next/link"
 import type { Ministry, Area, Servant } from "@/types/escalas"
+import { plural } from "@/lib/plural"
 
 type ServantWithAreas = Servant & { servant_areas?: { area_id: string }[] }
 
@@ -358,7 +359,7 @@ export default function MinisterioDetalhePage() {
             <div className="border-t mt-4 pt-4">
               <h4 className="text-sm font-medium mb-2 flex items-center gap-2">
                 <Users className="h-4 w-4 text-muted-foreground" />
-                Resumo — {uniqueServantCount} servo(s) no total
+                Resumo — {plural(uniqueServantCount, "servo", "servos")} no total
               </h4>
               <div className="flex flex-wrap gap-2">
                 {ministry.areas
@@ -409,7 +410,7 @@ export default function MinisterioDetalhePage() {
             <div className={ministry?.leader || ministry?.co_leader ? "border-t pt-4" : ""}>
               <h4 className="text-sm font-medium mb-2 flex items-center gap-2">
                 <Users className="h-4 w-4 text-muted-foreground" />
-                Resumo — {uniqueServantCount} servo(s) no total
+                Resumo — {plural(uniqueServantCount, "servo", "servos")} no total
               </h4>
               <div className="flex flex-wrap gap-2">
                 {ministry.areas
@@ -515,7 +516,7 @@ export default function MinisterioDetalhePage() {
                           <div className="flex items-center justify-between">
                             <span className="text-sm font-medium text-muted-foreground">
                               Servos ({activeCount}
-                              {inactiveCount > 0 ? ` + ${inactiveCount} inativo(s)` : ""})
+                              {inactiveCount > 0 ? ` + ${plural(inactiveCount, "inativo", "inativos")}` : ""})
                             </span>
                             {canEdit && (
                               <Button

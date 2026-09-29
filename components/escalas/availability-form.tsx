@@ -452,7 +452,7 @@ export function AvailabilityForm({ periodToken, period, events, initialIdentity 
         .map(([date, dateEvents]) => (
           <Card key={date}>
             <CardHeader className="pb-2">
-              <CardTitle className="text-base capitalize">
+              <CardTitle className="text-base first-letter:uppercase">
                 {formatEventDate(date)}
               </CardTitle>
             </CardHeader>

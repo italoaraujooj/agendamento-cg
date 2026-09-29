@@ -6,6 +6,7 @@ import { ptBR } from "date-fns/locale"
 import { AlertTriangle, CheckCheck, Clock, X } from "lucide-react"
 import type { Area, ScheduleAssignment, ScheduleEvent } from "@/types/escalas"
 import { areaCapacity, areaNeed, isFilling } from "@/lib/escalas/staffing"
+import { plural } from "@/lib/plural"
 
 interface ScheduleMatrixProps {
   events: ScheduleEvent[]
@@ -62,7 +63,7 @@ export function ScheduleMatrix({
                 }`}
               >
                 <button type="button" onClick={() => onSelectCell(e.id)} className="text-left hover:underline">
-                  <span className="block capitalize">
+                  <span className="block first-letter:uppercase">
                     {format(parseISO(e.event_date), "EEE dd/MM", { locale: ptBR })}
                   </span>
                   <span className="block text-xs text-muted-foreground font-normal truncate max-w-[130px]">
@@ -82,7 +83,7 @@ export function ScheduleMatrix({
                 <th className="sticky left-0 z-10 bg-background text-left font-medium px-3 py-2 border-b border-r align-top">
                   {area.name}
                   <span className="block text-xs text-muted-foreground font-normal">
-                    {cap !== null ? (need === cap ? `${need} pessoa(s)` : `${need} a ${cap} pessoas`) : need > 1 ? `mín. ${need}` : ""}
+                    {cap !== null ? (need === cap ? plural(need, "pessoa", "pessoas") : `${need} a ${cap} pessoas`) : need > 1 ? `mín. ${need}` : ""}
                   </span>
                 </th>
                 {sorted.map((e) => {

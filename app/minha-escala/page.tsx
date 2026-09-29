@@ -5,7 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
-import { Loader2, Search, CalendarCheck, Crown, ChevronDown, ChevronUp, Bell } from "lucide-react"
+import { Loader2, Search, CalendarCheck, UserCheck, ChevronDown, ChevronUp, Bell } from "lucide-react"
 import Link from "next/link"
 import { AssignmentResponse, AssignmentStatusBadge } from "@/components/escalas/assignment-response"
 import { Skeleton } from "@/components/ui/skeleton"
@@ -16,6 +16,7 @@ import type { AssignmentStatus } from "@/types/escalas"
 import { format, parseISO } from "date-fns"
 import { ptBR } from "date-fns/locale"
 import { supabase } from "@/lib/supabase/client"
+import { plural } from "@/lib/plural"
 
 /** Hoje no fuso de Brasília (YYYY-MM-DD) */
 const todayBr = () => new Date(Date.now() - 3 * 3600 * 1000).toISOString().slice(0, 10)
@@ -371,12 +372,12 @@ export default function MinhaEscalaPage() {
                                 style={{ backgroundColor: period.ministry.color }}
                               />
                               <div>
-                                <CardTitle className="text-base capitalize">{monthLabel}</CardTitle>
+                                <CardTitle className="text-base first-letter:uppercase">{monthLabel}</CardTitle>
                                 <p className="text-xs text-muted-foreground mt-0.5">
                                   {period.ministry.name}
                                   {myEventsCount > 0 && (
                                     <span className="ml-2 text-primary font-medium">
-                                      · você está em {myEventsCount} evento(s)
+                                      · você está em {plural(myEventsCount, "evento", "eventos")}
                                     </span>
                                   )}
                                 </p>
@@ -450,7 +451,7 @@ export default function MinhaEscalaPage() {
                                               }`}
                                             >
                                               {hasMe && (
-                                                <Crown className="h-3 w-3 text-primary flex-shrink-0 mt-0.5" />
+                                                <UserCheck className="h-3 w-3 text-primary flex-shrink-0 mt-0.5" aria-label="Você" />
                                               )}
                                               <span className={`text-xs flex-shrink-0 mt-0.5 ${hasMe ? "text-primary/70" : "text-muted-foreground/70"}`}>
                                                 {areaName}:
@@ -524,7 +525,7 @@ export default function MinhaEscalaPage() {
                           <div className="min-w-0">
                             <p className="text-sm font-medium truncate">
                               {c.ministry.name} ·{" "}
-                              <span className="capitalize">
+                              <span className="inline-block first-letter:uppercase">
                                 {format(new Date(c.year, c.month - 1), "MMMM", { locale: ptBR })}
                               </span>
                             </p>

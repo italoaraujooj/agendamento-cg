@@ -23,6 +23,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
+import { plural } from "@/lib/plural"
 
 interface Booking {
   id: string
@@ -334,7 +335,7 @@ export default function ReservationsView({ bookings, pastBookings, currentBookin
                       {environment.name}
                     </CardTitle>
                     <CardDescription>
-                      Capacidade: {environment.capacity} pessoas • {envBookings.length} reserva(s) atual(is)/futura(s)
+                      Capacidade: {environment.capacity} pessoas • {plural(envBookings.length, "reserva atual ou futura", "reservas atuais ou futuras")}
                     </CardDescription>
                   </CardHeader>
                   <CardContent>
@@ -367,7 +368,7 @@ export default function ReservationsView({ bookings, pastBookings, currentBookin
                       {environment.name}
                     </CardTitle>
                     <CardDescription>
-                      Capacidade: {environment.capacity} pessoas • {envBookings.length} reserva(s) passada(s)
+                      Capacidade: {environment.capacity} pessoas • {plural(envBookings.length, "reserva passada", "reservas passadas")}
                     </CardDescription>
                   </CardHeader>
                   <CardContent>

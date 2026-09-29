@@ -38,6 +38,7 @@ import { supabase } from "@/lib/supabase/client"
 import { toast } from "sonner"
 import type { RegularEvent, Ministry } from "@/types/escalas"
 import { DAY_OF_WEEK_LABELS, WEEK_OF_MONTH_LABELS } from "@/types/escalas"
+import { plural } from "@/lib/plural"
 
 interface RegularEventWithMinistry extends RegularEvent {
   ministry: Ministry
@@ -378,7 +379,7 @@ export default function CalendarioPage() {
                           ) : (
                             <>
                               <ChevronDown className="mr-1 h-3 w-3" />
-                              Ver mais {dayGroups.length - MAX_VISIBLE_EVENTS} evento(s)
+                              Ver mais {plural(dayGroups.length - MAX_VISIBLE_EVENTS, "evento", "eventos")}
                             </>
                           )}
                         </Button>

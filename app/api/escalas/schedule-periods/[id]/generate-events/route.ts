@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
 import { requireManagerOf } from "@/lib/escalas/auth"
+import { plural } from "@/lib/plural"
 
 // POST - Gerar eventos do calendário regular para o período
 export async function POST(
@@ -26,7 +27,7 @@ export async function POST(
     return NextResponse.json({
       success: true,
       generated: data,
-      message: `${data} evento(s) gerado(s) a partir do calendário regular`,
+      message: `${plural(data ?? 0, "evento gerado", "eventos gerados")} a partir do calendário regular`,
     })
   } catch (error) {
     console.error("Erro na API de geração de eventos:", error)

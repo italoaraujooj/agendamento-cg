@@ -99,7 +99,7 @@ export default function EscalaPessoalPage() {
             style={{ backgroundColor: data.period.ministry?.color || "#888" }}
           />
           <p className="text-sm text-muted-foreground">
-            {data.period.ministry?.name} · <span className="capitalize">{monthLabel}</span>
+            {data.period.ministry?.name} · <span className="inline-block first-letter:uppercase">{monthLabel}</span>
           </p>
         </div>
         <h1 className="text-2xl font-bold">Olá, {data.servant.name.split(" ")[0]}!</h1>
@@ -116,7 +116,7 @@ export default function EscalaPessoalPage() {
         {data.assignments.map((a) => (
           <Card key={a.id}>
             <CardHeader className="pb-2">
-              <CardTitle className="text-base capitalize">
+              <CardTitle className="text-base first-letter:uppercase">
                 {format(parseISO(a.event.event_date), "EEEE, dd 'de' MMMM", { locale: ptBR })}
               </CardTitle>
               <CardDescription>

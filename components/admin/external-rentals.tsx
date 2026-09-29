@@ -54,6 +54,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
 import { Switch } from "@/components/ui/switch"
+import { plural } from "@/lib/plural"
 
 // Tipos
 interface Environment {
@@ -471,7 +472,7 @@ export function ExternalRentalsManager({ userId }: ExternalRentalsManagerProps) 
       }
 
       if (otherConflicts.length > 0) {
-        toast.warning(`Atenção: ${otherConflicts.length} reserva(s) interna(s) em outros ambientes serão bloqueadas por esta locação.`)
+        toast.warning(`Atenção: ${plural(otherConflicts.length, "reserva interna", "reservas internas")} em outros ambientes ${otherConflicts.length === 1 ? "será bloqueada" : "serão bloqueadas"} por esta locação.`)
       }
 
       // Verificar conflito com outras locações externas (exceto a que está sendo editada)
@@ -897,7 +898,7 @@ export function ExternalRentalsManager({ userId }: ExternalRentalsManagerProps) 
               {formatCurrency(calculateTotalRevenue())}
             </p>
             <p className="text-xs text-green-600 dark:text-green-500 mt-1">
-              {payments.filter(p => p.payment_date >= summaryStart && p.payment_date <= summaryEnd).length} pagamento(s)
+              {plural(payments.filter(p => p.payment_date >= summaryStart && p.payment_date <= summaryEnd).length, "pagamento", "pagamentos")}
             </p>
           </CardContent>
         </Card>
@@ -914,7 +915,7 @@ export function ExternalRentalsManager({ userId }: ExternalRentalsManagerProps) 
               {formatCurrency(calculateTotalCosts())}
             </p>
             <p className="text-xs text-red-600 dark:text-red-500 mt-1">
-              {costs.filter(c => c.cost_date >= summaryStart && c.cost_date <= summaryEnd).length} despesa(s)
+              {plural(costs.filter(c => c.cost_date >= summaryStart && c.cost_date <= summaryEnd).length, "despesa", "despesas")}
             </p>
           </CardContent>
         </Card>
@@ -960,7 +961,7 @@ export function ExternalRentalsManager({ userId }: ExternalRentalsManagerProps) 
               {rentals.length}
             </p>
             <p className="text-xs text-purple-600 dark:text-purple-500 mt-1">
-              {rentals.filter(r => r.status === 'confirmed').length} confirmada(s)
+              {plural(rentals.filter(r => r.status === 'confirmed').length, "confirmada", "confirmadas")}
             </p>
           </CardContent>
         </Card>
