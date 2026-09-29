@@ -1,5 +1,5 @@
 import type React from "react"
-import type { Metadata } from "next"
+import type { Metadata, Viewport } from "next"
 import { GeistSans } from "geist/font/sans"
 import { GeistMono } from "geist/font/mono"
 import "./globals.css"
@@ -11,11 +11,28 @@ import { SystemModeProvider } from "@/components/system-mode-provider"
 import { AutoMigrateBookings } from "@/components/auth/auto-migrate"
 import { CompleteProfileModal } from "@/components/auth/complete-profile-modal"
 import { Toaster } from "@/components/ui/sonner"
+import { ServiceWorkerRegister } from "@/components/pwa/service-worker-register"
+import { InstallPrompt } from "@/components/pwa/install-prompt"
 
 export const metadata: Metadata = {
-  title: "Sistema de Agendamento - Igreja Cidade Viva Campina Grande",
-  description: "Sistema para agendamento de espaços",
-  generator: "v0.dev",
+  title: "Cidade Viva CG - Agendamentos e Escalas",
+  description: "Agendamento de espaços e escalas de ministérios da Igreja Cidade Viva Campina Grande",
+  applicationName: "Cidade Viva CG",
+  appleWebApp: {
+    capable: true,
+    title: "Cidade Viva",
+    statusBarStyle: "default",
+  },
+  formatDetection: {
+    telephone: false,
+  },
+}
+
+export const viewport: Viewport = {
+  themeColor: [
+    { media: "(prefers-color-scheme: light)", color: "#fcf8f0" },
+    { media: "(prefers-color-scheme: dark)", color: "#0a0a0a" },
+  ],
 }
 
 export default function RootLayout({
@@ -61,6 +78,8 @@ html {
               </main>
               <Footer />
               <Toaster />
+              <InstallPrompt />
+              <ServiceWorkerRegister />
             </SystemModeProvider>
           </AuthProvider>
         </ThemeProvider>
