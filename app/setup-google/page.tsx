@@ -156,22 +156,22 @@ export default function SetupGooglePage() {
             </div>
 
             {allConfigured ? (
-              <div className="mt-4 p-4 bg-green-50 dark:bg-green-950 border border-green-200 dark:border-green-800 rounded-lg">
-                <div className="flex items-center gap-2 text-green-800 dark:text-green-200">
+              <div className="mt-4 p-4 bg-success/10 border border-success/30 rounded-lg">
+                <div className="flex items-center gap-2 text-success">
                   <CheckCircle className="h-5 w-5" />
                   <span className="font-medium">Todas as variáveis estão configuradas!</span>
                 </div>
-                <p className="text-sm text-green-700 dark:text-green-300 mt-2">
+                <p className="text-sm text-success mt-2">
                   Você pode prosseguir para testar a integração no seu perfil.
                 </p>
               </div>
             ) : (
-              <div className="mt-4 p-4 bg-yellow-50 dark:bg-yellow-950 border border-yellow-200 dark:border-yellow-800 rounded-lg">
-                <div className="flex items-center gap-2 text-yellow-800 dark:text-yellow-200">
+              <div className="mt-4 p-4 bg-warning/10 border border-warning/30 rounded-lg">
+                <div className="flex items-center gap-2 text-warning">
                   <AlertCircle className="h-5 w-5" />
                   <span className="font-medium">Algumas variáveis não estão configuradas</span>
                 </div>
-                <p className="text-sm text-yellow-700 dark:text-yellow-300 mt-2">
+                <p className="text-sm text-warning mt-2">
                   Siga os passos abaixo para completar a configuração.
                 </p>
               </div>
@@ -187,7 +187,7 @@ export default function SetupGooglePage() {
             <Card key={index}>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
-                  <span className="flex items-center justify-center w-8 h-8 bg-blue-600 text-white rounded-full text-sm font-bold">
+                  <span className="flex items-center justify-center w-8 h-8 bg-info text-info-foreground rounded-full text-sm font-bold">
                     {index + 1}
                   </span>
                   {step.title}
@@ -220,7 +220,7 @@ export default function SetupGooglePage() {
                 {step.envVars && (
                   <div className="mb-4">
                     <h4 className="font-medium mb-2">Variáveis de ambiente (.env.local):</h4>
-                    <div className="bg-gray-100 dark:bg-gray-800 p-3 rounded-lg">
+                    <div className="bg-muted p-3 rounded-lg">
                       <code className="text-sm">
                         {step.envVars.join('\n')}
                       </code>
@@ -233,7 +233,7 @@ export default function SetupGooglePage() {
                     <h4 className="font-medium mb-2">Scripts SQL para executar:</h4>
                     <div className="space-y-2">
                       {step.scripts.map((script, scriptIndex) => (
-                        <div key={scriptIndex} className="bg-gray-100 dark:bg-gray-800 p-3 rounded-lg">
+                        <div key={scriptIndex} className="bg-muted p-3 rounded-lg">
                           <code className="text-sm">{script}</code>
                         </div>
                       ))}

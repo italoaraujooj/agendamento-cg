@@ -85,17 +85,17 @@ const parseLocalYmd = (ymd: string): Date => {
 const STATUS_CONFIG = {
   pending: {
     label: 'Pendente',
-    color: 'bg-yellow-100 text-yellow-800 border-yellow-200 dark:bg-yellow-900/30 dark:text-yellow-400 dark:border-yellow-800',
+    color: 'bg-warning/15 text-warning border-warning/30',
     icon: Clock3,
   },
   approved: {
     label: 'Aprovada',
-    color: 'bg-green-100 text-green-800 border-green-200 dark:bg-green-900/30 dark:text-green-400 dark:border-green-800',
+    color: 'bg-success/15 text-success border-success/30',
     icon: CheckCircle,
   },
   rejected: {
     label: 'Rejeitada',
-    color: 'bg-red-100 text-red-800 border-red-200 dark:bg-red-900/30 dark:text-red-400 dark:border-red-800',
+    color: 'bg-destructive/15 text-destructive border-destructive/30',
     icon: XCircle,
   },
 }
@@ -259,9 +259,9 @@ export default function ReservationsView({ bookings, pastBookings, currentBookin
               {currentBookings.length === 0 ? (
                 <Card>
                   <CardContent className="text-center py-12">
-                    <Calendar className="h-16 w-16 text-gray-400 mx-auto mb-4" />
-                    <h3 className="text-xl font-semibold text-gray-700 mb-2">Nenhuma reserva atual/futura</h3>
-                    <p className="text-gray-500">
+                    <Calendar className="h-16 w-16 text-muted-foreground mx-auto mb-4" />
+                    <h3 className="text-xl font-semibold text-foreground mb-2">Nenhuma reserva atual/futura</h3>
+                    <p className="text-muted-foreground">
                       {hasActiveFilters
                         ? "Tente ajustar os filtros ou limpar para ver todas as reservas."
                         : "Não há reservas atuais ou futuras no sistema."}
@@ -286,9 +286,9 @@ export default function ReservationsView({ bookings, pastBookings, currentBookin
               {pastBookings.length === 0 ? (
                 <Card>
                   <CardContent className="text-center py-12">
-                    <History className="h-16 w-16 text-gray-400 mx-auto mb-4" />
-                    <h3 className="text-xl font-semibold text-gray-700 mb-2">Nenhuma reserva passada</h3>
-                    <p className="text-gray-500">
+                    <History className="h-16 w-16 text-muted-foreground mx-auto mb-4" />
+                    <h3 className="text-xl font-semibold text-foreground mb-2">Nenhuma reserva passada</h3>
+                    <p className="text-muted-foreground">
                       {hasActiveFilters
                         ? "Tente ajustar os filtros ou limpar para ver todas as reservas."
                         : "Não há reservas passadas no sistema."}
@@ -340,7 +340,7 @@ export default function ReservationsView({ bookings, pastBookings, currentBookin
                   </CardHeader>
                   <CardContent>
                     {envBookings.length === 0 ? (
-                      <p className="text-gray-500 text-center py-4">Nenhuma reserva atual/futura para este ambiente</p>
+                      <p className="text-muted-foreground text-center py-4">Nenhuma reserva atual/futura para este ambiente</p>
                     ) : (
                       <div className="space-y-3">
                         {envBookings.map((booking) => (
@@ -373,7 +373,7 @@ export default function ReservationsView({ bookings, pastBookings, currentBookin
                   </CardHeader>
                   <CardContent>
                     {envBookings.length === 0 ? (
-                      <p className="text-gray-500 text-center py-4">Nenhuma reserva passada para este ambiente</p>
+                      <p className="text-muted-foreground text-center py-4">Nenhuma reserva passada para este ambiente</p>
                     ) : (
                       <div className="space-y-3">
                         {envBookings.map((booking) => (
@@ -483,7 +483,7 @@ function BookingCard({ booking, compact = false, isPast = false, user, isAuthent
                   </Badge>
                 )}
                 {booking.google_event_id && (
-                  <Badge variant="outline" className="text-xs bg-green-50 text-green-700 border-green-200 dark:bg-green-900/30 dark:text-green-400 dark:border-green-800">
+                  <Badge variant="outline" className="text-xs bg-success/10 text-success border-success/30">
                     📅 Calendar
                   </Badge>
                 )}
@@ -548,17 +548,17 @@ function BookingCard({ booking, compact = false, isPast = false, user, isAuthent
         {booking.review_notes && (
           <div className={`mt-3 p-3 rounded-lg border ${
             status === 'approved' 
-              ? 'bg-green-50 border-green-200 dark:bg-green-900/20 dark:border-green-800' 
+              ? 'bg-success/10 border-success/30' 
               : status === 'rejected'
-              ? 'bg-red-50 border-red-200 dark:bg-red-900/20 dark:border-red-800'
-              : 'bg-yellow-50 border-yellow-200 dark:bg-yellow-900/20 dark:border-yellow-800'
+              ? 'bg-destructive/10 border-destructive/30'
+              : 'bg-warning/10 border-warning/30'
           }`}>
             <p className={`text-sm ${
               status === 'approved' 
-                ? 'text-green-800 dark:text-green-300' 
+                ? 'text-success' 
                 : status === 'rejected'
-                ? 'text-red-800 dark:text-red-300'
-                : 'text-yellow-800 dark:text-yellow-300'
+                ? 'text-destructive'
+                : 'text-warning'
             }`}>
               <strong>Observações:</strong> {booking.review_notes}
             </p>
@@ -567,8 +567,8 @@ function BookingCard({ booking, compact = false, isPast = false, user, isAuthent
 
         {/* Aviso para reservas pendentes */}
         {status === 'pending' && !isPast && (
-          <div className="mt-3 p-3 bg-yellow-50 dark:bg-yellow-900/20 rounded-lg border border-yellow-200 dark:border-yellow-800">
-            <p className="text-sm text-yellow-800 dark:text-yellow-300 flex items-center gap-2">
+          <div className="mt-3 p-3 bg-warning/10 rounded-lg border border-warning/30">
+            <p className="text-sm text-warning flex items-center gap-2">
               <Clock3 className="h-4 w-4" />
               <span>Aguardando aprovação da administração</span>
             </p>
@@ -577,8 +577,8 @@ function BookingCard({ booking, compact = false, isPast = false, user, isAuthent
 
         {/* Aviso para reservas rejeitadas */}
         {status === 'rejected' && (
-          <div className="mt-3 p-3 bg-red-50 dark:bg-red-900/20 rounded-lg border border-red-200 dark:border-red-800">
-            <p className="text-sm text-red-800 dark:text-red-300 flex items-center gap-2">
+          <div className="mt-3 p-3 bg-destructive/10 rounded-lg border border-destructive/30">
+            <p className="text-sm text-destructive flex items-center gap-2">
               <XCircle className="h-4 w-4" />
               <span>Esta reserva foi rejeitada pela administração</span>
             </p>

@@ -12,13 +12,13 @@ function AuthCodeErrorContent() {
   const error = searchParams.get('error')
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-red-50 to-orange-100 dark:from-gray-900 dark:to-gray-800 flex items-center justify-center p-4">
+    <div className="min-h-screen bg-gradient-to-br from-destructive/10 to-warning/5 flex items-center justify-center p-4">
       <Card className="max-w-md w-full">
         <CardHeader className="text-center">
           <div className="flex justify-center mb-4">
-            <AlertTriangle className="h-12 w-12 text-red-500" />
+            <AlertTriangle className="h-12 w-12 text-destructive" />
           </div>
-          <CardTitle className="text-red-700 dark:text-red-400">
+          <CardTitle className="text-destructive">
             Erro na Autenticação
           </CardTitle>
           <CardDescription>
@@ -28,14 +28,14 @@ function AuthCodeErrorContent() {
         
         <CardContent className="space-y-4">
           {error && (
-            <div className="bg-red-50 dark:bg-red-900/20 p-3 rounded-lg">
-              <p className="text-sm text-red-700 dark:text-red-400">
+            <div className="bg-destructive/10 p-3 rounded-lg">
+              <p className="text-sm text-destructive">
                 <strong>Erro:</strong> {error}
               </p>
             </div>
           )}
           
-          <div className="text-sm text-gray-600 dark:text-gray-400">
+          <div className="text-sm text-muted-foreground">
             <p>Possíveis causas:</p>
             <ul className="list-disc list-inside mt-2 space-y-1">
               <li>Configuração OAuth incorreta</li>
@@ -70,13 +70,13 @@ function AuthCodeErrorContent() {
 export default function AuthCodeErrorPage() {
   return (
     <Suspense fallback={
-      <div className="min-h-screen bg-gradient-to-br from-red-50 to-orange-100 dark:from-gray-900 dark:to-gray-800 flex items-center justify-center p-4">
+      <div className="min-h-screen bg-gradient-to-br from-destructive/10 to-warning/5 flex items-center justify-center p-4">
         <Card className="max-w-md w-full">
           <CardHeader className="text-center">
             <div className="flex justify-center mb-4">
-              <AlertTriangle className="h-12 w-12 text-red-500" />
+              <AlertTriangle className="h-12 w-12 text-destructive" />
             </div>
-            <CardTitle className="text-red-700 dark:text-red-400">
+            <CardTitle className="text-destructive">
               Carregando...
             </CardTitle>
           </CardHeader>

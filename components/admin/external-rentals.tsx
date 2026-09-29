@@ -113,10 +113,10 @@ interface RentalCost {
 
 // Configurações de status
 const STATUS_CONFIG = {
-  pending: { label: 'Pendente', color: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400', icon: Clock },
-  confirmed: { label: 'Confirmado', color: 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400', icon: Check },
-  completed: { label: 'Realizado', color: 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400', icon: Check },
-  cancelled: { label: 'Cancelado', color: 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400', icon: X },
+  pending: { label: 'Pendente', color: 'bg-warning/15 text-warning', icon: Clock },
+  confirmed: { label: 'Confirmado', color: 'bg-info/15 text-info', icon: Check },
+  completed: { label: 'Realizado', color: 'bg-success/15 text-success', icon: Check },
+  cancelled: { label: 'Cancelado', color: 'bg-destructive/15 text-destructive', icon: X },
 }
 
 const PAYMENT_METHODS = {
@@ -130,15 +130,15 @@ const PAYMENT_METHODS = {
 }
 
 const COST_CATEGORIES = {
-  cleaning: { label: 'Limpeza', color: 'bg-blue-100 text-blue-800' },
-  maintenance: { label: 'Manutenção', color: 'bg-orange-100 text-orange-800' },
-  utilities: { label: 'Utilidades', color: 'bg-yellow-100 text-yellow-800' },
-  supplies: { label: 'Suprimentos', color: 'bg-green-100 text-green-800' },
-  staff: { label: 'Pessoal', color: 'bg-purple-100 text-purple-800' },
-  marketing: { label: 'Marketing', color: 'bg-pink-100 text-pink-800' },
-  taxes: { label: 'Impostos', color: 'bg-red-100 text-red-800' },
-  insurance: { label: 'Seguro', color: 'bg-indigo-100 text-indigo-800' },
-  other: { label: 'Outros', color: 'bg-gray-100 text-gray-800' },
+  cleaning: { label: 'Limpeza', color: 'bg-info/15 text-info' },
+  maintenance: { label: 'Manutenção', color: 'bg-warning/15 text-warning' },
+  utilities: { label: 'Utilidades', color: 'bg-warning/15 text-warning' },
+  supplies: { label: 'Suprimentos', color: 'bg-success/15 text-success' },
+  staff: { label: 'Pessoal', color: 'bg-brand/15 text-primary' },
+  marketing: { label: 'Marketing', color: 'bg-pink-100 text-pink-800 dark:bg-pink-950 dark:text-pink-300' },
+  taxes: { label: 'Impostos', color: 'bg-destructive/15 text-destructive' },
+  insurance: { label: 'Seguro', color: 'bg-indigo-100 text-indigo-800 dark:bg-indigo-950 dark:text-indigo-300' },
+  other: { label: 'Outros', color: 'bg-muted text-foreground' },
 }
 
 interface ExternalRentalsManagerProps {
@@ -838,7 +838,7 @@ export function ExternalRentalsManager({ userId }: ExternalRentalsManagerProps) 
     return (
       <Card className="p-8">
         <div className="text-center">
-          <AlertTriangle className="h-16 w-16 text-yellow-500 mx-auto mb-4" />
+          <AlertTriangle className="h-16 w-16 text-primary mx-auto mb-4" />
           <h3 className="text-xl font-semibold mb-2">Configuração Necessária</h3>
           <p className="text-muted-foreground mb-4 max-w-lg mx-auto">
             As tabelas de locações externas ainda não foram criadas no banco de dados. 
@@ -886,48 +886,48 @@ export function ExternalRentalsManager({ userId }: ExternalRentalsManagerProps) 
 
       {/* Cards de Resumo Financeiro */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <Card className="bg-gradient-to-br from-green-50 to-emerald-50 dark:from-green-950/30 dark:to-emerald-950/30 border-green-200 dark:border-green-800">
+        <Card className="bg-gradient-to-br from-success/10 to-success/5 border-success/30">
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-green-800 dark:text-green-300 flex items-center gap-2">
+            <CardTitle className="text-sm font-medium text-success flex items-center gap-2">
               <ArrowUpCircle className="h-4 w-4" />
               Total Recebido
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <p className="text-2xl font-bold text-green-700 dark:text-green-400">
+            <p className="text-2xl font-bold text-success">
               {formatCurrency(calculateTotalRevenue())}
             </p>
-            <p className="text-xs text-green-600 dark:text-green-500 mt-1">
+            <p className="text-xs text-success mt-1">
               {plural(payments.filter(p => p.payment_date >= summaryStart && p.payment_date <= summaryEnd).length, "pagamento", "pagamentos")}
             </p>
           </CardContent>
         </Card>
 
-        <Card className="bg-gradient-to-br from-red-50 to-rose-50 dark:from-red-950/30 dark:to-rose-950/30 border-red-200 dark:border-red-800">
+        <Card className="bg-gradient-to-br from-destructive/10 to-destructive/5 border-destructive/30">
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-red-800 dark:text-red-300 flex items-center gap-2">
+            <CardTitle className="text-sm font-medium text-destructive flex items-center gap-2">
               <ArrowDownCircle className="h-4 w-4" />
               Total de Custos
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <p className="text-2xl font-bold text-red-700 dark:text-red-400">
+            <p className="text-2xl font-bold text-destructive">
               {formatCurrency(calculateTotalCosts())}
             </p>
-            <p className="text-xs text-red-600 dark:text-red-500 mt-1">
+            <p className="text-xs text-destructive mt-1">
               {plural(costs.filter(c => c.cost_date >= summaryStart && c.cost_date <= summaryEnd).length, "despesa", "despesas")}
             </p>
           </CardContent>
         </Card>
 
         <Card className={`bg-gradient-to-br ${calculateNetBalance() >= 0 
-          ? 'from-blue-50 to-indigo-50 dark:from-blue-950/30 dark:to-indigo-950/30 border-blue-200 dark:border-blue-800' 
-          : 'from-orange-50 to-amber-50 dark:from-orange-950/30 dark:to-amber-950/30 border-orange-200 dark:border-orange-800'
+          ? 'from-info/10 to-info/5 border-info/30' 
+          : 'from-warning/10 to-warning/5 border-warning/30'
         }`}>
           <CardHeader className="pb-2">
             <CardTitle className={`text-sm font-medium flex items-center gap-2 ${calculateNetBalance() >= 0 
-              ? 'text-blue-800 dark:text-blue-300' 
-              : 'text-orange-800 dark:text-orange-300'
+              ? 'text-info' 
+              : 'text-warning'
             }`}>
               <Wallet className="h-4 w-4" />
               Saldo
@@ -935,32 +935,32 @@ export function ExternalRentalsManager({ userId }: ExternalRentalsManagerProps) 
           </CardHeader>
           <CardContent>
             <p className={`text-2xl font-bold ${calculateNetBalance() >= 0 
-              ? 'text-blue-700 dark:text-blue-400' 
-              : 'text-orange-700 dark:text-orange-400'
+              ? 'text-info' 
+              : 'text-warning'
             }`}>
               {formatCurrency(calculateNetBalance())}
             </p>
             <p className={`text-xs mt-1 ${calculateNetBalance() >= 0 
-              ? 'text-blue-600 dark:text-blue-500' 
-              : 'text-orange-600 dark:text-orange-500'
+              ? 'text-info' 
+              : 'text-warning'
             }`}>
               Receitas - Despesas
             </p>
           </CardContent>
         </Card>
 
-        <Card className="bg-gradient-to-br from-purple-50 to-violet-50 dark:from-purple-950/30 dark:to-violet-950/30 border-purple-200 dark:border-purple-800">
+        <Card className="bg-gradient-to-br from-brand/10 to-brand/5 border-primary/30">
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-purple-800 dark:text-purple-300 flex items-center gap-2">
+            <CardTitle className="text-sm font-medium text-primary flex items-center gap-2">
               <Building className="h-4 w-4" />
               Total de Locações
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <p className="text-2xl font-bold text-purple-700 dark:text-purple-400">
+            <p className="text-2xl font-bold text-primary">
               {rentals.length}
             </p>
-            <p className="text-xs text-purple-600 dark:text-purple-500 mt-1">
+            <p className="text-xs text-primary mt-1">
               {plural(rentals.filter(r => r.status === 'confirmed').length, "confirmada", "confirmadas")}
             </p>
           </CardContent>
@@ -1040,7 +1040,7 @@ export function ExternalRentalsManager({ userId }: ExternalRentalsManagerProps) 
                               {STATUS_CONFIG[rental.status].label}
                             </Badge>
                             {rental.blocks_all_environments && (
-                              <Badge variant="outline" className="text-xs text-amber-600 border-amber-300 bg-amber-50 dark:bg-amber-950/30">
+                              <Badge variant="outline" className="text-xs text-warning border-warning/30 bg-warning/10">
                                 Bloqueia todos os ambientes
                               </Badge>
                             )}
@@ -1067,7 +1067,7 @@ export function ExternalRentalsManager({ userId }: ExternalRentalsManagerProps) 
                           <Button 
                             variant="outline" 
                             size="sm"
-                            className="text-red-600 hover:text-red-700"
+                            className="text-destructive hover:text-destructive"
                             onClick={() => setDeleteDialog({ open: true, type: 'rental', id: rental.id })}
                           >
                             <Trash2 className="h-4 w-4" />
@@ -1110,7 +1110,7 @@ export function ExternalRentalsManager({ userId }: ExternalRentalsManagerProps) 
                           {rental.discount > 0 && (
                             <div className="flex justify-between items-center text-sm">
                               <span className="text-muted-foreground">Desconto:</span>
-                              <span className="text-red-600">-{formatCurrency(rental.discount)}</span>
+                              <span className="text-destructive">-{formatCurrency(rental.discount)}</span>
                             </div>
                           )}
                           <div className="flex justify-between items-center text-sm font-semibold border-t pt-2">
@@ -1120,11 +1120,11 @@ export function ExternalRentalsManager({ userId }: ExternalRentalsManagerProps) 
                           <div className="space-y-1">
                             <div className="flex justify-between items-center text-sm">
                               <span className="text-muted-foreground">Pago:</span>
-                              <span className="text-green-600">{formatCurrency(totalPaid)} / {formatCurrency(rental.final_value)}</span>
+                              <span className="text-success">{formatCurrency(totalPaid)} / {formatCurrency(rental.final_value)}</span>
                             </div>
                             <div className="h-1.5 rounded-full bg-muted overflow-hidden">
                               <div
-                                className={`h-1.5 rounded-full transition-all ${paymentProgress >= 100 ? 'bg-green-500' : 'bg-amber-500'}`}
+                                className={`h-1.5 rounded-full transition-all ${paymentProgress >= 100 ? 'bg-success' : 'bg-warning'}`}
                                 style={{ width: `${paymentProgress}%` }}
                               />
                             </div>
@@ -1132,7 +1132,7 @@ export function ExternalRentalsManager({ userId }: ExternalRentalsManagerProps) 
                           {pendingBalance > 0 && (
                             <div className="flex justify-between items-center text-sm">
                               <span className="text-muted-foreground">Pendente:</span>
-                              <span className="text-orange-600 font-medium">{formatCurrency(pendingBalance)}</span>
+                              <span className="text-warning font-medium">{formatCurrency(pendingBalance)}</span>
                             </div>
                           )}
                         </div>
@@ -1161,7 +1161,7 @@ export function ExternalRentalsManager({ userId }: ExternalRentalsManagerProps) 
                           <Button 
                             variant="outline" 
                             size="sm"
-                            className="text-blue-600"
+                            className="text-info"
                             onClick={() => updateRentalStatus(rental.id, 'confirmed')}
                           >
                             <Check className="h-4 w-4 mr-1" />
@@ -1173,7 +1173,7 @@ export function ExternalRentalsManager({ userId }: ExternalRentalsManagerProps) 
                           <Button 
                             variant="outline" 
                             size="sm"
-                            className="text-green-600"
+                            className="text-success"
                             onClick={() => updateRentalStatus(rental.id, 'completed')}
                           >
                             <Check className="h-4 w-4 mr-1" />
@@ -1185,7 +1185,7 @@ export function ExternalRentalsManager({ userId }: ExternalRentalsManagerProps) 
                           <Button 
                             variant="outline" 
                             size="sm"
-                            className="text-red-600"
+                            className="text-destructive"
                             onClick={() => updateRentalStatus(rental.id, 'cancelled')}
                           >
                             <X className="h-4 w-4 mr-1" />
@@ -1229,8 +1229,8 @@ export function ExternalRentalsManager({ userId }: ExternalRentalsManagerProps) 
                   <Card key={payment.id} className="p-4">
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-4">
-                        <div className="p-2 bg-green-100 dark:bg-green-900/30 rounded-lg">
-                          <PaymentIcon className="h-5 w-5 text-green-600 dark:text-green-400" />
+                        <div className="p-2 bg-success/15 rounded-lg">
+                          <PaymentIcon className="h-5 w-5 text-success" />
                         </div>
                         <div>
                           <p className="font-medium">{rental?.renter_name || 'Locação não encontrada'}</p>
@@ -1241,13 +1241,13 @@ export function ExternalRentalsManager({ userId }: ExternalRentalsManagerProps) 
                         </div>
                       </div>
                       <div className="flex items-center gap-4">
-                        <span className="text-lg font-bold text-green-600">
+                        <span className="text-lg font-bold text-success">
                           +{formatCurrency(payment.amount)}
                         </span>
                         <Button
                           variant="ghost"
                           size="sm"
-                          className="text-red-600"
+                          className="text-destructive"
                           onClick={() => setDeleteDialog({ open: true, type: 'payment', id: payment.id })}
                         >
                           <Trash2 className="h-4 w-4" />
@@ -1289,8 +1289,8 @@ export function ExternalRentalsManager({ userId }: ExternalRentalsManagerProps) 
                   <Card key={cost.id} className="p-4">
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-4">
-                        <div className="p-2 bg-red-100 dark:bg-red-900/30 rounded-lg">
-                          <ArrowDownCircle className="h-5 w-5 text-red-600 dark:text-red-400" />
+                        <div className="p-2 bg-destructive/15 rounded-lg">
+                          <ArrowDownCircle className="h-5 w-5 text-destructive" />
                         </div>
                         <div>
                           <div className="flex items-center gap-2">
@@ -1307,13 +1307,13 @@ export function ExternalRentalsManager({ userId }: ExternalRentalsManagerProps) 
                         </div>
                       </div>
                       <div className="flex items-center gap-4">
-                        <span className="text-lg font-bold text-red-600">
+                        <span className="text-lg font-bold text-destructive">
                           -{formatCurrency(cost.amount)}
                         </span>
                         <Button
                           variant="ghost"
                           size="sm"
-                          className="text-red-600"
+                          className="text-destructive"
                           onClick={() => setDeleteDialog({ open: true, type: 'cost', id: cost.id })}
                         >
                           <Trash2 className="h-4 w-4" />
@@ -1374,7 +1374,7 @@ export function ExternalRentalsManager({ userId }: ExternalRentalsManagerProps) 
               </div>
 
               {/* Bloqueio de ambientes */}
-              <div className="flex items-center gap-3 p-3 rounded-lg border bg-amber-50 dark:bg-amber-950/20 border-amber-200 dark:border-amber-800">
+              <div className="flex items-center gap-3 p-3 rounded-lg border bg-warning/10 border-warning/30">
                 <Switch
                   id="blocks_all"
                   checked={rentalForm.blocks_all_environments}
@@ -1537,7 +1537,7 @@ export function ExternalRentalsManager({ userId }: ExternalRentalsManagerProps) 
                   </div>
                   <div className="space-y-2">
                     <Label>Valor Final</Label>
-                    <div className="h-10 px-3 py-2 bg-muted rounded-md flex items-center font-semibold text-green-600">
+                    <div className="h-10 px-3 py-2 bg-muted rounded-md flex items-center font-semibold text-success">
                       {formatCurrency((parseFloat(rentalForm.total_value) || 0) - (parseFloat(rentalForm.discount) || 0))}
                     </div>
                   </div>
@@ -1840,7 +1840,7 @@ export function ExternalRentalsManager({ userId }: ExternalRentalsManagerProps) 
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle className="flex items-center gap-2">
-              <AlertTriangle className="h-5 w-5 text-red-500" />
+              <AlertTriangle className="h-5 w-5 text-destructive" />
               Confirmar Exclusão
             </AlertDialogTitle>
             <AlertDialogDescription>
@@ -1849,7 +1849,7 @@ export function ExternalRentalsManager({ userId }: ExternalRentalsManagerProps) 
                 deleteDialog.type === 'payment' ? 'pagamento' : 'custo'
               }? Esta ação não pode ser desfeita.
               {deleteDialog.type === 'rental' && (
-                <span className="block mt-2 text-red-600">
+                <span className="block mt-2 text-destructive">
                   ⚠️ Todos os pagamentos vinculados a esta locação também serão excluídos.
                 </span>
               )}
@@ -1859,7 +1859,7 @@ export function ExternalRentalsManager({ userId }: ExternalRentalsManagerProps) 
             <AlertDialogCancel>Cancelar</AlertDialogCancel>
             <AlertDialogAction
               onClick={handleDelete}
-              className="bg-red-600 hover:bg-red-700"
+              className="bg-destructive hover:bg-destructive/90"
             >
               Excluir
             </AlertDialogAction>

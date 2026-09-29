@@ -174,30 +174,30 @@ const PERMISSION_LABELS: Record<string, string> = {
 const ROLE_CONFIG = {
   user: {
     label: "Usuário",
-    color: "bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-300",
+    color: "bg-muted text-foreground",
     icon: User,
   },
   ministry_leader: {
     label: "Líder de Ministério",
-    color: "bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400",
+    color: "bg-info/15 text-info",
     icon: UserCheck,
   },
   admin: {
     label: "Administrador",
-    color: "bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-400",
+    color: "bg-brand/15 text-primary",
     icon: Shield,
   },
 }
 
 const MINISTRY_ROLE_CONFIG = {
-  leader: { label: "Líder Principal", color: "bg-amber-100 text-amber-800" },
-  coordinator: { label: "Coordenador", color: "bg-blue-100 text-blue-800" },
-  helper: { label: "Auxiliar", color: "bg-green-100 text-green-800" },
+  leader: { label: "Líder Principal", color: "bg-warning/15 text-warning" },
+  coordinator: { label: "Coordenador", color: "bg-info/15 text-info" },
+  helper: { label: "Auxiliar", color: "bg-success/15 text-success" },
 }
 
 const PROVIDER_CONFIG: Record<string, { label: string; color: string }> = {
-  google: { label: "Google", color: "bg-red-100 text-red-700" },
-  email: { label: "Email", color: "bg-gray-100 text-gray-700" },
+  google: { label: "Google", color: "bg-destructive/15 text-destructive" },
+  email: { label: "Email", color: "bg-muted text-foreground" },
 }
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -710,39 +710,39 @@ export default function AdminUsuariosPage() {
           </CardContent>
         </Card>
 
-        <Card className="bg-gradient-to-br from-purple-50 to-violet-50 dark:from-purple-950/30 dark:to-violet-950/30">
+        <Card className="bg-gradient-to-br from-brand/10 to-brand/5">
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-purple-700 dark:text-purple-300 flex items-center gap-2">
+            <CardTitle className="text-sm font-medium text-primary flex items-center gap-2">
               <Shield className="h-4 w-4" />
               Administradores
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <p className="text-3xl font-bold text-purple-700 dark:text-purple-400">{stats.admins}</p>
+            <p className="text-3xl font-bold text-primary">{stats.admins}</p>
           </CardContent>
         </Card>
 
-        <Card className="bg-gradient-to-br from-blue-50 to-indigo-50 dark:from-blue-950/30 dark:to-indigo-950/30">
+        <Card className="bg-gradient-to-br from-info/10 to-info/5">
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-blue-700 dark:text-blue-300 flex items-center gap-2">
+            <CardTitle className="text-sm font-medium text-info flex items-center gap-2">
               <Crown className="h-4 w-4" />
               Líderes de Ministério
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <p className="text-3xl font-bold text-blue-700 dark:text-blue-400">{stats.leaders}</p>
+            <p className="text-3xl font-bold text-info">{stats.leaders}</p>
           </CardContent>
         </Card>
 
-        <Card className="bg-gradient-to-br from-red-50 to-rose-50 dark:from-red-950/30 dark:to-rose-950/30">
+        <Card className="bg-gradient-to-br from-destructive/10 to-destructive/5">
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-red-700 dark:text-red-300 flex items-center gap-2">
+            <CardTitle className="text-sm font-medium text-destructive flex items-center gap-2">
               <UserX className="h-4 w-4" />
               Desativados
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <p className="text-3xl font-bold text-red-700 dark:text-red-400">{stats.inactive}</p>
+            <p className="text-3xl font-bold text-destructive">{stats.inactive}</p>
           </CardContent>
         </Card>
       </div>
@@ -816,13 +816,13 @@ export default function AdminUsuariosPage() {
                             {roleConfig.label}
                           </Badge>
                           {banned && (
-                            <Badge variant="outline" className="bg-red-100 text-red-700 border-red-200">
+                            <Badge variant="outline" className="bg-destructive/15 text-destructive border-destructive/30">
                               <UserX className="h-3 w-3 mr-1" />
                               Desativado
                             </Badge>
                           )}
                           {!user.profile_completed && (
-                            <Badge variant="outline" className="bg-amber-50 text-amber-700 border-amber-200 text-xs">
+                            <Badge variant="outline" className="bg-warning/10 text-warning border-warning/30 text-xs">
                               <AlertCircle className="h-3 w-3 mr-1" />
                               Perfil incompleto
                             </Badge>
@@ -841,7 +841,7 @@ export default function AdminUsuariosPage() {
                             </span>
                           )}
                           {user.providers?.map((p) => {
-                            const cfg = PROVIDER_CONFIG[p] || { label: p, color: "bg-gray-100 text-gray-700" }
+                            const cfg = PROVIDER_CONFIG[p] || { label: p, color: "bg-muted text-foreground" }
                             return (
                               <Badge key={p} variant="secondary" className={`text-xs ${cfg.color}`}>
                                 {cfg.label}
@@ -878,9 +878,9 @@ export default function AdminUsuariosPage() {
                         )}
                         {user.permissions?.length > 0 && !user.is_admin && (
                           <div className="flex items-center gap-2 mt-1 flex-wrap">
-                            <ShieldCheck className="h-3 w-3 text-emerald-600" />
+                            <ShieldCheck className="h-3 w-3 text-success" />
                             {user.permissions.map((p) => (
-                              <Badge key={p} variant="outline" className="text-xs text-emerald-700 border-emerald-200 bg-emerald-50 dark:bg-emerald-950/20 dark:text-emerald-400 dark:border-emerald-800">
+                              <Badge key={p} variant="outline" className="text-xs text-success border-success/30 bg-success/10">
                                 {PERMISSION_LABELS[p] ?? p}
                               </Badge>
                             ))}
@@ -912,7 +912,7 @@ export default function AdminUsuariosPage() {
                         </DropdownMenuItem>
                         {!isSelf && !user.is_admin && (
                           <DropdownMenuItem
-                            className={banned ? "text-green-600 focus:text-green-600" : "text-red-600 focus:text-red-600"}
+                            className={banned ? "text-success focus:text-success" : "text-destructive focus:text-destructive"}
                             onClick={() => setStatusDialog({ open: true, user })}
                           >
                             {banned ? (
@@ -958,7 +958,7 @@ export default function AdminUsuariosPage() {
                       <Button
                         size="icon"
                         variant="ghost"
-                        className="h-6 w-6 shrink-0 text-green-600 hover:text-green-700"
+                        className="h-6 w-6 shrink-0 text-success hover:text-success"
                         onClick={handleSaveName}
                         disabled={isSavingName}
                         aria-label={isSavingName ? "Salvando..." : "Salvar nome"}
@@ -1062,14 +1062,14 @@ export default function AdminUsuariosPage() {
                       </div>
                       <div>
                         <p className="text-muted-foreground text-xs">Email confirmado</p>
-                        <p>{editingUser.email_confirmed_at ? "Sim" : <span className="text-amber-600">Não</span>}</p>
+                        <p>{editingUser.email_confirmed_at ? "Sim" : <span className="text-warning">Não</span>}</p>
                       </div>
                       <div>
                         <p className="text-muted-foreground text-xs">Provedores</p>
                         <div className="flex gap-1 flex-wrap mt-0.5">
                           {editingUser.providers?.length > 0
                             ? editingUser.providers.map((p) => {
-                                const cfg = PROVIDER_CONFIG[p] || { label: p, color: "bg-gray-100 text-gray-700" }
+                                const cfg = PROVIDER_CONFIG[p] || { label: p, color: "bg-muted text-foreground" }
                                 return <Badge key={p} variant="secondary" className={`text-xs ${cfg.color}`}>{cfg.label}</Badge>
                               })
                             : <span className="text-muted-foreground">—</span>
@@ -1102,8 +1102,8 @@ export default function AdminUsuariosPage() {
                         size="sm"
                         className={`w-full justify-start ${
                           isUserBanned(editingUser.banned_until)
-                            ? "text-green-600 border-green-200 hover:bg-green-50"
-                            : "text-red-600 border-red-200 hover:bg-red-50"
+                            ? "text-success border-success/30 hover:bg-success/10"
+                            : "text-destructive border-destructive/30 hover:bg-destructive/10"
                         }`}
                         onClick={() => setStatusDialog({ open: true, user: editingUser })}
                       >
@@ -1120,10 +1120,10 @@ export default function AdminUsuariosPage() {
                 {/* ── Aba Acesso ───────────────────────────────────────── */}
                 <TabsContent value="permissions" className="space-y-5">
                   {editingUser.is_admin ? (
-                    <div className="rounded-lg border border-purple-200 bg-purple-50 dark:bg-purple-950/20 p-4 flex items-start gap-3">
-                      <Shield className="h-5 w-5 text-purple-600 dark:text-purple-400 shrink-0 mt-0.5" />
+                    <div className="rounded-lg border border-primary/30 bg-brand/10 p-4 flex items-start gap-3">
+                      <Shield className="h-5 w-5 text-primary shrink-0 mt-0.5" />
                       <div>
-                        <p className="text-sm font-semibold text-purple-800 dark:text-purple-300">Acesso total</p>
+                        <p className="text-sm font-semibold text-primary">Acesso total</p>
                         <p className="text-xs text-muted-foreground mt-0.5">
                           Administradores têm acesso completo a todos os módulos. Remova o role de administrador para configurar permissões individuais.
                         </p>
@@ -1141,7 +1141,7 @@ export default function AdminUsuariosPage() {
                                 <p className="text-xs text-muted-foreground">{description}</p>
                               </div>
                               {activeCount > 0 && (
-                                <Badge className="text-xs bg-emerald-100 text-emerald-700 dark:bg-emerald-950/30 dark:text-emerald-400 border-0">
+                                <Badge className="text-xs bg-success/15 text-success border-0">
                                   {activeCount}/{permissions.length} ativo{activeCount !== 1 ? "s" : ""}
                                 </Badge>
                               )}
@@ -1210,7 +1210,7 @@ export default function AdminUsuariosPage() {
                           <Button
                             variant="ghost"
                             size="icon"
-                            className="text-red-500 hover:text-red-700 hover:bg-red-50 h-8 w-8"
+                            className="text-destructive hover:text-destructive hover:bg-destructive/10 h-8 w-8"
                             onClick={() => setRemoveMinistryDialog({
                               open: true,
                               roleId: mr.id,
@@ -1316,7 +1316,7 @@ export default function AdminUsuariosPage() {
                               <Button
                                 variant="ghost"
                                 size="icon"
-                                className="text-red-500 hover:text-red-700 hover:bg-red-50 h-8 w-8"
+                                className="text-destructive hover:text-destructive hover:bg-destructive/10 h-8 w-8"
                                 onClick={() => setUnlinkServantDialog({ open: true, servantId: s.id, servantName: s.name })}
                               >
                                 <Link2Off className="h-4 w-4" />
@@ -1347,7 +1347,7 @@ export default function AdminUsuariosPage() {
                                 {suggested.map((s) => (
                                   <div
                                     key={s.id}
-                                    className="flex items-center justify-between p-2 rounded-md border border-amber-200 bg-amber-50 dark:bg-amber-950/20"
+                                    className="flex items-center justify-between p-2 rounded-md border border-warning/30 bg-warning/10"
                                   >
                                     <div>
                                       <p className="text-sm font-medium">{s.name}</p>
@@ -1420,7 +1420,7 @@ export default function AdminUsuariosPage() {
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle className="flex items-center gap-2">
-              <AlertTriangle className="h-5 w-5 text-amber-500" />
+              <AlertTriangle className="h-5 w-5 text-warning" />
               {statusDialog.user && isUserBanned(statusDialog.user.banned_until)
                 ? "Reativar conta"
                 : "Desativar conta"
@@ -1441,8 +1441,8 @@ export default function AdminUsuariosPage() {
               disabled={isTogglingStatus}
               className={
                 statusDialog.user && isUserBanned(statusDialog.user.banned_until)
-                  ? "bg-green-600 hover:bg-green-700"
-                  : "bg-red-600 hover:bg-red-700"
+                  ? "bg-success hover:bg-success/90"
+                  : "bg-destructive hover:bg-destructive/90"
               }
             >
               {isTogglingStatus && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
@@ -1466,7 +1466,7 @@ export default function AdminUsuariosPage() {
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancelar</AlertDialogCancel>
-            <AlertDialogAction onClick={handleRemoveMinistry} className="bg-red-600 hover:bg-red-700">
+            <AlertDialogAction onClick={handleRemoveMinistry} className="bg-destructive hover:bg-destructive/90">
               Remover
             </AlertDialogAction>
           </AlertDialogFooter>
@@ -1488,7 +1488,7 @@ export default function AdminUsuariosPage() {
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancelar</AlertDialogCancel>
-            <AlertDialogAction onClick={handleUnlinkServant} className="bg-red-600 hover:bg-red-700">
+            <AlertDialogAction onClick={handleUnlinkServant} className="bg-destructive hover:bg-destructive/90">
               Desvincular
             </AlertDialogAction>
           </AlertDialogFooter>
@@ -1513,7 +1513,7 @@ export default function AdminUsuariosPage() {
                 <div className="flex gap-2">
                   <Input value={resetDialog.link} readOnly className="text-xs" />
                   <Button variant="outline" size="icon" onClick={handleCopyLink}>
-                    {isCopied ? <Check className="h-4 w-4 text-green-600" /> : <Copy className="h-4 w-4" />}
+                    {isCopied ? <Check className="h-4 w-4 text-success" /> : <Copy className="h-4 w-4" />}
                   </Button>
                 </div>
                 <p className="text-xs text-muted-foreground flex items-center gap-1">

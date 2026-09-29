@@ -124,24 +124,24 @@ export function AnnouncementForm({ onSuccess }: AnnouncementFormProps) {
 
   if (confirmedSundays) {
     return (
-      <Card className="border-green-200 bg-green-50 dark:bg-green-950/20">
+      <Card className="border-success/30 bg-success/10">
         <CardContent className="pt-6 space-y-4">
-          <div className="flex items-center gap-2 text-green-700 dark:text-green-400">
+          <div className="flex items-center gap-2 text-success">
             <CalendarDays className="h-5 w-5" />
             <p className="font-semibold">Aviso enviado para aprovação!</p>
           </div>
-          <p className="text-sm text-green-700 dark:text-green-400">
+          <p className="text-sm text-success">
             Se aprovado, seu aviso será dado nos seguintes domingos:
           </p>
           <div className="flex flex-wrap gap-2">
             {confirmedSundays.map((d, i) => (
-              <Badge key={i} variant="outline" className="bg-white dark:bg-background border-green-300 text-green-800 dark:text-green-300">
+              <Badge key={i} variant="outline" className="bg-background border-success/30 text-success">
                 {format(d, "dd/MM/yyyy", { locale: ptBR })}
               </Badge>
             ))}
           </div>
           {confirmedSundays.length === 0 && (
-            <p className="text-sm text-amber-600">Não há domingos disponíveis com os dados informados.</p>
+            <p className="text-sm text-warning">Não há domingos disponíveis com os dados informados.</p>
           )}
           <Button variant="outline" size="sm" onClick={() => {
             setConfirmedSundays(null)
@@ -160,7 +160,7 @@ export function AnnouncementForm({ onSuccess }: AnnouncementFormProps) {
 
   return (
     <form onSubmit={handleSubmit} className="space-y-5">
-      <div className="rounded-lg border border-amber-200 bg-amber-50 dark:bg-amber-950/20 p-3 flex gap-2 text-sm text-amber-800 dark:text-amber-300">
+      <div className="rounded-lg border border-warning/30 bg-warning/10 p-3 flex gap-2 text-sm text-warning">
         <Info className="h-4 w-4 mt-0.5 shrink-0" />
         <span>Solicitações recebidas até <strong>sexta-feira</strong> serão incluídas no domingo seguinte. Após isso, apenas no próximo.</span>
       </div>
@@ -180,14 +180,14 @@ export function AnnouncementForm({ onSuccess }: AnnouncementFormProps) {
 
       {/* Título */}
       <div className="space-y-2">
-        <Label>Título <span className="text-red-500">*</span></Label>
+        <Label>Título <span className="text-destructive">*</span></Label>
         <Input value={title} onChange={e => setTitle(e.target.value)} placeholder="Ex: Retiro de Jovens 2025" required maxLength={200} />
       </div>
 
       {/* Ministério (obrigatório para ministry, opcional para event) */}
       {(type === "ministry" || type === "event") && (
         <div className="space-y-2">
-          <Label>Ministério responsável {type === "ministry" && <span className="text-red-500">*</span>}</Label>
+          <Label>Ministério responsável {type === "ministry" && <span className="text-destructive">*</span>}</Label>
           <Input
             value={ministryName}
             onChange={e => setMinistryName(e.target.value)}
@@ -202,16 +202,16 @@ export function AnnouncementForm({ onSuccess }: AnnouncementFormProps) {
         <div className="space-y-4 p-4 border rounded-lg bg-muted/20">
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div className="space-y-2">
-              <Label>Local do Evento <span className="text-red-500">*</span></Label>
+              <Label>Local do Evento <span className="text-destructive">*</span></Label>
               <Input value={location} onChange={e => setLocation(e.target.value)} placeholder="Ex: Salão Principal" required maxLength={200} />
             </div>
             <div className="space-y-2">
-              <Label>Horário <span className="text-red-500">*</span></Label>
+              <Label>Horário <span className="text-destructive">*</span></Label>
               <Input value={eventTime} onChange={e => setEventTime(e.target.value)} placeholder="Ex: 19h30" required maxLength={20} />
             </div>
           </div>
           <div className="space-y-2">
-            <Label>Data do Evento <span className="text-red-500">*</span></Label>
+            <Label>Data do Evento <span className="text-destructive">*</span></Label>
             <Input
               type="date"
               value={eventDate}
@@ -221,7 +221,7 @@ export function AnnouncementForm({ onSuccess }: AnnouncementFormProps) {
             />
           </div>
           <div className="space-y-2">
-            <Label>Inscrição <span className="text-red-500">*</span></Label>
+            <Label>Inscrição <span className="text-destructive">*</span></Label>
             <RadioGroup value={registrationType} onValueChange={(v: string) => setRegistrationType(v as "free" | "paid")} className="flex gap-4">
               <div className="flex items-center gap-2">
                 <RadioGroupItem value="free" id="free" />
@@ -251,7 +251,7 @@ export function AnnouncementForm({ onSuccess }: AnnouncementFormProps) {
       {/* Descrição */}
       <div className="space-y-2">
         <Label>
-          Descrição {(type === "general" || type === "ministry") && <span className="text-red-500">*</span>}
+          Descrição {(type === "general" || type === "ministry") && <span className="text-destructive">*</span>}
         </Label>
         <Textarea
           value={description}
@@ -323,14 +323,14 @@ export function AnnouncementForm({ onSuccess }: AnnouncementFormProps) {
 
       {/* Preview dos domingos */}
       {sundays.length > 0 && (
-        <div className="rounded-lg border bg-blue-50 dark:bg-blue-950/20 p-3 space-y-2">
-          <p className="text-sm font-medium text-blue-800 dark:text-blue-300 flex items-center gap-2">
+        <div className="rounded-lg border bg-info/10 p-3 space-y-2">
+          <p className="text-sm font-medium text-info flex items-center gap-2">
             <CalendarDays className="h-4 w-4" />
             Domingos em que o aviso será dado (se aprovado):
           </p>
           <div className="flex flex-wrap gap-1.5">
             {sundays.map((d, i) => (
-              <Badge key={i} variant="outline" className="bg-white dark:bg-background border-blue-200 text-blue-700 dark:text-blue-300 text-xs">
+              <Badge key={i} variant="outline" className="bg-background border-info/30 text-info text-xs">
                 {format(d, "dd/MM", { locale: ptBR })}
               </Badge>
             ))}
@@ -338,7 +338,7 @@ export function AnnouncementForm({ onSuccess }: AnnouncementFormProps) {
         </div>
       )}
       {type === "event" && eventDate && sundays.length === 0 && (
-        <p className="text-sm text-amber-600 flex items-center gap-2">
+        <p className="text-sm text-warning flex items-center gap-2">
           <Info className="h-4 w-4" />
           A data do evento é muito próxima para inclusão nos avisos.
         </p>

@@ -84,17 +84,17 @@ interface Environment {
 const STATUS_CONFIG = {
   pending: {
     label: 'Pendente',
-    color: 'bg-yellow-100 text-yellow-800 border-yellow-200',
+    color: 'bg-warning/15 text-warning border-warning/30',
     icon: Clock3,
   },
   approved: {
     label: 'Aprovada',
-    color: 'bg-green-100 text-green-800 border-green-200',
+    color: 'bg-success/15 text-success border-success/30',
     icon: CheckCircle,
   },
   rejected: {
     label: 'Rejeitada',
-    color: 'bg-red-100 text-red-800 border-red-200',
+    color: 'bg-destructive/15 text-destructive border-destructive/30',
     icon: XCircle,
   },
 }
@@ -869,7 +869,7 @@ export default function AdminPage() {
                   onClick={openHistoryModal}
                   variant="outline"
                   size="sm"
-                  className="flex items-center gap-2 border-gray-300 hover:bg-gray-50 dark:border-gray-700 dark:hover:bg-gray-900"
+                  className="flex items-center gap-2 border-border hover:bg-muted/50"
                 >
                   <Clock className="h-4 w-4" />
                   <span className="hidden sm:inline">Histórico</span>
@@ -881,7 +881,7 @@ export default function AdminPage() {
                   onClick={openUpcomingModal}
                   variant="outline"
                   size="sm"
-                  className="flex items-center gap-2 border-blue-300 hover:bg-blue-50 dark:border-blue-700 dark:hover:bg-blue-950"
+                  className="flex items-center gap-2 border-info/30 hover:bg-info/10"
                 >
                   <CalendarIcon className="h-4 w-4" />
                   <span className="hidden sm:inline">Relatório Mensal</span>
@@ -902,7 +902,7 @@ export default function AdminPage() {
                 </CardHeader>
                 <CardContent>
                   <div className="flex items-center gap-2">
-                    <Clock3 className="h-8 w-8 text-yellow-500" />
+                    <Clock3 className="h-8 w-8 text-primary" />
                     <span className="text-3xl font-bold">{pendingBookings.length}</span>
                   </div>
                 </CardContent>
@@ -916,7 +916,7 @@ export default function AdminPage() {
                 </CardHeader>
                 <CardContent>
                   <div className="flex items-center gap-2">
-                    <CheckCircle className="h-8 w-8 text-green-500" />
+                    <CheckCircle className="h-8 w-8 text-success" />
                     <span className="text-3xl font-bold">{approvedBookings.length}</span>
                   </div>
                 </CardContent>
@@ -930,7 +930,7 @@ export default function AdminPage() {
                 </CardHeader>
                 <CardContent>
                   <div className="flex items-center gap-2">
-                    <XCircle className="h-8 w-8 text-red-500" />
+                    <XCircle className="h-8 w-8 text-destructive" />
                     <span className="text-3xl font-bold">{rejectedBookings.length}</span>
                   </div>
                 </CardContent>
@@ -962,7 +962,7 @@ export default function AdminPage() {
                 {pendingBookings.length === 0 ? (
                   <Card>
                     <CardContent className="text-center py-12">
-                      <CheckCircle className="h-16 w-16 text-green-400 mx-auto mb-4" />
+                      <CheckCircle className="h-16 w-16 text-success mx-auto mb-4" />
                       <h3 className="text-xl font-semibold mb-2">Tudo em dia!</h3>
                       <p className="text-muted-foreground">
                         Não há solicitações pendentes de aprovação.
@@ -991,7 +991,7 @@ export default function AdminPage() {
                 {approvedBookings.length === 0 ? (
                   <Card>
                     <CardContent className="text-center py-12">
-                      <CalendarIcon className="h-16 w-16 text-gray-400 mx-auto mb-4" />
+                      <CalendarIcon className="h-16 w-16 text-muted-foreground mx-auto mb-4" />
                       <h3 className="text-xl font-semibold mb-2">Nenhuma reserva vigente</h3>
                       <p className="text-muted-foreground">
                         Não há reservas aprovadas para datas futuras.
@@ -1019,7 +1019,7 @@ export default function AdminPage() {
                 {completedBookings.length === 0 ? (
                   <Card>
                     <CardContent className="text-center py-12">
-                      <CheckCircle className="h-16 w-16 text-green-400 mx-auto mb-4" />
+                      <CheckCircle className="h-16 w-16 text-success mx-auto mb-4" />
                       <h3 className="text-xl font-semibold mb-2">Nenhuma reserva finalizada</h3>
                       <p className="text-muted-foreground">
                         Ainda não há reservas que já aconteceram.
@@ -1046,7 +1046,7 @@ export default function AdminPage() {
                 {rejectedBookings.length === 0 ? (
                   <Card>
                     <CardContent className="text-center py-12">
-                      <CalendarIcon className="h-16 w-16 text-gray-400 mx-auto mb-4" />
+                      <CalendarIcon className="h-16 w-16 text-muted-foreground mx-auto mb-4" />
                       <h3 className="text-xl font-semibold mb-2">Nenhuma reserva rejeitada</h3>
                       <p className="text-muted-foreground">
                         Não há reservas rejeitadas no momento.
@@ -1159,8 +1159,8 @@ export default function AdminPage() {
             <AlertDialogAction
               onClick={handleAction}
               className={actionDialog.type === 'approve' 
-                ? 'bg-green-600 hover:bg-green-700' 
-                : 'bg-red-600 hover:bg-red-700'}
+                ? 'bg-success hover:bg-success/90' 
+                : 'bg-destructive hover:bg-destructive/90'}
             >
               {actionDialog.type === 'approve' ? 'Aprovar' : 'Rejeitar'}
             </AlertDialogAction>
@@ -1277,16 +1277,16 @@ function ReportModal({
   
   const colors = colorScheme === 'blue' 
     ? {
-        gradient: 'from-blue-50 to-indigo-50 dark:from-blue-950/30 dark:to-indigo-950/30',
-        border: 'border-blue-200 dark:border-blue-800',
-        text: 'text-blue-600 dark:text-blue-400',
-        icon: 'text-blue-600',
+        gradient: 'from-info/10 to-info/5',
+        border: 'border-info/30',
+        text: 'text-info',
+        icon: 'text-info',
       }
     : {
-        gradient: 'from-gray-50 to-slate-50 dark:from-gray-950/30 dark:to-slate-950/30',
-        border: 'border-gray-200 dark:border-gray-700',
-        text: 'text-gray-600 dark:text-gray-400',
-        icon: 'text-gray-600',
+        gradient: 'from-muted to-muted',
+        border: 'border-border',
+        text: 'text-muted-foreground',
+        icon: 'text-muted-foreground',
       }
 
   const DAY_NAMES = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb']
@@ -1322,7 +1322,7 @@ function ReportModal({
               onClick={onExportPDF}
               variant="outline"
               size="sm"
-              className="flex items-center gap-2 bg-red-50 hover:bg-red-100 text-red-700 border-red-200 dark:bg-red-950/30 dark:hover:bg-red-950/50 dark:text-red-400 dark:border-red-800"
+              className="flex items-center gap-2 bg-destructive/10 hover:bg-destructive/15 text-destructive border-destructive/30"
               disabled={filteredBookings.length === 0}
             >
               <FileText className="h-4 w-4" />
@@ -1368,7 +1368,7 @@ function ReportModal({
               ))}
             </div>
             {!selectAllMonths && selectedMonths.length === 0 && (
-              <p className="text-xs text-amber-600 dark:text-amber-400 mt-2">
+              <p className="text-xs text-warning mt-2">
                 ⚠️ Selecione pelo menos um mês para gerar o relatório
               </p>
             )}
@@ -1379,7 +1379,7 @@ function ReportModal({
         <div className="flex-1 overflow-y-auto p-6">
           {(availableMonths.length === 0 || (!selectAllMonths && selectedMonths.length === 0)) ? (
             <div className="text-center py-12">
-              <CalendarIcon className="h-16 w-16 text-gray-400 mx-auto mb-4" />
+              <CalendarIcon className="h-16 w-16 text-muted-foreground mx-auto mb-4" />
               <h3 className="text-xl font-semibold mb-2">
                 {availableMonths.length === 0 ? emptyMessage : 'Selecione os meses'}
               </h3>
@@ -1409,25 +1409,25 @@ function ReportModal({
                       <p className="text-sm text-muted-foreground">Total de Reservas</p>
                     </div>
                     <div className="text-center">
-                      <p className="text-3xl font-bold text-green-600 dark:text-green-400">
+                      <p className="text-3xl font-bold text-success">
                         {filteredBookings.filter(b => b.status === 'approved').length}
                       </p>
                       <p className="text-sm text-muted-foreground">Aprovadas</p>
                     </div>
                     <div className="text-center">
-                      <p className="text-3xl font-bold text-yellow-600 dark:text-yellow-400">
+                      <p className="text-3xl font-bold text-primary">
                         {filteredBookings.filter(b => b.status === 'pending').length}
                       </p>
                       <p className="text-sm text-muted-foreground">Pendentes</p>
                     </div>
                     <div className="text-center">
-                      <p className="text-3xl font-bold text-red-600 dark:text-red-400">
+                      <p className="text-3xl font-bold text-destructive">
                         {filteredBookings.filter(b => b.status === 'rejected').length}
                       </p>
                       <p className="text-sm text-muted-foreground">Rejeitadas</p>
                     </div>
                     <div className="text-center">
-                      <p className="text-3xl font-bold text-purple-600 dark:text-purple-400">
+                      <p className="text-3xl font-bold text-primary">
                         {filteredBookings.reduce((sum, b) => sum + b.estimated_participants, 0)}
                       </p>
                       <p className="text-sm text-muted-foreground">Participantes</p>
@@ -1458,15 +1458,15 @@ function ReportModal({
                     <CardContent className="pt-4">
                       <div className="grid grid-cols-2 md:grid-cols-5 gap-4 text-sm">
                         <div className="flex items-center gap-2">
-                          <div className="w-3 h-3 rounded-full bg-green-500"></div>
+                          <div className="w-3 h-3 rounded-full bg-success"></div>
                           <span>Aprovadas: <strong>{monthData.approved}</strong></span>
                         </div>
                         <div className="flex items-center gap-2">
-                          <div className="w-3 h-3 rounded-full bg-yellow-500"></div>
+                          <div className="w-3 h-3 rounded-full bg-warning"></div>
                           <span>Pendentes: <strong>{monthData.pending}</strong></span>
                         </div>
                         <div className="flex items-center gap-2">
-                          <div className="w-3 h-3 rounded-full bg-red-500"></div>
+                          <div className="w-3 h-3 rounded-full bg-destructive"></div>
                           <span>Rejeitadas: <strong>{monthData.rejected}</strong></span>
                         </div>
                         <div className="flex items-center gap-2 md:col-span-2">
@@ -1493,9 +1493,9 @@ function ReportModal({
                                 <div
                                   key={booking.id}
                                   className={`text-sm p-3 rounded-lg border-l-4 ${
-                                    booking.status === 'approved' ? 'border-l-green-500 bg-green-50 dark:bg-green-950/20' :
-                                    booking.status === 'rejected' ? 'border-l-red-500 bg-red-50 dark:bg-red-950/20' :
-                                    'border-l-yellow-500 bg-yellow-50 dark:bg-yellow-950/20'
+                                    booking.status === 'approved' ? 'border-l-green-500 bg-success/10' :
+                                    booking.status === 'rejected' ? 'border-l-red-500 bg-destructive/10' :
+                                    'border-l-yellow-500 bg-warning/10'
                                   }`}
                                 >
                                   {/* Linha 1: Data, Horário e Status */}
@@ -1690,10 +1690,10 @@ function BookingAdminCard({
         </div>
 
         {booking.review_notes && (
-          <div className="mt-3 p-3 bg-amber-50 dark:bg-amber-950/20 rounded-lg border border-amber-200 dark:border-amber-800">
+          <div className="mt-3 p-3 bg-warning/10 rounded-lg border border-warning/30">
             <p className="text-sm">
-              <strong className="text-amber-700 dark:text-amber-400">Observações:</strong>{' '}
-              <span className="text-amber-800 dark:text-amber-300">{booking.review_notes}</span>
+              <strong className="text-warning">Observações:</strong>{' '}
+              <span className="text-warning">{booking.review_notes}</span>
             </p>
           </div>
         )}
@@ -1706,7 +1706,7 @@ function BookingAdminCard({
                 <Button
                   onClick={onApprove}
                   disabled={processing}
-                  className="flex-1 bg-green-600 hover:bg-green-700"
+                  className="flex-1 bg-success hover:bg-success/90"
                 >
                   {processing ? (
                     <Loader2 className="h-4 w-4 animate-spin mr-2" />
@@ -1735,7 +1735,7 @@ function BookingAdminCard({
                 onClick={onCancel}
                 disabled={processing}
                 variant="outline"
-                className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                className="text-destructive hover:text-destructive hover:bg-destructive/10"
               >
                 {processing ? (
                   <Loader2 className="h-4 w-4 animate-spin mr-2" />

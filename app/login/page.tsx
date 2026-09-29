@@ -101,7 +101,7 @@ function LoginContent() {
         </CardHeader>
         <CardContent className="space-y-6">
           {confirmed && (
-            <div className="flex items-center gap-3 rounded-lg border border-green-200 bg-green-50 p-4 text-green-800 dark:border-green-800 dark:bg-green-950 dark:text-green-200">
+            <div className="flex items-center gap-3 rounded-lg border border-success/30 bg-success/10 p-4 text-success">
               <CheckCircle className="h-5 w-5 flex-shrink-0" />
               <p className="text-sm font-medium">Email confirmado com sucesso! Faça login para continuar.</p>
             </div>
