@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
-import { createAdminClient, createServerClient } from "@/lib/supabase/server"
+import { createServerClient } from "@/lib/supabase/server"
+import { canManageMinistry, requireManagerOf } from "@/lib/escalas/auth"
 import { z } from "zod"
 
 const servantUpdateSchema = z.object({
@@ -60,10 +61,9 @@ export async function PUT(
 ) {
   try {
     const { id } = await params
-    const supabase = createAdminClient()
-    if (!supabase) {
-      return NextResponse.json({ error: "Erro de configuração" }, { status: 500 })
-    }
+    const auth = await requireManagerOf("servant", id)
+    if (!auth.ok) return auth.response
+    const { supabase, caller } = auth
 
     const body = await request.json()
     const validationResult = servantUpdateSchema.safeParse(body)
@@ -85,6 +85,21 @@ export async function PUT(
     // Se area_ids fornecido, manter área primária como a primeira da lista
     if (area_ids && area_ids.length > 0) {
       updateData.area_id = area_ids[0]
+    }
+
+    // Líderes só podem mover servos para áreas de ministérios que gerenciam
+    const targetAreaIds = [...new Set([...(area_ids ?? []), ...(updateData.area_id ? [updateData.area_id] : [])])]
+    if (!caller.isAdmin && targetAreaIds.length > 0) {
+      const { data: targetAreas } = await supabase
+        .from("areas")
+        .select("id, ministry_id")
+        .in("id", targetAreaIds)
+      const allowed =
+        (targetAreas ?? []).length === targetAreaIds.length &&
+        (targetAreas ?? []).every((a: { ministry_id: string }) => canManageMinistry(caller, a.ministry_id))
+      if (!allowed) {
+        return NextResponse.json({ error: "Acesso negado" }, { status: 403 })
+      }
     }
 
     const { data, error } = await supabase
@@ -124,10 +139,9 @@ export async function DELETE(
 ) {
   try {
     const { id } = await params
-    const supabase = createAdminClient()
-    if (!supabase) {
-      return NextResponse.json({ error: "Erro de configuração" }, { status: 500 })
-    }
+    const auth = await requireManagerOf("servant", id)
+    if (!auth.ok) return auth.response
+    const { supabase } = auth
 
     const { error } = await supabase
       .from("servants")

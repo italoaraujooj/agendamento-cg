@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server"
-import { createAdminClient } from "@/lib/supabase/server"
+import { requireManagerOf } from "@/lib/escalas/auth"
 
 // GET - Buscar respostas de disponibilidade do período
 export async function GET(
@@ -8,10 +8,9 @@ export async function GET(
 ) {
   try {
     const { id: periodId } = await params
-    const supabase = createAdminClient()
-    if (!supabase) {
-      return NextResponse.json({ error: "Erro de configuração" }, { status: 500 })
-    }
+    const auth = await requireManagerOf("period", periodId)
+    if (!auth.ok) return auth.response
+    const { supabase } = auth
 
     // Buscar todas as respostas de disponibilidade do período com dados do servo e evento
     const { data, error } = await supabase

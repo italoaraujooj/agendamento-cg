@@ -1,5 +1,11 @@
 import { NextRequest, NextResponse } from "next/server"
-import { createAdminClient, createServerClient } from "@/lib/supabase/server"
+import { createAdminClient } from "@/lib/supabase/server"
+import {
+  canManageMinistry,
+  getEscalasCaller,
+  requireEscalasAdmin,
+  requireMinistryManager,
+} from "@/lib/escalas/auth"
 import { z } from "zod"
 
 const ministryUpdateSchema = z.object({
@@ -108,13 +114,17 @@ export async function GET(
       return NextResponse.json({ error: result.error.message }, { status: 500 })
     }
 
-    // Replace user_id with has_account to avoid leaking stable auth identifiers
+    // Replace user_id with has_account to avoid leaking stable auth identifiers.
+    // E-mails só são expostos para quem gerencia o ministério.
+    const caller = await getEscalasCaller()
+    const canSeeContacts = !!caller && canManageMinistry(caller, id)
     const data = result.data as any
     if (data?.areas) {
       data.areas = data.areas.map((area: any) => ({
         ...area,
-        servants: (area.servants ?? []).map(({ user_id, ...s }: any) => ({
+        servants: (area.servants ?? []).map(({ user_id, email, ...s }: any) => ({
           ...s,
+          email: canSeeContacts ? email : null,
           has_account: user_id !== null,
         })),
       }))
@@ -134,10 +144,9 @@ export async function PUT(
 ) {
   try {
     const { id } = await params
-    const supabase = createAdminClient()
-    if (!supabase) {
-      return NextResponse.json({ error: "Erro de configuração" }, { status: 500 })
-    }
+    const auth = await requireMinistryManager(id)
+    if (!auth.ok) return auth.response
+    const { supabase } = auth
 
     const body = await request.json()
     const validationResult = ministryUpdateSchema.safeParse(body)
@@ -318,10 +327,9 @@ export async function DELETE(
 ) {
   try {
     const { id } = await params
-    const supabase = createAdminClient()
-    if (!supabase) {
-      return NextResponse.json({ error: "Erro de configuração" }, { status: 500 })
-    }
+    const auth = await requireEscalasAdmin()
+    if (!auth.ok) return auth.response
+    const { supabase } = auth
 
     // Soft delete - apenas desativa
     const { error } = await supabase

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
-import { createAdminClient, createServerClient } from "@/lib/supabase/server"
+import { createServerClient } from "@/lib/supabase/server"
+import { requireEscalasAdmin } from "@/lib/escalas/auth"
 import { z } from "zod"
 
 const ministrySchema = z.object({
@@ -44,10 +45,9 @@ export async function GET() {
 // POST - Criar ministério
 export async function POST(request: NextRequest) {
   try {
-    const supabase = createAdminClient()
-    if (!supabase) {
-      return NextResponse.json({ error: "Erro de configuração" }, { status: 500 })
-    }
+    const auth = await requireEscalasAdmin()
+    if (!auth.ok) return auth.response
+    const { supabase } = auth
 
     const body = await request.json()
     const validationResult = ministrySchema.safeParse(body)

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
-import { createAdminClient, createServerClient } from "@/lib/supabase/server"
+import { createServerClient } from "@/lib/supabase/server"
+import { requireManagerOf } from "@/lib/escalas/auth"
 import { z } from "zod"
 
 const schedulePeriodUpdateSchema = z.object({
@@ -59,10 +60,9 @@ export async function PUT(
 ) {
   try {
     const { id } = await params
-    const supabase = createAdminClient()
-    if (!supabase) {
-      return NextResponse.json({ error: "Erro de configuração" }, { status: 500 })
-    }
+    const auth = await requireManagerOf("period", id)
+    if (!auth.ok) return auth.response
+    const { supabase } = auth
 
     const body = await request.json()
     const validationResult = schedulePeriodUpdateSchema.safeParse(body)
@@ -113,10 +113,9 @@ export async function DELETE(
 ) {
   try {
     const { id } = await params
-    const supabase = createAdminClient()
-    if (!supabase) {
-      return NextResponse.json({ error: "Erro de configuração" }, { status: 500 })
-    }
+    const auth = await requireManagerOf("period", id)
+    if (!auth.ok) return auth.response
+    const { supabase } = auth
 
     // Verificar se o período existe e seu status
     const { data: period, error: fetchError } = await supabase

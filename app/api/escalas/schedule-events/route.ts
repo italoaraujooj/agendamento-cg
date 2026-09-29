@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server"
-import { createAdminClient } from "@/lib/supabase/server"
+import { requireManagerOf } from "@/lib/escalas/auth"
 import { z } from "zod"
 
 const createEventSchema = z.object({
@@ -15,11 +15,6 @@ const createEventSchema = z.object({
 // POST - Criar evento avulso em um período
 export async function POST(request: NextRequest) {
   try {
-    const supabase = createAdminClient()
-    if (!supabase) {
-      return NextResponse.json({ error: "Erro de configuração" }, { status: 500 })
-    }
-
     const body = await request.json()
     const validation = createEventSchema.safeParse(body)
 
@@ -31,6 +26,10 @@ export async function POST(request: NextRequest) {
     }
 
     const { period_id, event_date, event_time, title, description } = validation.data
+
+    const auth = await requireManagerOf("period", period_id)
+    if (!auth.ok) return auth.response
+    const { supabase } = auth
 
     const normalizedTime = event_time.length === 5 ? `${event_time}:00` : event_time
 

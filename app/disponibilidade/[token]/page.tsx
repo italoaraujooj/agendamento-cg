@@ -5,7 +5,11 @@ import { useParams } from "next/navigation"
 import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Loader2, AlertCircle, Calendar, ArrowLeft } from "lucide-react"
-import { AvailabilityForm } from "@/components/escalas/availability-form"
+import {
+  AvailabilityForm,
+  type AvailabilityEvent,
+  type IdentifiedServant,
+} from "@/components/escalas/availability-form"
 import Link from "next/link"
 import { format } from "date-fns"
 import { ptBR } from "date-fns/locale"
@@ -22,25 +26,6 @@ interface PeriodData {
   } | null
 }
 
-interface EventData {
-  id: string
-  event_date: string
-  event_time: string
-  title: string
-  description: string | null
-}
-
-interface ServantData {
-  id: string
-  name: string
-  email: string | null
-  is_leader: boolean
-  area: {
-    id: string
-    name: string
-    ministry_id: string
-  } | null
-}
 
 export default function DisponibilidadePage() {
   const params = useParams()
@@ -50,8 +35,8 @@ export default function DisponibilidadePage() {
   const [error, setError] = useState<string | null>(null)
   const [data, setData] = useState<{
     period: PeriodData
-    events: EventData[]
-    servants: ServantData[]
+    events: AvailabilityEvent[]
+    me: IdentifiedServant | null
   } | null>(null)
 
   useEffect(() => {
@@ -146,9 +131,10 @@ export default function DisponibilidadePage() {
       {/* Conteúdo */}
       <main className="container mx-auto px-4 py-6">
         <AvailabilityForm
+          periodToken={token}
           period={data.period}
-          events={data.events as any}
-          servants={data.servants as any}
+          events={data.events}
+          initialIdentity={data.me}
         />
       </main>
 

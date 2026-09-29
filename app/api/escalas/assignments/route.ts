@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
-import { createAdminClient, createServerClient } from "@/lib/supabase/server"
+import { createServerClient } from "@/lib/supabase/server"
+import { requireAuthenticated, requireManagerOf } from "@/lib/escalas/auth"
 import { z } from "zod"
 
 const assignmentSchema = z.object({
@@ -13,6 +14,9 @@ const assignmentSchema = z.object({
 // GET - Listar atribuições (por período ou evento)
 export async function GET(request: NextRequest) {
   try {
+    const auth = await requireAuthenticated()
+    if (!auth.ok) return auth.response
+
     const supabase = await createServerClient()
     if (!supabase) {
       return NextResponse.json({ error: "Erro de configuração" }, { status: 500 })
@@ -55,11 +59,6 @@ export async function GET(request: NextRequest) {
 // POST - Criar atribuição
 export async function POST(request: NextRequest) {
   try {
-    const supabase = createAdminClient()
-    if (!supabase) {
-      return NextResponse.json({ error: "Erro de configuração" }, { status: 500 })
-    }
-
     const body = await request.json()
     const validationResult = assignmentSchema.safeParse(body)
 
@@ -71,6 +70,10 @@ export async function POST(request: NextRequest) {
     }
 
     const { schedule_event_id, servant_id, area_id, notes, mode } = validationResult.data
+
+    const auth = await requireManagerOf("event", schedule_event_id)
+    if (!auth.ok) return auth.response
+    const { supabase } = auth
 
     // No modo "replace", remove a atribuição existente antes de inserir
     if (mode !== "add") {
@@ -118,15 +121,24 @@ export async function POST(request: NextRequest) {
 // DELETE - Remover atribuição
 export async function DELETE(request: NextRequest) {
   try {
-    const supabase = createAdminClient()
-    if (!supabase) {
-      return NextResponse.json({ error: "Erro de configuração" }, { status: 500 })
-    }
-
     const { searchParams } = new URL(request.url)
     const id = searchParams.get("id")
     const eventId = searchParams.get("event_id")
     const areaId = searchParams.get("area_id")
+
+    const auth = id
+      ? await requireManagerOf("assignment", id)
+      : eventId
+        ? await requireManagerOf("event", eventId)
+        : null
+    if (!auth) {
+      return NextResponse.json(
+        { error: "ID ou event_id + area_id são obrigatórios" },
+        { status: 400 }
+      )
+    }
+    if (!auth.ok) return auth.response
+    const { supabase } = auth
 
     if (id) {
       // Deletar por ID
