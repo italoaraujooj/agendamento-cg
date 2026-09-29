@@ -147,20 +147,20 @@ export function GoogleCalendarSetup() {
           <div className="flex items-center gap-2">
             {isConnected ? (
               <>
-                <CheckCircle className="h-5 w-5 text-green-600" />
-                <span className="font-medium text-green-700">Conectado</span>
+                <CheckCircle className="h-5 w-5 text-success" />
+                <span className="font-medium text-success">Conectado</span>
                 <Badge variant="default">Ativo</Badge>
               </>
             ) : tokenStatus?.hasTokens && tokenStatus?.isExpired ? (
               <>
-                <AlertTriangle className="h-5 w-5 text-yellow-600" />
-                <span className="font-medium text-yellow-700">Expirado</span>
+                <AlertTriangle className="h-5 w-5 text-primary" />
+                <span className="font-medium text-warning">Expirado</span>
                 <Badge variant="secondary">Reconectar</Badge>
               </>
             ) : (
               <>
-                <AlertTriangle className="h-5 w-5 text-gray-600" />
-                <span className="font-medium text-gray-700">Não conectado</span>
+                <AlertTriangle className="h-5 w-5 text-muted-foreground" />
+                <span className="font-medium text-foreground">Não conectado</span>
                 <Badge variant="outline">Desconectado</Badge>
               </>
             )}
@@ -177,7 +177,7 @@ export function GoogleCalendarSetup() {
 
         {/* Informações */}
         {tokenStatus && (
-          <div className="bg-gray-50 p-3 rounded text-sm">
+          <div className="bg-muted/50 p-3 rounded text-sm">
             <p><strong>Email:</strong> {user?.email}</p>
             {tokenStatus.expiresAt && (
               <p><strong>Expira em:</strong> {new Date(tokenStatus.expiresAt).toLocaleString()}</p>

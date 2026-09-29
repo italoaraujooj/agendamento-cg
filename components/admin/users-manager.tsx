@@ -73,25 +73,25 @@ interface UserMinistryRole {
 const ROLE_CONFIG = {
   user: {
     label: 'Usuário',
-    color: 'bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-300',
+    color: 'bg-muted text-foreground',
     icon: User
   },
   ministry_leader: {
     label: 'Líder de Ministério',
-    color: 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400',
+    color: 'bg-info/15 text-info',
     icon: UserCheck
   },
   admin: {
     label: 'Administrador',
-    color: 'bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-400',
+    color: 'bg-brand/15 text-primary',
     icon: Shield
   },
 }
 
 const MINISTRY_ROLE_CONFIG = {
-  leader: { label: 'Líder', color: 'bg-amber-100 text-amber-800' },
-  coordinator: { label: 'Coordenador', color: 'bg-blue-100 text-blue-800' },
-  helper: { label: 'Auxiliar', color: 'bg-green-100 text-green-800' },
+  leader: { label: 'Líder', color: 'bg-warning/15 text-warning' },
+  coordinator: { label: 'Coordenador', color: 'bg-info/15 text-info' },
+  helper: { label: 'Auxiliar', color: 'bg-success/15 text-success' },
 }
 
 export function UsersManager() {
@@ -366,27 +366,27 @@ export function UsersManager() {
           </CardContent>
         </Card>
 
-        <Card className="bg-gradient-to-br from-purple-50 to-violet-50 dark:from-purple-950/30 dark:to-violet-950/30">
+        <Card className="bg-gradient-to-br from-brand/10 to-brand/5">
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-purple-700 dark:text-purple-300 flex items-center gap-2">
+            <CardTitle className="text-sm font-medium text-primary flex items-center gap-2">
               <Shield className="h-4 w-4" />
               Administradores
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <p className="text-3xl font-bold text-purple-700 dark:text-purple-400">{stats.admins}</p>
+            <p className="text-3xl font-bold text-primary">{stats.admins}</p>
           </CardContent>
         </Card>
 
-        <Card className="bg-gradient-to-br from-blue-50 to-indigo-50 dark:from-blue-950/30 dark:to-indigo-950/30">
+        <Card className="bg-gradient-to-br from-info/10 to-info/5">
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-blue-700 dark:text-blue-300 flex items-center gap-2">
+            <CardTitle className="text-sm font-medium text-info flex items-center gap-2">
               <Crown className="h-4 w-4" />
               Líderes de Ministério
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <p className="text-3xl font-bold text-blue-700 dark:text-blue-400">{stats.leaders}</p>
+            <p className="text-3xl font-bold text-info">{stats.leaders}</p>
           </CardContent>
         </Card>
 
@@ -461,7 +461,7 @@ export function UsersManager() {
                             {roleConfig.label}
                           </Badge>
                           {user.is_admin && user.role !== 'admin' && (
-                            <Badge variant="outline" className="bg-purple-100 text-purple-800">
+                            <Badge variant="outline" className="bg-brand/15 text-primary">
                               Admin
                             </Badge>
                           )}
@@ -478,7 +478,7 @@ export function UsersManager() {
                             </span>
                           )}
                           {!user.profile_completed && (
-                            <Badge variant="outline" className="text-xs bg-amber-50 text-amber-700 border-amber-200">
+                            <Badge variant="outline" className="text-xs bg-warning/10 text-warning border-warning/30">
                               <AlertCircle className="h-3 w-3 mr-1" />
                               Perfil incompleto
                             </Badge>
@@ -631,7 +631,7 @@ export function UsersManager() {
                           <Button
                             variant="ghost"
                             size="sm"
-                            className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                            className="text-destructive hover:text-destructive hover:bg-destructive/10"
                             onClick={() => setDeleteDialog({
                               open: true,
                               type: 'ministry_role',
@@ -751,7 +751,7 @@ export function UsersManager() {
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle className="flex items-center gap-2">
-              <AlertTriangle className="h-5 w-5 text-red-500" />
+              <AlertTriangle className="h-5 w-5 text-destructive" />
               Remover Vínculo
             </AlertDialogTitle>
             <AlertDialogDescription>
@@ -762,7 +762,7 @@ export function UsersManager() {
             <AlertDialogCancel>Cancelar</AlertDialogCancel>
             <AlertDialogAction
               onClick={handleRemoveMinistry}
-              className="bg-red-600 hover:bg-red-700"
+              className="bg-destructive hover:bg-destructive/90"
             >
               Remover
             </AlertDialogAction>

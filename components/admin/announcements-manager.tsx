@@ -49,15 +49,15 @@ interface Announcement {
 }
 
 const TYPE_CONFIG = {
-  event: { label: "Evento", color: "bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400" },
-  general: { label: "Comunicado Geral", color: "bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-300" },
-  ministry: { label: "Aviso de Ministério", color: "bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-400" },
+  event: { label: "Evento", color: "bg-info/15 text-info" },
+  general: { label: "Comunicado Geral", color: "bg-muted text-foreground" },
+  ministry: { label: "Aviso de Ministério", color: "bg-brand/15 text-primary" },
 }
 
 const STATUS_CONFIG = {
-  pending: { label: "Pendente", color: "bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400" },
-  approved: { label: "Aprovado", color: "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400" },
-  rejected: { label: "Rejeitado", color: "bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400" },
+  pending: { label: "Pendente", color: "bg-warning/15 text-warning" },
+  approved: { label: "Aprovado", color: "bg-success/15 text-success" },
+  rejected: { label: "Rejeitado", color: "bg-destructive/15 text-destructive" },
 }
 
 function AnnouncementCard({
@@ -166,14 +166,14 @@ function AnnouncementCard({
 
         {showActions && a.status === "pending" && (
           <div className="flex gap-2 pt-1 border-t">
-            <Button size="sm" className="flex-1 bg-green-600 hover:bg-green-700" onClick={() => onApprove?.(a.id)}>
+            <Button size="sm" className="flex-1 bg-success hover:bg-success/90" onClick={() => onApprove?.(a.id)}>
               <CheckCircle2 className="h-3.5 w-3.5 mr-1" />Aprovar
             </Button>
-            <Button size="sm" variant="outline" className="flex-1 text-red-600 border-red-200 hover:bg-red-50" onClick={() => setShowRejectDialog(true)}>
+            <Button size="sm" variant="outline" className="flex-1 text-destructive border-destructive/30 hover:bg-destructive/10" onClick={() => setShowRejectDialog(true)}>
               <XCircle className="h-3.5 w-3.5 mr-1" />Rejeitar
             </Button>
             {onDelete && (
-              <Button size="icon" variant="ghost" className="h-8 w-8 text-muted-foreground hover:text-red-600" onClick={() => onDelete(a.id)}>
+              <Button size="icon" variant="ghost" className="h-8 w-8 text-muted-foreground hover:text-destructive" onClick={() => onDelete(a.id)}>
                 <Trash2 className="h-3.5 w-3.5" />
               </Button>
             )}
@@ -196,7 +196,7 @@ function AnnouncementCard({
           <AlertDialogFooter>
             <AlertDialogCancel>Cancelar</AlertDialogCancel>
             <AlertDialogAction
-              className="bg-red-600 hover:bg-red-700"
+              className="bg-destructive hover:bg-destructive/90"
               onClick={() => { onReject?.(a.id, rejectNotes); setShowRejectDialog(false); setRejectNotes("") }}
             >
               Rejeitar
@@ -300,7 +300,7 @@ export function AnnouncementsManager() {
           <TabsTrigger value="pending" className="flex-1">
             Pendentes
             {pending.length > 0 && (
-              <Badge className="ml-1.5 h-5 px-1.5 bg-amber-500 text-white text-xs">{pending.length}</Badge>
+              <Badge className="ml-1.5 h-5 px-1.5 bg-warning text-warning-foreground text-xs">{pending.length}</Badge>
             )}
           </TabsTrigger>
           <TabsTrigger value="scheduled" className="flex-1">Programados</TabsTrigger>
@@ -401,7 +401,7 @@ export function AnnouncementsManager() {
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancelar</AlertDialogCancel>
-            <AlertDialogAction className="bg-red-600 hover:bg-red-700" onClick={handleDelete}>Remover</AlertDialogAction>
+            <AlertDialogAction className="bg-destructive hover:bg-destructive/90" onClick={handleDelete}>Remover</AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>

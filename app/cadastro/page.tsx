@@ -87,8 +87,8 @@ export default function CadastroPage() {
       <div className="flex items-center justify-center min-h-[60vh] px-4">
         <Card className="w-full max-w-md">
           <CardHeader className="text-center">
-            <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-yellow-100">
-              <Mail className="h-6 w-6 text-yellow-600" />
+            <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-warning/15">
+              <Mail className="h-6 w-6 text-primary" />
             </div>
             <CardTitle className="text-2xl">Email já cadastrado</CardTitle>
             <CardDescription>

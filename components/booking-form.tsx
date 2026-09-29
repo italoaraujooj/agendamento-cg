@@ -527,7 +527,7 @@ export default function BookingForm({ environments, preselectedEnvironment }: Bo
         <div className="space-y-2">
           <Label htmlFor={`extraEnd-${idx}`}>Horário Fim</Label>
           <div className="flex items-center gap-2">
-            <Input id={`extraEnd-${idx}`} value={endDisplay} readOnly placeholder="Automático" className="bg-gray-50" />
+            <Input id={`extraEnd-${idx}`} value={endDisplay} readOnly placeholder="Automático" className="bg-muted/50" />
             <Button
               type="button"
               variant="ghost"
@@ -1145,9 +1145,9 @@ export default function BookingForm({ environments, preselectedEnvironment }: Bo
       <Card className="text-center">
         <CardHeader>
           <div className="flex justify-center mb-4">
-            <CheckCircle className="h-16 w-16 text-green-600" />
+            <CheckCircle className="h-16 w-16 text-success" />
           </div>
-          <CardTitle className="text-green-600 text-2xl">Reserva Criada com Sucesso!</CardTitle>
+          <CardTitle className="text-success text-2xl">Reserva Criada com Sucesso!</CardTitle>
           <CardDescription className="text-lg">
             Sua reserva foi registrada no sistema. Redirecionando para a página de reservas...
           </CardDescription>
@@ -1381,7 +1381,7 @@ export default function BookingForm({ environments, preselectedEnvironment }: Bo
                   value={calculateEndTime(formData.startTime, formData.duration)}
                   readOnly
                   placeholder="Automático"
-                  className="bg-gray-50"
+                  className="bg-muted/50"
                 />
                 {extraOccurrences.length > 0 && (
                   <Button
@@ -1620,7 +1620,7 @@ export default function BookingForm({ environments, preselectedEnvironment }: Bo
 
           {/* Aviso de disponibilidade por dia */}
           {formData.bookingDate && !isLoadingAvailability && availability.length === 0 && (
-            <div className="bg-amber-50 border border-amber-200 text-amber-800 px-4 py-2 rounded text-sm">
+            <div className="bg-warning/10 border border-warning/30 text-warning px-4 py-2 rounded text-sm">
               Não há disponibilidade configurada para {WEEKDAY_LABELS_PT_BR[getWeekdayFromDate(formData.bookingDate) || 0]}.
             </div>
           )}

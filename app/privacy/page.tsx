@@ -5,17 +5,17 @@ import Link from 'next/link'
 
 export default function PrivacyPolicyPage() {
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 dark:from-gray-900 dark:to-gray-800">
+    <div className="min-h-screen bg-gradient-to-br from-info/10 to-info/5">
       <div className="container mx-auto px-4 py-8">
         {/* Header */}
         <div className="text-center mb-8">
           <div className="flex items-center justify-center mb-4">
-            <Shield className="h-12 w-12 text-blue-600 mr-3" />
-            <h1 className="text-4xl font-bold text-gray-900 dark:text-white">
+            <Shield className="h-12 w-12 text-info mr-3" />
+            <h1 className="text-4xl font-bold text-foreground">
               Política de Privacidade
             </h1>
           </div>
-          <p className="text-lg text-gray-600 dark:text-gray-300 max-w-2xl mx-auto">
+          <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
             Transparência sobre como coletamos, usamos e protegemos seus dados pessoais
           </p>
           <Badge variant="outline" className="mt-4">
@@ -33,15 +33,15 @@ export default function PrivacyPolicyPage() {
           </CardHeader>
           <CardContent>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              <Link href="#interpretacao" className="text-blue-600 hover:underline">• Interpretação e Definições</Link>
-              <Link href="#coleta" className="text-blue-600 hover:underline">• Coleta de Dados</Link>
-              <Link href="#uso" className="text-blue-600 hover:underline">• Uso dos Dados</Link>
-              <Link href="#retencao" className="text-blue-600 hover:underline">• Retenção de Dados</Link>
-              <Link href="#transferencia" className="text-blue-600 hover:underline">• Transferência de Dados</Link>
-              <Link href="#seguranca" className="text-blue-600 hover:underline">• Segurança</Link>
-              <Link href="#criancas" className="text-blue-600 hover:underline">• Privacidade de Menores</Link>
-              <Link href="#alteracoes" className="text-blue-600 hover:underline">• Alterações</Link>
-              <Link href="#contato" className="text-blue-600 hover:underline">• Contato</Link>
+              <Link href="#interpretacao" className="text-info hover:underline">• Interpretação e Definições</Link>
+              <Link href="#coleta" className="text-info hover:underline">• Coleta de Dados</Link>
+              <Link href="#uso" className="text-info hover:underline">• Uso dos Dados</Link>
+              <Link href="#retencao" className="text-info hover:underline">• Retenção de Dados</Link>
+              <Link href="#transferencia" className="text-info hover:underline">• Transferência de Dados</Link>
+              <Link href="#seguranca" className="text-info hover:underline">• Segurança</Link>
+              <Link href="#criancas" className="text-info hover:underline">• Privacidade de Menores</Link>
+              <Link href="#alteracoes" className="text-info hover:underline">• Alterações</Link>
+              <Link href="#contato" className="text-info hover:underline">• Contato</Link>
             </div>
           </CardContent>
         </Card>
@@ -89,7 +89,7 @@ export default function PrivacyPolicyPage() {
                 <li><strong>Serviço</strong> refere-se ao Site.</li>
                 <li><strong>Provedor de Serviços</strong> significa qualquer pessoa física ou jurídica que processa os dados em nome da Empresa.</li>
                 <li><strong>Dados de Uso</strong> refere-se aos dados coletados automaticamente, gerados pelo uso do Serviço.</li>
-                <li><strong>Site</strong> refere-se ao Agendamento ICVCG, acessível em <a href="https://agendamento-cg.vercel.app/" target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline">https://agendamento-cg.vercel.app/</a></li>
+                <li><strong>Site</strong> refere-se ao Agendamento ICVCG, acessível em <a href="https://agendamento-cg.vercel.app/" target="_blank" rel="noopener noreferrer" className="text-info hover:underline">https://agendamento-cg.vercel.app/</a></li>
                 <li><strong>Você</strong> significa o indivíduo que acessa ou usa o Serviço.</li>
               </ul>
             </div>
@@ -341,11 +341,11 @@ export default function PrivacyPolicyPage() {
           <CardContent>
             <div className="prose prose-gray dark:prose-invert max-w-none">
               <p>Se você tiver alguma dúvida sobre esta Política de Privacidade, pode entrar em contato conosco:</p>
-              <div className="bg-blue-50 dark:bg-blue-900/20 p-4 rounded-lg mt-4">
+              <div className="bg-info/10 p-4 rounded-lg mt-4">
                 <p className="flex items-center mb-0">
-                  <Mail className="h-4 w-4 mr-2 text-blue-600" />
+                  <Mail className="h-4 w-4 mr-2 text-info" />
                   <strong>Por email:</strong> 
-                  <a href="mailto:matheus.ramalho1354@gmail.com" className="ml-2 text-blue-600 hover:underline">
+                  <a href="mailto:matheus.ramalho1354@gmail.com" className="ml-2 text-info hover:underline">
                     matheus.ramalho1354@gmail.com
                   </a>
                 </p>
@@ -356,14 +356,14 @@ export default function PrivacyPolicyPage() {
 
         {/* Footer */}
         <div className="text-center py-8">
-          <p className="text-gray-600 dark:text-gray-400">
+          <p className="text-muted-foreground">
             © 2025 Agendamento ICVCG. Todos os direitos reservados.
           </p>
           <div className="mt-4">
-            <Link href="/" className="text-blue-600 hover:underline mr-4">
+            <Link href="/" className="text-info hover:underline mr-4">
               Voltar ao Início
             </Link>
-            <Link href="/profile" className="text-blue-600 hover:underline">
+            <Link href="/profile" className="text-info hover:underline">
               Meu Perfil
             </Link>
           </div>

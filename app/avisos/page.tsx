@@ -36,9 +36,9 @@ interface Announcement {
 
 const TYPE_LABELS = { event: "Evento", general: "Comunicado Geral", ministry: "Aviso de Ministério" }
 const STATUS_CONFIG = {
-  pending: { label: "Aguardando revisão", color: "bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400" },
-  approved: { label: "Aprovado", color: "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400" },
-  rejected: { label: "Rejeitado", color: "bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400" },
+  pending: { label: "Aguardando revisão", color: "bg-warning/15 text-warning" },
+  approved: { label: "Aprovado", color: "bg-success/15 text-success" },
+  rejected: { label: "Rejeitado", color: "bg-destructive/15 text-destructive" },
 }
 
 export default function AvisosPage() {
@@ -157,7 +157,7 @@ export default function AvisosPage() {
                     </div>
                     <div className="flex gap-1 shrink-0">
                       {a.status === "pending" && (
-                        <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:text-red-600" onClick={() => setDeleteId(a.id)}>
+                        <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:text-destructive" onClick={() => setDeleteId(a.id)}>
                           <Trash2 className="h-3.5 w-3.5" />
                         </Button>
                       )}
@@ -215,7 +215,7 @@ export default function AvisosPage() {
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Manter</AlertDialogCancel>
-            <AlertDialogAction className="bg-red-600 hover:bg-red-700" onClick={handleDelete}>Remover</AlertDialogAction>
+            <AlertDialogAction className="bg-destructive hover:bg-destructive/90" onClick={handleDelete}>Remover</AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
