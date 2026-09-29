@@ -24,6 +24,7 @@ interface PeriodData {
     name: string
     color: string
   } | null
+  late: boolean
 }
 
 

@@ -38,6 +38,8 @@ import {
   ChevronDown,
   ChevronUp,
   Plus,
+  HelpCircle,
+  Clock3,
 } from "lucide-react"
 import { format, parseISO } from "date-fns"
 import { ptBR } from "date-fns/locale"
@@ -53,6 +55,8 @@ import type {
 interface ScheduleBuilderProps {
   periodId: string
   periodLabel?: string
+  /** Respostas enviadas depois deste momento são marcadas como tardias */
+  availabilityDeadline?: string | null
   events: ScheduleEvent[]
   areas: Area[]
   servants: Servant[]
@@ -64,6 +68,7 @@ interface ScheduleBuilderProps {
 export function ScheduleBuilder({
   periodId,
   periodLabel,
+  availabilityDeadline,
   events,
   areas,
   servants,
@@ -94,6 +99,23 @@ export function ScheduleBuilder({
 
   const isServantAvailable = (servantId: string, eventId: string) =>
     !unavailableSet.has(`${servantId}-${eventId}`)
+
+  // Quem respondeu, quem alterou depois do prazo e o motivo de cada indisponibilidade.
+  // Sem resposta = considerado disponível, mas sinalizado com "?"
+  const { respondedSet, lateSet, unavailableReason } = useMemo(() => {
+    const responded = new Set<string>()
+    const late = new Set<string>()
+    const reasons = new Map<string, string>()
+    const deadline = availabilityDeadline ? new Date(availabilityDeadline) : null
+    availabilities.forEach((a) => {
+      responded.add(a.servant_id)
+      // Registros legados de auto-preenchimento não contam como alteração tardia
+      const autoFilled = !!a.notes?.includes("automaticamente")
+      if (deadline && !autoFilled && new Date(a.submitted_at) > deadline) late.add(a.servant_id)
+      if (!a.is_available && a.notes) reasons.set(`${a.servant_id}-${a.event_id}`, a.notes)
+    })
+    return { respondedSet: responded, lateSet: late, unavailableReason: reasons }
+  }, [availabilities, availabilityDeadline])
 
   const getEventAssignments = useMemo(() => {
     const assignmentMap = new Map<string, ScheduleAssignment[]>()
@@ -184,10 +206,12 @@ export function ScheduleBuilder({
           availCount,
           assignCount,
           ids,
+          responded: ids.some((id) => respondedSet.has(id)),
+          late: ids.some((id) => lateSet.has(id)),
         }
       })
       .sort((a, b) => a.name.localeCompare(b.name)) // ordenação base sempre por nome
-  }, [servants, events, unavailableSet, servantAssignmentCount])
+  }, [servants, events, unavailableSet, servantAssignmentCount, respondedSet, lateSet])
 
   const sortedSummary = useMemo(() => {
     const copy = [...servantSummary]
@@ -724,6 +748,8 @@ export function ScheduleBuilder({
                                       })
                                       .map((servant) => {
                                         const available = isServantAvailable(servant.id, selectedEvent.id)
+                                        const responded = respondedSet.has(servant.id)
+                                        const reason = unavailableReason.get(`${servant.id}-${selectedEvent.id}`)
                                         const assignCount = servantAssignmentCount.get(servant.id) || 0
                                         const availEventCount = servantAvailableEventCount.get(servant.id) ?? 0
                                         return (
@@ -733,16 +759,36 @@ export function ScheduleBuilder({
                                             disabled={!available}
                                             className={!available ? "opacity-50" : ""}
                                           >
-                                            <div className="flex items-center gap-2 w-full">
-                                              {available ? (
+                                            <div
+                                              className="flex items-center gap-2 w-full"
+                                              title={
+                                                !available
+                                                  ? `Indisponível${reason ? `: ${reason}` : ""}`
+                                                  : !responded
+                                                    ? "Não respondeu a disponibilidade (considerado disponível)"
+                                                    : undefined
+                                              }
+                                            >
+                                              {!available ? (
+                                                <AlertCircle className="h-3 w-3 text-red-500 flex-shrink-0" />
+                                              ) : responded ? (
                                                 <Check className="h-3 w-3 text-green-500 flex-shrink-0" />
                                               ) : (
-                                                <AlertCircle className="h-3 w-3 text-red-500 flex-shrink-0" />
+                                                <HelpCircle className="h-3 w-3 text-muted-foreground flex-shrink-0" />
                                               )}
                                               <span className="flex-1 truncate">
                                                 {servant.name}
                                                 {servant.is_leader && (
                                                   <Crown className="inline h-3 w-3 text-yellow-500 ml-1 flex-shrink-0" />
+                                                )}
+                                                {!available && reason && (
+                                                  <span className="ml-1 text-xs text-muted-foreground">({reason})</span>
+                                                )}
+                                                {lateSet.has(servant.id) && (
+                                                  <Clock3
+                                                    className="inline h-3 w-3 text-amber-500 ml-1 flex-shrink-0"
+                                                    aria-label="Alterou a disponibilidade após o prazo"
+                                                  />
                                                 )}
                                               </span>
                                               <div className="flex items-center gap-1 flex-shrink-0 ml-auto">
@@ -864,19 +910,36 @@ export function ScheduleBuilder({
                       )}
                     </div>
                     <div className="flex items-center gap-1.5 flex-shrink-0">
-                      <Badge
-                        variant="outline"
-                        className={`text-xs ${
-                          availRatio < 0.5
-                            ? "border-red-300 text-red-600"
-                            : availRatio < 0.8
-                            ? "border-amber-300 text-amber-600"
-                            : "border-green-300 text-green-600"
-                        }`}
-                        title={`Disponível em ${servant.availCount} de ${events.length} eventos`}
-                      >
-                        disp. {servant.availCount}/{events.length}
-                      </Badge>
+                      {servant.late && (
+                        <Clock3
+                          className="h-3.5 w-3.5 text-amber-500"
+                          aria-label="Alterou a disponibilidade após o prazo"
+                        />
+                      )}
+                      {servant.responded ? (
+                        <Badge
+                          variant="outline"
+                          className={`text-xs ${
+                            availRatio < 0.5
+                              ? "border-red-300 text-red-600"
+                              : availRatio < 0.8
+                              ? "border-amber-300 text-amber-600"
+                              : "border-green-300 text-green-600"
+                          }`}
+                          title={`Disponível em ${servant.availCount} de ${events.length} eventos`}
+                        >
+                          disp. {servant.availCount}/{events.length}
+                        </Badge>
+                      ) : (
+                        <Badge
+                          variant="outline"
+                          className="text-xs text-muted-foreground border-dashed"
+                          title="Não respondeu a disponibilidade (considerado disponível)"
+                        >
+                          <HelpCircle className="mr-1 h-3 w-3" />
+                          sem resposta
+                        </Badge>
+                      )}
                       <Badge
                         variant={servant.assignCount > 0 ? "secondary" : "outline"}
                         className="text-xs"

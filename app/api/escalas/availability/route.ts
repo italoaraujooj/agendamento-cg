@@ -2,7 +2,13 @@ import { NextRequest, NextResponse } from "next/server"
 import { createAdminClient } from "@/lib/supabase/server"
 import { z } from "zod"
 import { verifyAvailabilityToken } from "@/lib/escalas/availability-token"
-import { checkPeriodOpen, findMinistryServants, samePersonIds } from "@/lib/escalas/availability"
+import {
+  checkPeriodOpen,
+  findMinistryServants,
+  loadSavedAnswers,
+  notifyLateAvailabilityChange,
+  samePersonIds,
+} from "@/lib/escalas/availability"
 
 const availabilitySubmissionSchema = z.object({
   servant_id: z.string().uuid(),
@@ -53,9 +59,10 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Período não encontrado" }, { status: 404 })
     }
 
-    if (!checkPeriodOpen(period).open) {
+    const open = checkPeriodOpen(period)
+    if (!open.open) {
       return NextResponse.json(
-        { error: "O prazo para informar disponibilidade já encerrou" },
+        { error: "A escala deste período já foi publicada. Fale com o líder do ministério para alterações." },
         { status: 400 }
       )
     }
@@ -76,6 +83,9 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Servo não encontrado" }, { status: 404 })
     }
     const personIds = samePersonIds(servants, servant)
+
+    // Alteração tardia: guarda o estado anterior para avisar o líder do que mudou
+    const previous = open.late ? await loadSavedAnswers(supabase, period_id, personIds) : null
 
     const submittedAt = new Date().toISOString()
     const records = personIds.flatMap((id) =>
@@ -108,11 +118,30 @@ export async function POST(request: NextRequest) {
       .eq("id", servant_id)
       .eq("is_active", false)
 
+    if (previous) {
+      try {
+        await notifyLateAvailabilityChange(supabase, {
+          periodId: period_id,
+          servantName: servant.name,
+          before: previous.answers,
+          after: answers.map((a) => ({
+            event_id: a.event_id,
+            is_available: a.is_available,
+            notes: a.notes?.trim() || null,
+          })),
+        })
+      } catch (notifyError) {
+        // A resposta já foi salva; falha no aviso não deve bloquear o servo
+        console.error("Erro ao avisar líder sobre alteração tardia:", notifyError)
+      }
+    }
+
     return NextResponse.json({
       success: true,
       message: "Disponibilidade registrada com sucesso!",
       count: answers.length,
       submitted_at: submittedAt,
+      late: open.late,
     })
   } catch (error) {
     console.error("Erro na API de disponibilidade:", error)

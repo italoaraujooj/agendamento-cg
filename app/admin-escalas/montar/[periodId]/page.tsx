@@ -295,6 +295,7 @@ export default function MontarEscalaPage() {
         <ScheduleBuilder
           periodId={periodId}
           periodLabel={`${period.ministry?.name} · ${format(new Date(period.year, period.month - 1), "MMMM 'de' yyyy", { locale: ptBR })}`}
+          availabilityDeadline={period.availability_deadline}
           events={events}
           areas={areas}
           servants={servants}

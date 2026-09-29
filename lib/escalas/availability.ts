@@ -1,7 +1,17 @@
 import type { SupabaseClient } from "@supabase/supabase-js"
+import { format } from "date-fns"
+import { ptBR } from "date-fns/locale"
+import { signAvailabilityToken } from "@/lib/escalas/availability-token"
+import {
+  APP_URL,
+  availabilityInviteEmail,
+  lateAvailabilityChangeEmail,
+  sendEmails,
+  type EmailMessage,
+} from "@/lib/escalas/email"
 
 /**
- * Helpers do fluxo público de disponibilidade (/disponibilidade/[token]).
+ * Helpers do fluxo de disponibilidade (/disponibilidade/[token]).
  */
 
 export interface MinistryServant {
@@ -22,19 +32,22 @@ export interface OpenPeriod {
 }
 
 export type PeriodLookup =
-  | { ok: true; period: OpenPeriod }
+  | { ok: true; period: OpenPeriod; late: boolean }
   | { ok: false; status: number; error: string; periodStatus?: string; deadline?: string }
 
-/** Verifica se o período está aceitando respostas (status + prazo). */
+/**
+ * Respostas são aceitas enquanto a escala não foi publicada
+ * (status "collecting" ou "scheduling"). Depois do prazo, ou com a escala já
+ * em montagem, a resposta é tardia: continua sendo aceita, mas o líder é avisado.
+ */
 export function checkPeriodOpen(period: {
   status: string
   availability_deadline: string | null
-}): { open: true } | { open: false; reason: "status" | "deadline" } {
-  if (period.status !== "collecting") return { open: false, reason: "status" }
-  if (period.availability_deadline && new Date() > new Date(period.availability_deadline)) {
-    return { open: false, reason: "deadline" }
-  }
-  return { open: true }
+}): { open: false } | { open: true; late: boolean } {
+  if (period.status !== "collecting" && period.status !== "scheduling") return { open: false }
+  const pastDeadline =
+    !!period.availability_deadline && new Date() > new Date(period.availability_deadline)
+  return { open: true, late: period.status === "scheduling" || pastDeadline }
 }
 
 export async function findOpenPeriodByToken(
@@ -56,13 +69,13 @@ export async function findOpenPeriodByToken(
     return {
       ok: false,
       status: 400,
-      error: "O prazo para informar disponibilidade já encerrou",
+      error: "A escala deste período já foi publicada. Fale com o líder do ministério para alterações.",
       periodStatus: period.status,
       deadline: period.availability_deadline ?? undefined,
     }
   }
 
-  return { ok: true, period: period as unknown as OpenPeriod }
+  return { ok: true, period: period as unknown as OpenPeriod, late: open.late }
 }
 
 /**
@@ -113,6 +126,38 @@ export function samePersonIds(servants: MinistryServant[], target: MinistryServa
     .map((s) => s.id)
 }
 
+export interface Person {
+  /** Registro usado no link pessoal (prefere ativo e com e-mail) */
+  primary: MinistryServant
+  ids: string[]
+  email: string | null
+  isActive: boolean
+}
+
+/** Agrupa os registros de servo do ministério por pessoa. */
+export function groupPeople(servants: MinistryServant[]): Person[] {
+  const seen = new Set<string>()
+  const people: Person[] = []
+  for (const s of servants) {
+    if (seen.has(s.id)) continue
+    const ids = samePersonIds(servants, s)
+    ids.forEach((id) => seen.add(id))
+    const records = servants.filter((x) => ids.includes(x.id))
+    const primary =
+      records.find((r) => r.is_active && r.email) ??
+      records.find((r) => r.email) ??
+      records.find((r) => r.is_active) ??
+      records[0]
+    people.push({
+      primary,
+      ids,
+      email: records.find((r) => r.email)?.email ?? null,
+      isActive: records.some((r) => r.is_active),
+    })
+  }
+  return people
+}
+
 export interface SavedAnswers {
   answers: { event_id: string; is_available: boolean; notes: string | null }[]
   submitted_at: string | null
@@ -141,4 +186,159 @@ export async function loadSavedAnswers(
     .map((r: any) => ({ event_id: r.event_id, is_available: r.is_available, notes: r.notes }))
 
   return { answers, submitted_at: rows[0].submitted_at }
+}
+
+/** Link pessoal: abre o formulário já identificado, sem pedir e-mail. */
+export function personalAvailabilityLink(periodToken: string, servantId: string, periodId: string) {
+  const k = signAvailabilityToken(servantId, periodId)
+  return `${APP_URL}/disponibilidade/${periodToken}?s=${servantId}&k=${k}`
+}
+
+export const monthLabel = (month: number, year: number) =>
+  format(new Date(year, month - 1), "MMMM 'de' yyyy", { locale: ptBR })
+
+export const deadlineLabel = (deadline: string | null) =>
+  deadline
+    ? format(new Date(deadline), "dd/MM/yyyy 'às' HH:mm", { locale: ptBR })
+    : null
+
+/**
+ * Envia o link pessoal de disponibilidade por e-mail.
+ * mode "all": todos os servos ativos; "pending": só quem ainda não respondeu.
+ */
+export async function sendAvailabilityInvites(
+  supabase: SupabaseClient,
+  periodId: string,
+  mode: "all" | "pending"
+): Promise<{ sent: number; failed: number; withoutEmail: string[]; recipients: number }> {
+  const { data: period } = await supabase
+    .from("schedule_periods")
+    .select("id, month, year, availability_deadline, availability_token, ministry:ministries(id, name)")
+    .eq("id", periodId)
+    .single()
+
+  const ministry = period?.ministry as unknown as { id: string; name: string } | null
+  if (!period || !ministry) return { sent: 0, failed: 0, withoutEmail: [], recipients: 0 }
+
+  const servants = await findMinistryServants(supabase, ministry.id)
+  let people = groupPeople(servants).filter((p) => p.isActive)
+
+  if (mode === "pending") {
+    const { data: rows } = await supabase
+      .from("servant_availability")
+      .select("servant_id")
+      .eq("period_id", periodId)
+    const responded = new Set((rows ?? []).map((r: { servant_id: string }) => r.servant_id))
+    people = people.filter((p) => !p.ids.some((id) => responded.has(id)))
+  }
+
+  const withoutEmail = people.filter((p) => !p.email).map((p) => p.primary.name)
+  const messages: EmailMessage[] = people
+    .filter((p) => p.email)
+    .map((p) => {
+      const { subject, html } = availabilityInviteEmail({
+        name: p.primary.name,
+        ministryName: ministry.name,
+        monthLabel: monthLabel(period.month, period.year),
+        deadlineLabel: deadlineLabel(period.availability_deadline),
+        link: personalAvailabilityLink(period.availability_token, p.primary.id, period.id),
+        reminder: mode === "pending",
+      })
+      return { to: p.email!, subject, html }
+    })
+
+  const result = await sendEmails(messages)
+  return { ...result, withoutEmail, recipients: messages.length }
+}
+
+/** E-mails de quem gerencia o ministério: líder/co-líder e user_ministry_roles. */
+export async function findMinistryManagerEmails(
+  supabase: SupabaseClient,
+  ministryId: string
+): Promise<string[]> {
+  const [{ data: ministry }, { data: roles }] = await Promise.all([
+    supabase
+      .from("ministries")
+      .select(
+        "leader:servants!ministries_leader_id_fkey(email, user_id), co_leader:servants!ministries_co_leader_id_fkey(email, user_id)"
+      )
+      .eq("id", ministryId)
+      .maybeSingle(),
+    supabase.from("user_ministry_roles").select("user_id").eq("ministry_id", ministryId),
+  ])
+
+  const emails = new Set<string>()
+  const userIds = new Set<string>((roles ?? []).map((r: { user_id: string }) => r.user_id))
+  for (const leader of [(ministry as any)?.leader, (ministry as any)?.co_leader]) {
+    if (leader?.email) emails.add(leader.email.toLowerCase())
+    else if (leader?.user_id) userIds.add(leader.user_id)
+  }
+
+  if (userIds.size > 0) {
+    const { data: profiles } = await supabase
+      .from("profiles")
+      .select("email")
+      .in("id", Array.from(userIds))
+    profiles?.forEach((p: { email: string | null }) => p.email && emails.add(p.email.toLowerCase()))
+  }
+
+  return Array.from(emails)
+}
+
+const answerLabel = (a: { is_available: boolean; notes: string | null } | undefined) =>
+  !a ? "Sem resposta" : a.is_available ? "Disponível" : a.notes ? `Indisponível (${a.notes})` : "Indisponível"
+
+/** Avisa os líderes quando alguém altera a disponibilidade depois do prazo. */
+export async function notifyLateAvailabilityChange(
+  supabase: SupabaseClient,
+  params: {
+    periodId: string
+    servantName: string
+    before: SavedAnswers["answers"]
+    after: SavedAnswers["answers"]
+  }
+): Promise<void> {
+  const beforeMap = new Map(params.before.map((a) => [a.event_id, a]))
+  const changedIds = params.after
+    .filter((a) => {
+      const prev = beforeMap.get(a.event_id)
+      return !prev || prev.is_available !== a.is_available || (prev.notes ?? null) !== (a.notes ?? null)
+    })
+    .map((a) => a.event_id)
+  if (changedIds.length === 0) return
+
+  const { data: period } = await supabase
+    .from("schedule_periods")
+    .select("id, month, year, ministry:ministries(id, name)")
+    .eq("id", params.periodId)
+    .single()
+  const ministry = period?.ministry as unknown as { id: string; name: string } | null
+  if (!period || !ministry) return
+
+  const recipients = await findMinistryManagerEmails(supabase, ministry.id)
+  if (recipients.length === 0) return
+
+  const { data: events } = await supabase
+    .from("schedule_events")
+    .select("id, event_date, event_time, title")
+    .in("id", changedIds)
+    .order("event_date")
+    .order("event_time")
+
+  const afterMap = new Map(params.after.map((a) => [a.event_id, a]))
+  const changes = (events ?? []).map((e: any) => ({
+    label: `${format(new Date(`${e.event_date}T12:00:00`), "dd/MM (EEE)", { locale: ptBR })} ${e.event_time.slice(0, 5)} — ${e.title}`,
+    before: answerLabel(beforeMap.get(e.id)),
+    after: answerLabel(afterMap.get(e.id)),
+  }))
+
+  const { subject, html } = lateAvailabilityChangeEmail({
+    servantName: params.servantName,
+    ministryName: ministry.name,
+    monthLabel: monthLabel(period.month, period.year),
+    changes,
+    link: `${APP_URL}/admin-escalas/montar/${period.id}`,
+  })
+
+  await sendEmails(recipients.map((to) => ({ to, subject, html })))
 }

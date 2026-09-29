@@ -5,10 +5,9 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { Checkbox } from "@/components/ui/checkbox"
 import { Textarea } from "@/components/ui/textarea"
 import { Badge } from "@/components/ui/badge"
-import { Loader2, CheckCircle, Calendar, Clock, AlertCircle, Pencil } from "lucide-react"
+import { Loader2, CheckCircle, Calendar, Clock, AlertCircle, AlertTriangle, Pencil, Check, X } from "lucide-react"
 import { format, parseISO } from "date-fns"
 import { ptBR } from "date-fns/locale"
 import { toast } from "sonner"
@@ -38,11 +37,15 @@ interface AvailabilityFormProps {
     year: number
     availability_deadline: string | null
     ministry: Pick<Ministry, 'id' | 'name' | 'color'> | null
+    /** Prazo encerrado ou escala em montagem: resposta é aceita, mas avisa o líder */
+    late?: boolean
   }
   events: AvailabilityEvent[]
   /** Identificação automática (usuário logado vinculado a um servo) */
   initialIdentity?: IdentifiedServant | null
 }
+
+const REASON_CHIPS = ["Viagem", "Trabalho", "Saúde", "Compromisso familiar"]
 
 const storageKey = (periodToken: string) => `disponibilidade:${periodToken}`
 
@@ -74,11 +77,22 @@ function clearStoredIdentity(periodToken: string) {
   }
 }
 
+/** Link pessoal (?s=&k=) enviado por e-mail; removido da barra de endereço após ler */
+function readPersonalLinkParams(): { servant_id: string; access_token: string } | null {
+  const params = new URLSearchParams(window.location.search)
+  const s = params.get("s")
+  const k = params.get("k")
+  if (!s || !k) return null
+  window.history.replaceState(null, "", window.location.pathname)
+  return { servant_id: s, access_token: k }
+}
+
 export function AvailabilityForm({ periodToken, period, events, initialIdentity }: AvailabilityFormProps) {
   const [step, setStep] = useState<"identify" | "availability" | "success">("identify")
   const [email, setEmail] = useState("")
   const [identity, setIdentity] = useState<IdentifiedServant | null>(null)
-  const [availabilities, setAvailabilities] = useState<Record<string, boolean>>({})
+  // undefined = ainda não respondeu este evento
+  const [availabilities, setAvailabilities] = useState<Record<string, boolean | undefined>>({})
   const [notes, setNotes] = useState<Record<string, string>>({})
   const [isIdentifying, setIsIdentifying] = useState(false)
   const [isRestoring, setIsRestoring] = useState(true)
@@ -86,12 +100,11 @@ export function AvailabilityForm({ periodToken, period, events, initialIdentity 
 
   const applyIdentity = (data: IdentifiedServant) => {
     const saved = new Map(data.answers.map((a) => [a.event_id, a]))
-    const nextAvailability: Record<string, boolean> = {}
+    const nextAvailability: Record<string, boolean | undefined> = {}
     const nextNotes: Record<string, string> = {}
     events.forEach((e) => {
       const answer = saved.get(e.id)
-      // Sem resposta salva: por padrão, disponível
-      nextAvailability[e.id] = answer ? answer.is_available : true
+      nextAvailability[e.id] = answer?.is_available
       if (answer?.notes) nextNotes[e.id] = answer.notes
     })
     setAvailabilities(nextAvailability)
@@ -101,15 +114,16 @@ export function AvailabilityForm({ periodToken, period, events, initialIdentity 
     setStep("availability")
   }
 
-  // Retomar identificação: usuário logado ou token salvo neste dispositivo
+  // Retomar identificação: link pessoal, usuário logado ou token salvo neste dispositivo
   useEffect(() => {
-    if (initialIdentity) {
+    const fromLink = readPersonalLinkParams()
+    if (!fromLink && initialIdentity) {
       applyIdentity(initialIdentity)
       setIsRestoring(false)
       return
     }
 
-    const stored = readStoredIdentity(periodToken)
+    const stored = fromLink ?? readStoredIdentity(periodToken)
     if (!stored) {
       setIsRestoring(false)
       return
@@ -118,8 +132,12 @@ export function AvailabilityForm({ periodToken, period, events, initialIdentity 
     identify(stored)
       .then((data) => {
         if (data) applyIdentity(data)
-        else clearStoredIdentity(periodToken)
+        else {
+          clearStoredIdentity(periodToken)
+          if (fromLink) toast.error("Link pessoal inválido. Informe seu email para continuar.")
+        }
       })
+      .catch(() => toast.error("Erro ao conectar com o servidor"))
       .finally(() => setIsRestoring(false))
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
@@ -170,15 +188,33 @@ export function AvailabilityForm({ periodToken, period, events, initialIdentity 
     setStep("identify")
   }
 
+  const setAnswer = (eventId: string, value: boolean) =>
+    setAvailabilities((prev) => ({ ...prev, [eventId]: value }))
+
+  const setAll = (value: boolean) => {
+    const next: Record<string, boolean> = {}
+    events.forEach((e) => (next[e.id] = value))
+    setAvailabilities(next)
+  }
+
+  const toggleReasonChip = (eventId: string, chip: string) =>
+    setNotes((prev) => ({ ...prev, [eventId]: prev[eventId] === chip ? "" : chip }))
+
+  const isEditing = !!identity?.submitted_at
+  const answeredCount = events.filter((e) => availabilities[e.id] !== undefined).length
+  const availableCount = events.filter((e) => availabilities[e.id] === true).length
+  const totalCount = events.length
+  const missingCount = totalCount - answeredCount
+
   const handleSubmit = async () => {
     if (!identity) return
 
-    // Validar que eventos indisponíveis tenham motivo preenchido
-    const unavailableEvents = Object.entries(availabilities).filter(([_, isAvailable]) => !isAvailable)
-    const missingReasons = unavailableEvents.filter(([eventId]) => !notes[eventId]?.trim())
-
-    if (missingReasons.length > 0) {
-      toast.error("Por favor, informe o motivo da indisponibilidade para todos os eventos que você não poderá comparecer.")
+    if (missingCount > 0) {
+      toast.error(
+        missingCount === 1
+          ? "Falta responder 1 evento."
+          : `Faltam responder ${missingCount} eventos.`
+      )
       return
     }
 
@@ -189,10 +225,10 @@ export function AvailabilityForm({ periodToken, period, events, initialIdentity 
         servant_id: identity.servant.id,
         period_id: period.id,
         access_token: identity.access_token,
-        availabilities: Object.entries(availabilities).map(([eventId, isAvailable]) => ({
-          event_id: eventId,
-          is_available: isAvailable,
-          notes: isAvailable ? null : notes[eventId]?.trim() || null,
+        availabilities: events.map((e) => ({
+          event_id: e.id,
+          is_available: availabilities[e.id] === true,
+          notes: availabilities[e.id] ? null : notes[e.id]?.trim() || null,
         })),
       }
 
@@ -234,9 +270,19 @@ export function AvailabilityForm({ periodToken, period, events, initialIdentity 
   const formatSubmittedAt = (iso: string) =>
     format(new Date(iso), "dd/MM 'às' HH:mm", { locale: ptBR })
 
-  const isEditing = !!identity?.submitted_at
-  const availableCount = Object.values(availabilities).filter(Boolean).length
-  const totalCount = events.length
+  const lateNotice = period.late && (
+    <Card className="bg-amber-50 dark:bg-amber-950 border-amber-200 dark:border-amber-800">
+      <CardContent className="pt-4">
+        <div className="flex gap-3">
+          <AlertTriangle className="h-5 w-5 text-amber-600 dark:text-amber-400 flex-shrink-0 mt-0.5" />
+          <p className="text-sm text-amber-800 dark:text-amber-200">
+            O prazo para responder já encerrou. Você ainda pode enviar ou alterar sua
+            disponibilidade, e o líder do ministério será avisado da mudança.
+          </p>
+        </div>
+      </CardContent>
+    </Card>
+  )
 
   if (isRestoring) {
     return (
@@ -249,51 +295,54 @@ export function AvailabilityForm({ periodToken, period, events, initialIdentity 
   // Step 1: Identificação
   if (step === "identify") {
     return (
-      <Card className="max-w-md mx-auto">
-        <CardHeader className="text-center">
-          <div
-            className="w-16 h-16 rounded-full mx-auto mb-4 flex items-center justify-center"
-            style={{ backgroundColor: period.ministry?.color || '#3b82f6' }}
-          >
-            <Calendar className="h-8 w-8 text-white" />
-          </div>
-          <CardTitle>Disponibilidade - {period.ministry?.name}</CardTitle>
-          <CardDescription>
-            {format(new Date(period.year, period.month - 1), "MMMM 'de' yyyy", { locale: ptBR })}
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <form onSubmit={handleIdentify} className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="email">Seu Email</Label>
-              <Input
-                id="email"
-                type="email"
-                placeholder="seu@email.com"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                required
-              />
-              <p className="text-xs text-muted-foreground">
-                Use o mesmo email cadastrado no ministério. Se você já respondeu,
-                suas respostas serão carregadas para edição.
-              </p>
+      <div className="max-w-md mx-auto space-y-4">
+        {lateNotice}
+        <Card>
+          <CardHeader className="text-center">
+            <div
+              className="w-16 h-16 rounded-full mx-auto mb-4 flex items-center justify-center"
+              style={{ backgroundColor: period.ministry?.color || '#3b82f6' }}
+            >
+              <Calendar className="h-8 w-8 text-white" />
             </div>
-
-            {period.availability_deadline && (
-              <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                <Clock className="h-4 w-4" />
-                Prazo: {format(new Date(period.availability_deadline), "dd/MM/yyyy 'às' HH:mm")}
+            <CardTitle>Disponibilidade - {period.ministry?.name}</CardTitle>
+            <CardDescription>
+              {format(new Date(period.year, period.month - 1), "MMMM 'de' yyyy", { locale: ptBR })}
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <form onSubmit={handleIdentify} className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="email">Seu Email</Label>
+                <Input
+                  id="email"
+                  type="email"
+                  placeholder="seu@email.com"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  required
+                />
+                <p className="text-xs text-muted-foreground">
+                  Use o mesmo email cadastrado no ministério. Se você já respondeu,
+                  suas respostas serão carregadas para edição.
+                </p>
               </div>
-            )}
 
-            <Button type="submit" className="w-full" disabled={isIdentifying}>
-              {isIdentifying && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-              Continuar
-            </Button>
-          </form>
-        </CardContent>
-      </Card>
+              {period.availability_deadline && (
+                <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                  <Clock className="h-4 w-4" />
+                  Prazo: {format(new Date(period.availability_deadline), "dd/MM/yyyy 'às' HH:mm")}
+                </div>
+              )}
+
+              <Button type="submit" className="w-full" disabled={isIdentifying}>
+                {isIdentifying && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                Continuar
+              </Button>
+            </form>
+          </CardContent>
+        </Card>
+      </div>
     )
   }
 
@@ -305,15 +354,16 @@ export function AvailabilityForm({ periodToken, period, events, initialIdentity 
           <CheckCircle className="h-16 w-16 text-green-500 mx-auto mb-4" />
           <h2 className="text-2xl font-bold mb-2">Enviado com Sucesso!</h2>
           <p className="text-muted-foreground mb-4">
-            Sua disponibilidade foi registrada. Você pode voltar a este link e
-            editar suas respostas até o prazo.
+            {period.late
+              ? "Sua disponibilidade foi registrada e o líder do ministério foi avisado."
+              : "Sua disponibilidade foi registrada. Você pode voltar a este link e editar suas respostas até o prazo."}
           </p>
           <div className="p-4 rounded-lg bg-muted/50 mb-4">
             <p className="text-sm">
               <strong>{identity?.servant.name}</strong>
             </p>
             <p className="text-sm text-muted-foreground">
-              {availableCount} de {totalCount} eventos disponível
+              Disponível em {availableCount} de {totalCount} eventos
             </p>
           </div>
           <Button variant="outline" onClick={() => setStep("availability")}>
@@ -345,16 +395,21 @@ export function AvailabilityForm({ periodToken, period, events, initialIdentity 
                 Não é você?
               </button>
             </div>
-            <Badge variant="outline" className="flex-shrink-0">
-              {availableCount}/{totalCount} disponível
-            </Badge>
+            {period.availability_deadline && !period.late && (
+              <Badge variant="outline" className="flex-shrink-0 gap-1">
+                <Clock className="h-3 w-3" />
+                até {format(new Date(period.availability_deadline), "dd/MM HH:mm")}
+              </Badge>
+            )}
           </div>
         </CardContent>
       </Card>
 
-      {/* Instruções */}
+      {lateNotice}
+
+      {/* Instruções + ações em lote */}
       <Card className="bg-blue-50 dark:bg-blue-950 border-blue-200 dark:border-blue-800">
-        <CardContent className="pt-4">
+        <CardContent className="pt-4 space-y-3">
           <div className="flex gap-3">
             <AlertCircle className="h-5 w-5 text-blue-600 dark:text-blue-400 flex-shrink-0 mt-0.5" />
             <div className="text-sm">
@@ -365,10 +420,19 @@ export function AvailabilityForm({ periodToken, period, events, initialIdentity 
                 {isEditing && identity?.submitted_at && (
                   <>Última atualização em {formatSubmittedAt(identity.submitted_at)}. </>
                 )}
-                Marque os eventos em que você <strong>estará disponível</strong> para servir.
-                Desmarque os que você não poderá comparecer.
+                Para cada evento, marque <strong>Posso</strong> ou <strong>Não posso</strong>.
               </p>
             </div>
+          </div>
+          <div className="flex flex-wrap gap-2 pl-8">
+            <Button type="button" size="sm" variant="outline" className="bg-background" onClick={() => setAll(true)}>
+              <Check className="mr-1.5 h-3.5 w-3.5 text-green-600" />
+              Posso em todos
+            </Button>
+            <Button type="button" size="sm" variant="outline" className="bg-background" onClick={() => setAll(false)}>
+              <X className="mr-1.5 h-3.5 w-3.5 text-red-600" />
+              Não posso em nenhum
+            </Button>
           </div>
         </CardContent>
       </Card>
@@ -386,62 +450,89 @@ export function AvailabilityForm({ periodToken, period, events, initialIdentity 
             <CardContent className="space-y-3">
               {dateEvents
                 .sort((a, b) => a.event_time.localeCompare(b.event_time))
-                .map((event) => (
-                  <div
-                    key={event.id}
-                    className={`p-3 rounded-lg border transition-colors ${
-                      availabilities[event.id]
-                        ? "bg-green-50 dark:bg-green-950 border-green-200 dark:border-green-800"
-                        : "bg-red-50 dark:bg-red-950 border-red-200 dark:border-red-800"
-                    }`}
-                  >
-                    <div className="flex items-start gap-3">
-                      <Checkbox
-                        id={event.id}
-                        checked={availabilities[event.id]}
-                        onCheckedChange={(checked) =>
-                          setAvailabilities((prev) => ({
-                            ...prev,
-                            [event.id]: !!checked,
-                          }))
-                        }
-                        className="mt-1"
-                      />
-                      <div className="flex-1">
-                        <Label
-                          htmlFor={event.id}
-                          className="font-medium cursor-pointer flex items-center gap-2"
-                        >
-                          <span className="font-mono text-sm">
-                            {formatEventTime(event.event_time)}
-                          </span>
-                          <span>{event.title}</span>
-                        </Label>
-                        {event.description && (
-                          <p className="text-xs text-muted-foreground mt-1">
-                            {event.description}
+                .map((event) => {
+                  const answer = availabilities[event.id]
+                  return (
+                    <div
+                      key={event.id}
+                      className={`p-3 rounded-lg border transition-colors ${
+                        answer === true
+                          ? "bg-green-50 dark:bg-green-950 border-green-200 dark:border-green-800"
+                          : answer === false
+                            ? "bg-red-50 dark:bg-red-950 border-red-200 dark:border-red-800"
+                            : "bg-background"
+                      }`}
+                    >
+                      <div className="flex flex-col sm:flex-row sm:items-center gap-3">
+                        <div className="flex-1 min-w-0">
+                          <p className="font-medium flex items-center gap-2">
+                            <span className="font-mono text-sm">{formatEventTime(event.event_time)}</span>
+                            <span>{event.title}</span>
                           </p>
-                        )}
-                        {!availabilities[event.id] && (
-                          <div className="mt-2">
-                            <Textarea
-                              placeholder="Motivo da indisponibilidade *"
-                              className="h-16 text-sm"
-                              value={notes[event.id] || ""}
-                              required
-                              onChange={(e) =>
-                                setNotes((prev) => ({
-                                  ...prev,
-                                  [event.id]: e.target.value,
-                                }))
-                              }
-                            />
-                          </div>
-                        )}
+                          {event.description && (
+                            <p className="text-xs text-muted-foreground mt-1">{event.description}</p>
+                          )}
+                        </div>
+                        <div className="flex gap-2 flex-shrink-0" role="radiogroup" aria-label={`Disponibilidade em ${event.title}`}>
+                          <Button
+                            type="button"
+                            size="sm"
+                            role="radio"
+                            aria-checked={answer === true}
+                            variant={answer === true ? "default" : "outline"}
+                            className={answer === true ? "bg-green-600 hover:bg-green-700 text-white" : ""}
+                            onClick={() => setAnswer(event.id, true)}
+                          >
+                            <Check className="mr-1 h-3.5 w-3.5" />
+                            Posso
+                          </Button>
+                          <Button
+                            type="button"
+                            size="sm"
+                            role="radio"
+                            aria-checked={answer === false}
+                            variant={answer === false ? "default" : "outline"}
+                            className={answer === false ? "bg-red-600 hover:bg-red-700 text-white" : ""}
+                            onClick={() => setAnswer(event.id, false)}
+                          >
+                            <X className="mr-1 h-3.5 w-3.5" />
+                            Não posso
+                          </Button>
+                        </div>
                       </div>
+
+                      {answer === false && (
+                        <div className="mt-3 space-y-2">
+                          <div className="flex flex-wrap gap-1.5">
+                            {REASON_CHIPS.map((chip) => (
+                              <button
+                                key={chip}
+                                type="button"
+                                onClick={() => toggleReasonChip(event.id, chip)}
+                                className={`text-xs px-2.5 py-1 rounded-full border transition-colors ${
+                                  notes[event.id] === chip
+                                    ? "bg-red-600 border-red-600 text-white"
+                                    : "bg-background hover:bg-muted"
+                                }`}
+                              >
+                                {chip}
+                              </button>
+                            ))}
+                          </div>
+                          <Textarea
+                            placeholder="Motivo (opcional) — ajuda o líder a montar a escala"
+                            className="h-14 text-sm"
+                            maxLength={200}
+                            value={notes[event.id] || ""}
+                            onChange={(e) =>
+                              setNotes((prev) => ({ ...prev, [event.id]: e.target.value }))
+                            }
+                          />
+                        </div>
+                      )}
                     </div>
-                  </div>
-                ))}
+                  )
+                })}
             </CardContent>
           </Card>
         ))}
@@ -452,12 +543,21 @@ export function AvailabilityForm({ periodToken, period, events, initialIdentity 
           <CardContent className="pt-4">
             <div className="flex items-center justify-between gap-4">
               <div className="text-sm">
-                <span className="font-medium">{availableCount}</span> de{" "}
-                <span className="font-medium">{totalCount}</span> eventos disponível
+                {missingCount > 0 ? (
+                  <span className="text-amber-700 dark:text-amber-400">
+                    <span className="font-medium">{answeredCount}</span> de{" "}
+                    <span className="font-medium">{totalCount}</span> respondidos
+                  </span>
+                ) : (
+                  <span>
+                    Disponível em <span className="font-medium">{availableCount}</span> de{" "}
+                    <span className="font-medium">{totalCount}</span>
+                  </span>
+                )}
               </div>
               <Button
                 onClick={handleSubmit}
-                disabled={isSubmitting}
+                disabled={isSubmitting || missingCount > 0}
                 size="lg"
               >
                 {isSubmitting ? (

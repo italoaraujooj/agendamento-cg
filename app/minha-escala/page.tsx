@@ -5,7 +5,8 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
-import { Loader2, Search, Calendar, Crown, ChevronDown, ChevronUp } from "lucide-react"
+import { Loader2, Search, Calendar, CalendarCheck, Crown, ChevronDown, ChevronUp } from "lucide-react"
+import Link from "next/link"
 import { format, parseISO } from "date-fns"
 import { ptBR } from "date-fns/locale"
 import { supabase } from "@/lib/supabase/client"
@@ -39,6 +40,18 @@ interface ApiResponse {
   periods: PeriodData[]
 }
 
+/** Coleta de disponibilidade aberta para o usuário logado */
+interface OpenCollection {
+  id: string
+  month: number
+  year: number
+  ministry: { name: string; color: string }
+  availability_deadline: string | null
+  late: boolean
+  submitted_at: string | null
+  link: string
+}
+
 export default function MinhaEscalaPage() {
   const [email, setEmail] = useState("")
   const [loading, setLoading] = useState(false)
@@ -47,6 +60,7 @@ export default function MinhaEscalaPage() {
   const [data, setData] = useState<ApiResponse | null>(null)
   const [collapsedPeriods, setCollapsedPeriods] = useState<Set<string>>(new Set())
   const [loggedInUser, setLoggedInUser] = useState<{ id: string; name: string | null } | null>(null)
+  const [openCollections, setOpenCollections] = useState<OpenCollection[]>([])
 
   // Auto-carregar escala se o usuário estiver logado
   useEffect(() => {
@@ -59,6 +73,12 @@ export default function MinhaEscalaPage() {
         }
 
         const userId = session.user.id
+
+        // Coletas de disponibilidade abertas (independente de já haver escala publicada)
+        fetch("/api/escalas/minha-disponibilidade")
+          .then((r) => (r.ok ? r.json() : { periods: [] }))
+          .then((d) => setOpenCollections(d.periods ?? []))
+          .catch(() => {})
 
         const res = await fetch(`/api/escalas/minha-escala?user_id=${encodeURIComponent(userId)}`)
         const json = await res.json()
@@ -158,6 +178,55 @@ export default function MinhaEscalaPage() {
               : "Digite seu email cadastrado para ver os eventos em que você está escalado."}
           </p>
         </div>
+
+        {/* Minha disponibilidade — coletas abertas para o usuário logado */}
+        {openCollections.length > 0 && (
+          <Card>
+            <CardHeader className="pb-3">
+              <CardTitle className="text-base flex items-center gap-2">
+                <CalendarCheck className="h-4 w-4 text-primary" />
+                Minha disponibilidade
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-2">
+              {openCollections.map((c) => (
+                <div
+                  key={c.id}
+                  className="flex items-center justify-between gap-3 rounded-lg border p-3"
+                >
+                  <div className="flex items-start gap-3 min-w-0">
+                    <div
+                      className="w-3 h-3 rounded-full flex-shrink-0 mt-1"
+                      style={{ backgroundColor: c.ministry.color }}
+                    />
+                    <div className="min-w-0">
+                      <p className="text-sm font-medium truncate">
+                        {c.ministry.name} ·{" "}
+                        <span className="capitalize">
+                          {format(new Date(c.year, c.month - 1), "MMMM", { locale: ptBR })}
+                        </span>
+                      </p>
+                      <p className="text-xs text-muted-foreground">
+                        {c.submitted_at ? (
+                          <>Respondida em {format(new Date(c.submitted_at), "dd/MM 'às' HH:mm")}</>
+                        ) : (
+                          <span className="text-amber-700 dark:text-amber-400 font-medium">Pendente</span>
+                        )}
+                        {c.availability_deadline && !c.late && (
+                          <> · prazo {format(new Date(c.availability_deadline), "dd/MM HH:mm")}</>
+                        )}
+                        {c.late && <> · prazo encerrado</>}
+                      </p>
+                    </div>
+                  </div>
+                  <Button size="sm" variant={c.submitted_at ? "outline" : "default"} asChild>
+                    <Link href={c.link}>{c.submitted_at ? "Editar" : "Responder"}</Link>
+                  </Button>
+                </div>
+              ))}
+            </CardContent>
+          </Card>
+        )}
 
         {/* Formulário — oculto quando já carregou automaticamente */}
         {!(loggedInUser && data) && (

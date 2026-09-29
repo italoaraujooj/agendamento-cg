@@ -1,8 +1,8 @@
 {
   "crons": [
     {
-      "path": "/api/cron/auto-fill-availability",
-      "schedule": "0 3 * * *"
+      "path": "/api/cron/availability-reminders",
+      "schedule": "0 12 * * *"
     }
   ]
 }
