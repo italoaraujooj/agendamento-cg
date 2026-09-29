@@ -4,8 +4,33 @@ import { createAdminClient } from "@/lib/supabase/server"
 import { getEscalasCaller } from "@/lib/escalas/auth"
 import { verifyScheduleToken } from "@/lib/escalas/availability-token"
 
+// Serviços de push dos navegadores (Chrome/Edge/Android, Firefox, Safari/iOS, Windows).
+// Restringir evita que o servidor seja usado para fazer requisições a URLs arbitrárias.
+const PUSH_SERVICE_HOSTS = [
+  "fcm.googleapis.com",
+  "android.googleapis.com",
+  "updates.push.services.mozilla.com",
+  "push.services.mozilla.com",
+  "web.push.apple.com",
+  "notify.windows.com",
+]
+
+function isAllowedPushEndpoint(endpoint: string): boolean {
+  try {
+    const url = new URL(endpoint)
+    // Só para testes locais (servidor de push falso); nunca definir em produção
+    if (process.env.PUSH_ALLOW_LOCAL_ENDPOINTS === "1" && url.hostname === "localhost") return true
+    return (
+      url.protocol === "https:" &&
+      PUSH_SERVICE_HOSTS.some((host) => url.hostname === host || url.hostname.endsWith(`.${host}`))
+    )
+  } catch {
+    return false
+  }
+}
+
 const subscriptionSchema = z.object({
-  endpoint: z.string().url().max(1000),
+  endpoint: z.string().url().max(1000).refine(isAllowedPushEndpoint, "Serviço de push não suportado"),
   keys: z.object({
     p256dh: z.string().min(1).max(200),
     auth: z.string().min(1).max(100),
