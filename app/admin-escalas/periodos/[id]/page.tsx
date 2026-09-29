@@ -34,6 +34,9 @@ import {
   Plus,
   X,
   FileText,
+  BellRing,
+  RotateCcw,
+  Clock3,
 } from "lucide-react"
 import {
   Dialog,
@@ -103,28 +106,36 @@ function AvailabilityTab({
   events,
   servants,
   periodLabel,
+  deadline,
   onRefresh,
 }: {
   availabilityData: AvailabilityRecord[]
   events: ScheduleEvent[]
   servants: ServantSummary[]
   periodLabel: string
+  deadline: string | null
   onRefresh: () => void
 }) {
+  // Resposta enviada depois do prazo (o prazo é fixado ao iniciar a montagem)
+  const isLate = (submittedAt: string) =>
+    !!deadline && new Date(submittedAt) > new Date(deadline)
+
   // Get unique servants who responded — deduplicated by name because a
   // servant registered in multiple areas has one servant_id per area, and
   // the availability API propagates a single submission across all of them
-  const servantsMap = new Map<string, { name: string; area: string; submittedAt: string; autoFilled: boolean }>()
+  const servantsMap = new Map<string, { name: string; area: string; submittedAt: string; autoFilled: boolean; late: boolean }>()
   for (const record of availabilityData) {
     if (!record.servant) continue
     const key = record.servant.name.toLowerCase().trim()
     const existing = servantsMap.get(key)
     if (!existing || record.submitted_at > existing.submittedAt) {
+      const autoFilled = isAutoFilled(record.notes)
       servantsMap.set(key, {
         name: record.servant.name,
         area: record.servant.area?.name || "",
         submittedAt: record.submitted_at,
-        autoFilled: isAutoFilled(record.notes),
+        autoFilled,
+        late: !autoFilled && isLate(record.submitted_at),
       })
     }
   }
@@ -279,6 +290,15 @@ function AvailabilityTab({
                     {servant.autoFilled && (
                       <span className="ml-1 italic">— não respondeu</span>
                     )}
+                    {servant.late && (
+                      <span
+                        className="ml-1 inline-flex items-center gap-0.5 text-amber-700 dark:text-amber-400"
+                        title={`Alterou em ${format(new Date(servant.submittedAt), "dd/MM 'às' HH:mm")}, depois do prazo`}
+                      >
+                        <Clock3 className="h-3 w-3" />
+                        após o prazo
+                      </span>
+                    )}
                   </Badge>
                 ))}
             </div>
@@ -431,6 +451,12 @@ export default function PeriodoDetalhePage() {
   // Delete event state
   const [deleteEventId, setDeleteEventId] = useState<string | null>(null)
   const [deleteEventLoading, setDeleteEventLoading] = useState(false)
+
+  // Coleta de disponibilidade: iniciar/reabrir com prazo e envio de e-mails
+  const [collectDialog, setCollectDialog] = useState<"start" | "reopen" | null>(null)
+  const [collectDeadline, setCollectDeadline] = useState("")
+  const [collectNotify, setCollectNotify] = useState(true)
+  const [remindDialog, setRemindDialog] = useState(false)
 
   // Report state
   const [reportDialogOpen, setReportDialogOpen] = useState(false)
@@ -639,33 +665,16 @@ export default function PeriodoDetalhePage() {
     }
   }
 
-  const handleChangeStatus = async (newStatus: string) => {
+  const handleChangeStatus = async (
+    newStatus: string,
+    extra: { availability_deadline?: string | null } = {}
+  ): Promise<boolean> => {
     setActionLoading("status")
     try {
-      // Ao iniciar a montagem da escala, preencher automaticamente quem não respondeu
-      if (newStatus === "scheduling") {
-        try {
-          const fillRes = await fetch(
-            `/api/escalas/schedule-periods/${periodId}/auto-fill-availability`,
-            { method: "POST" }
-          )
-          if (fillRes.ok) {
-            const fillData = await fillRes.json()
-            if (fillData.filled > 0) {
-              toast.info(
-                `${fillData.filled} servo(s) sem resposta foram marcados como disponíveis automaticamente`
-              )
-            }
-          }
-        } catch {
-          // Falha no auto-fill não impede a mudança de status
-        }
-      }
-
       const response = await fetch(`/api/escalas/schedule-periods/${periodId}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ status: newStatus }),
+        body: JSON.stringify({ status: newStatus, ...extra }),
       })
       const data = await response.json()
 
@@ -676,11 +685,76 @@ export default function PeriodoDetalhePage() {
       toast.success(`Status alterado para ${PERIOD_STATUS_LABELS[newStatus as keyof typeof PERIOD_STATUS_LABELS]}`)
       fetchPeriod()
       if (newStatus === "scheduling") fetchAvailability()
+      return true
     } catch (error) {
       console.error("Erro:", error)
       toast.error(error instanceof Error ? error.message : "Erro ao alterar status")
+      return false
     } finally {
       setActionLoading(null)
+    }
+  }
+
+  // Envia o link pessoal por e-mail (todos os servos ou só quem não respondeu)
+  const sendAvailabilityEmails = async (mode: "all" | "pending") => {
+    setActionLoading("notify")
+    try {
+      const response = await fetch(`/api/escalas/schedule-periods/${periodId}/notify-availability`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ mode }),
+      })
+      const data = await response.json()
+      if (!response.ok) throw new Error(data.error || "Erro ao enviar e-mails")
+
+      if (data.recipients === 0 && data.withoutEmail.length === 0) {
+        toast.info(mode === "pending" ? "Todos já responderam." : "Nenhum servo ativo para convidar.")
+        return
+      }
+      toast.success(`${data.sent} e-mail(s) enviado(s)`, {
+        description: [
+          data.failed > 0 ? `${data.failed} falharam.` : null,
+          data.withoutEmail.length > 0
+            ? `Sem e-mail cadastrado: ${data.withoutEmail.join(", ")}. Envie o link manualmente.`
+            : null,
+        ].filter(Boolean).join(" ") || undefined,
+        duration: data.withoutEmail.length > 0 ? 10000 : undefined,
+      })
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Erro ao enviar e-mails")
+    } finally {
+      setActionLoading(null)
+    }
+  }
+
+  const openCollectDialog = (mode: "start" | "reopen") => {
+    const current = period?.availability_deadline
+    setCollectDeadline(
+      current && new Date(current) > new Date()
+        ? format(new Date(current), "yyyy-MM-dd'T'HH:mm")
+        : ""
+    )
+    setCollectNotify(true)
+    setCollectDialog(mode)
+  }
+
+  const handleConfirmCollect = async () => {
+    const mode = collectDialog
+    if (!mode) return
+    if (mode === "reopen" && !collectDeadline) {
+      toast.error("Defina o novo prazo para reabrir a coleta")
+      return
+    }
+    const deadlineIso = collectDeadline ? new Date(collectDeadline).toISOString() : null
+    if (deadlineIso && new Date(deadlineIso) <= new Date()) {
+      toast.error("O prazo precisa ser no futuro")
+      return
+    }
+
+    setCollectDialog(null)
+    const ok = await handleChangeStatus("collecting", { availability_deadline: deadlineIso })
+    if (ok && collectNotify) {
+      await sendAvailabilityEmails(mode === "start" ? "all" : "pending")
     }
   }
 
@@ -865,7 +939,7 @@ export default function PeriodoDetalhePage() {
                   <Plus className="mr-2 h-4 w-4" />
                   Novo Evento
                 </Button>
-                <Button onClick={() => handleChangeStatus("collecting")} disabled={!!actionLoading} className="w-full sm:w-auto">
+                <Button onClick={() => openCollectDialog("start")} disabled={!!actionLoading} className="w-full sm:w-auto">
                   <Play className="mr-2 h-4 w-4" />
                   Iniciar Coleta
                 </Button>
@@ -878,6 +952,14 @@ export default function PeriodoDetalhePage() {
                   <Copy className="mr-2 h-4 w-4" />
                   Copiar Link
                 </Button>
+                <Button variant="outline" onClick={() => setRemindDialog(true)} disabled={!!actionLoading} className="w-full sm:w-auto">
+                  {actionLoading === "notify" ? (
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  ) : (
+                    <BellRing className="mr-2 h-4 w-4" />
+                  )}
+                  Lembrar Pendentes
+                </Button>
                 <Button onClick={() => handleChangeStatus("scheduling")} disabled={!!actionLoading} className="w-full sm:w-auto">
                   <ClipboardList className="mr-2 h-4 w-4" />
                   Montar Escala
@@ -887,6 +969,10 @@ export default function PeriodoDetalhePage() {
 
             {period.status === "scheduling" && (
               <>
+                <Button variant="outline" onClick={() => openCollectDialog("reopen")} disabled={!!actionLoading} className="w-full sm:w-auto">
+                  <RotateCcw className="mr-2 h-4 w-4" />
+                  Reabrir Coleta
+                </Button>
                 <Button variant="outline" asChild className="w-full sm:w-auto">
                   <Link href={`/admin-escalas/montar/${period.id}`}>
                     <ClipboardList className="mr-2 h-4 w-4" />
@@ -1093,6 +1179,7 @@ export default function PeriodoDetalhePage() {
                 events={period.events || []}
                 servants={servants}
                 periodLabel={format(new Date(period.year, period.month - 1), "MMMM-yyyy", { locale: ptBR })}
+                deadline={period.availability_deadline}
                 onRefresh={fetchAvailability}
               />
             )}
@@ -1133,6 +1220,90 @@ export default function PeriodoDetalhePage() {
           </Card>
         </TabsContent>
       </Tabs>
+
+      {/* Iniciar / Reabrir coleta */}
+      <Dialog open={!!collectDialog} onOpenChange={(open) => !open && setCollectDialog(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>
+              {collectDialog === "reopen" ? "Reabrir coleta de disponibilidade" : "Iniciar coleta de disponibilidade"}
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            {collectDialog === "reopen" && (
+              <p className="text-sm text-muted-foreground">
+                As atribuições já feitas são mantidas. Os servos voltam a poder responder
+                e editar normalmente até o novo prazo.
+              </p>
+            )}
+            <div className="space-y-2">
+              <Label htmlFor="collect-deadline">
+                Prazo para responder{collectDialog === "start" && " (opcional)"}
+              </Label>
+              <Input
+                id="collect-deadline"
+                type="datetime-local"
+                value={collectDeadline}
+                onChange={(e) => setCollectDeadline(e.target.value)}
+              />
+              <p className="text-xs text-muted-foreground">
+                Depois do prazo, os servos ainda podem alterar a resposta, mas você recebe um aviso por e-mail.
+              </p>
+            </div>
+            <div className="flex items-start gap-2">
+              <Checkbox
+                id="collect-notify"
+                checked={collectNotify}
+                onCheckedChange={(checked) => setCollectNotify(!!checked)}
+                className="mt-0.5"
+              />
+              <Label htmlFor="collect-notify" className="text-sm font-normal leading-snug cursor-pointer">
+                {collectDialog === "reopen"
+                  ? "Enviar e-mail com o link pessoal para quem ainda não respondeu"
+                  : "Enviar e-mail com o link pessoal para todos os servos ativos"}
+              </Label>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setCollectDialog(null)}>
+              Cancelar
+            </Button>
+            <Button onClick={handleConfirmCollect} disabled={!!actionLoading}>
+              {collectDialog === "reopen" ? (
+                <RotateCcw className="mr-2 h-4 w-4" />
+              ) : (
+                <Play className="mr-2 h-4 w-4" />
+              )}
+              {collectDialog === "reopen" ? "Reabrir Coleta" : "Iniciar Coleta"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Lembrar pendentes */}
+      <AlertDialog open={remindDialog} onOpenChange={setRemindDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Lembrar quem não respondeu</AlertDialogTitle>
+            <AlertDialogDescription>
+              Os servos ativos que ainda não informaram disponibilidade receberão um e-mail
+              com o link pessoal para responder.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                setRemindDialog(false)
+                sendAvailabilityEmails("pending")
+              }}
+            >
+              <BellRing className="mr-2 h-4 w-4" />
+              Enviar lembrete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       {/* Delete Period Confirmation */}
       <AlertDialog open={deleteDialog} onOpenChange={setDeleteDialog}>

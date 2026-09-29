@@ -53,7 +53,7 @@ export async function GET(
 
     const lookup = await findOpenPeriodByToken(supabase, token)
     if (!lookup.ok) return lookupError(lookup)
-    const { period } = lookup
+    const { period, late } = lookup
 
     const { data: events, error: eventsError } = await supabase
       .from("schedule_events")
@@ -82,6 +82,7 @@ export async function GET(
         year: period.year,
         availability_deadline: period.availability_deadline,
         ministry: period.ministry,
+        late,
       },
       events: events || [],
       me,

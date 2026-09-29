@@ -81,6 +81,21 @@ export async function PUT(
       updateData.published_at = new Date().toISOString()
     }
 
+    // Ao iniciar a montagem, a coleta é encerrada agora: respostas a partir daqui
+    // são tardias (continuam aceitas, com aviso ao líder). O prazo passa a
+    // registrar esse momento, caso não existisse ou ainda estivesse no futuro.
+    if (updateData.status === "scheduling" && updateData.availability_deadline === undefined) {
+      const { data: current } = await supabase
+        .from("schedule_periods")
+        .select("availability_deadline")
+        .eq("id", id)
+        .single()
+      const deadline = current?.availability_deadline
+      if (!deadline || new Date(deadline) > new Date()) {
+        updateData.availability_deadline = new Date().toISOString()
+      }
+    }
+
     const { data, error } = await supabase
       .from("schedule_periods")
       .update(updateData)
