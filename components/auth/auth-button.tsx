@@ -13,7 +13,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
-import { LogIn, LogOut, User } from 'lucide-react'
+import { CalendarCheck, LogIn, LogOut, User } from 'lucide-react'
 
 export function AuthButton() {
   const { user, loading, signInWithGoogle, signOut } = useAuth()
@@ -84,6 +84,12 @@ export function AuthButton() {
           </div>
         </DropdownMenuLabel>
         <DropdownMenuSeparator />
+        <DropdownMenuItem asChild>
+          <Link href="/minha-escala">
+            <CalendarCheck className="mr-2 h-4 w-4" />
+            <span>Minha Escala</span>
+          </Link>
+        </DropdownMenuItem>
         <DropdownMenuItem onClick={() => window.location.href = '/profile'}>
           <User className="mr-2 h-4 w-4" />
           <span>Perfil & Integrações</span>
