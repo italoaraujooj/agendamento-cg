@@ -34,7 +34,8 @@ export function CalendarStatusIndicator({ className }: CalendarStatusIndicatorPr
         const data = await response.json()
         setStatus({
           isConnected: data.profile.hasGoogleAccessToken && data.profile.calendarIntegrationEnabled,
-          isExpired: data.profile.isExpired,
+          // Sem token nenhum a API diz "expirado"; aqui isso conta como nunca conectado
+          isExpired: data.profile.hasGoogleAccessToken && data.profile.isExpired,
           expiresAt: data.profile.tokenExpiry
         })
       }
@@ -49,7 +50,9 @@ export function CalendarStatusIndicator({ className }: CalendarStatusIndicatorPr
     checkStatus()
   }, [checkStatus])
 
-  if (!isAuthenticated) {
+  // Só aparece para quem usa a integração: "Desconectado" para quem nunca
+  // conectou (a maioria, inclusive servos) é ruído no cabeçalho
+  if (!isAuthenticated || (!status.isConnected && !status.isExpired)) {
     return null
   }
 
@@ -59,7 +62,7 @@ export function CalendarStatusIndicator({ className }: CalendarStatusIndicatorPr
         variant: 'secondary' as const,
         text: 'Calendar Desconectado',
         icon: AlertTriangle,
-        color: 'text-yellow-600'
+        color: 'text-warning'
       }
     }
 
@@ -68,15 +71,15 @@ export function CalendarStatusIndicator({ className }: CalendarStatusIndicatorPr
         variant: 'destructive' as const,
         text: 'Calendar Expirado',
         icon: AlertTriangle,
-        color: 'text-red-600'
+        color: 'text-destructive'
       }
     }
 
     return {
-      variant: 'default' as const,
+      variant: 'success' as const,
       text: 'Calendar Conectado',
       icon: CheckCircle,
-      color: 'text-green-600'
+      color: 'text-success'
     }
   }
 

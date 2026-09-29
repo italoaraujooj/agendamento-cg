@@ -547,7 +547,7 @@ export function AvailabilityForm({ periodToken, period, events, initialIdentity 
         ))}
 
       {/* Botão de Envio */}
-      <div className="sticky bottom-4">
+      <div className="sticky bottom-[calc(var(--bottom-nav-h)+1rem)]">
         <Card>
           <CardContent className="pt-4">
             <div className="flex items-center justify-between gap-4">

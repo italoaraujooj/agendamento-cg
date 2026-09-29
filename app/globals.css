@@ -144,6 +144,18 @@
   --color-sidebar-ring: var(--sidebar-ring);
 }
 
+/* Altura da barra inferior do celular: o body reserva esse espaço e elementos
+   fixos/sticky no rodapé (convite de instalação, barra de envio) sobem junto */
+:root {
+  --bottom-nav-h: 0px;
+}
+@media (max-width: 767.98px) {
+  body:has([data-bottom-nav]) {
+    --bottom-nav-h: calc(4rem + env(safe-area-inset-bottom));
+    padding-bottom: var(--bottom-nav-h);
+  }
+}
+
 @layer base {
   * {
     @apply border-border outline-ring/50;
