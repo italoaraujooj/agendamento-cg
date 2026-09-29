@@ -319,7 +319,7 @@ export default function MontarEscalaPage() {
             <AlertDialogAction
               onClick={() => handlePublish(true)}
               disabled={publishing}
-              className="bg-amber-600 hover:bg-amber-700 text-white"
+              className="bg-warning hover:bg-warning/90 text-warning-foreground"
             >
               {publishing && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
               Publicar mesmo assim

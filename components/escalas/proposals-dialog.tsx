@@ -150,7 +150,7 @@ export function ProposalsDialog({
                       <span className="font-medium">{servantName.get(p.servant_id) ?? "—"}</span>
                       <span className="text-muted-foreground"> · {areaName.get(p.area_id) ?? "—"}</span>
                       {p.notes.length > 0 && (
-                        <span className="block text-xs text-amber-700 dark:text-amber-400">{p.notes.join(" · ")}</span>
+                        <span className="block text-xs text-warning">{p.notes.join(" · ")}</span>
                       )}
                     </span>
                   </label>
@@ -160,13 +160,13 @@ export function ProposalsDialog({
           ))}
 
           {unfilled.length > 0 && (
-            <div className="rounded-md border border-amber-300 bg-amber-50 dark:bg-amber-950 p-3 space-y-1">
-              <p className="text-sm font-medium flex items-center gap-1.5 text-amber-800 dark:text-amber-300">
+            <div className="rounded-md border border-warning/30 bg-warning/10 p-3 space-y-1">
+              <p className="text-sm font-medium flex items-center gap-1.5 text-warning">
                 <AlertTriangle className="h-4 w-4" />
                 Vagas sem candidato disponível
               </p>
               {unfilled.map((u) => (
-                <p key={`${u.event_id}-${u.area_id}`} className="text-xs text-amber-800 dark:text-amber-300">
+                <p key={`${u.event_id}-${u.area_id}`} className="text-xs text-warning">
                   {eventLabel(u.event_id)} · {areaName.get(u.area_id)} (faltam {u.missing})
                 </p>
               ))}

@@ -286,12 +286,13 @@ export const PERIOD_STATUS_LABELS: Record<SchedulePeriodStatus, string> = {
   closed: 'Encerrada',
 }
 
+// Classes completas (fundo + texto) com os tokens do tema, que já se ajustam ao modo escuro
 export const PERIOD_STATUS_COLORS: Record<SchedulePeriodStatus, string> = {
-  draft: 'bg-gray-500',
-  collecting: 'bg-blue-500',
-  scheduling: 'bg-yellow-500',
-  published: 'bg-green-500',
-  closed: 'bg-gray-400',
+  draft: 'bg-secondary text-secondary-foreground hover:bg-secondary/90',
+  collecting: 'bg-info text-info-foreground hover:bg-info/90',
+  scheduling: 'bg-warning text-warning-foreground hover:bg-warning/90',
+  published: 'bg-success text-success-foreground hover:bg-success/90',
+  closed: 'bg-muted text-muted-foreground hover:bg-muted/90',
 }
 
 export const EVENT_TYPE_LABELS: Record<EventType, string> = {

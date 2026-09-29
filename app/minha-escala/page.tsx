@@ -235,7 +235,7 @@ export default function MinhaEscalaPage() {
                         {c.submitted_at ? (
                           <>Respondida em {format(new Date(c.submitted_at), "dd/MM 'às' HH:mm")}</>
                         ) : (
-                          <span className="text-amber-700 dark:text-amber-400 font-medium">Pendente</span>
+                          <span className="text-warning font-medium">Pendente</span>
                         )}
                         {c.availability_deadline && !c.late && (
                           <> · prazo {format(new Date(c.availability_deadline), "dd/MM HH:mm")}</>

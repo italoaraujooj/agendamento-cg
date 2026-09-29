@@ -132,7 +132,7 @@ export default function AdminEscalasPage() {
             <CardDescription>Coletando</CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-blue-600">
+            <div className="text-2xl font-bold text-info">
               {periods.filter(p => p.status === "collecting").length}
             </div>
           </CardContent>
@@ -142,7 +142,7 @@ export default function AdminEscalasPage() {
             <CardDescription>Montando</CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-yellow-600">
+            <div className="text-2xl font-bold text-primary">
               {periods.filter(p => p.status === "scheduling").length}
             </div>
           </CardContent>
@@ -152,7 +152,7 @@ export default function AdminEscalasPage() {
             <CardDescription>Publicadas</CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-green-600">
+            <div className="text-2xl font-bold text-success">
               {periods.filter(p => p.status === "published").length}
             </div>
           </CardContent>
@@ -205,7 +205,7 @@ export default function AdminEscalasPage() {
                     <div className="flex items-center gap-3">
                       <Badge
                         variant="secondary"
-                        className={`${PERIOD_STATUS_COLORS[period.status]} text-white`}
+                        className={PERIOD_STATUS_COLORS[period.status]}
                       >
                         {getStatusIcon(period.status)}
                         <span className="ml-1">{PERIOD_STATUS_LABELS[period.status]}</span>
