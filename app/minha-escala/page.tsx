@@ -9,6 +9,7 @@ import { Loader2, Search, Calendar, CalendarCheck, Crown, ChevronDown, ChevronUp
 import Link from "next/link"
 import { AssignmentResponse } from "@/components/escalas/assignment-response"
 import { CalendarSubscribe } from "@/components/escalas/calendar-subscribe"
+import { PushOptIn } from "@/components/pwa/push-opt-in"
 import type { AssignmentStatus } from "@/types/escalas"
 import { format, parseISO } from "date-fns"
 import { ptBR } from "date-fns/locale"
@@ -297,11 +298,14 @@ export default function MinhaEscalaPage() {
 
             {data.calendarToken && (
               <Card>
-                <CardContent className="pt-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                  <p className="text-sm text-muted-foreground">
-                    Receba suas escalas no calendário do celular:
-                  </p>
-                  <CalendarSubscribe calendarToken={data.calendarToken} />
+                <CardContent className="pt-4 space-y-4">
+                  <PushOptIn />
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-t pt-4">
+                    <p className="text-sm text-muted-foreground">
+                      Receba suas escalas no calendário do celular:
+                    </p>
+                    <CalendarSubscribe calendarToken={data.calendarToken} />
+                  </div>
                 </CardContent>
               </Card>
             )}

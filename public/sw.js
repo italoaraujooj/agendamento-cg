@@ -74,3 +74,42 @@ self.addEventListener("fetch", (event) => {
   }
   // Demais requisições (API, Supabase, imagens dinâmicas): seguem direto para a rede
 })
+
+// ─── Notificações push ─────────────────────────────────────────────────────
+// Payload enviado pelo servidor (lib/push.ts): { title, body, url, tag? }
+self.addEventListener("push", (event) => {
+  let data = {}
+  try {
+    data = event.data ? event.data.json() : {}
+  } catch {
+    data = { title: "Cidade Viva CG", body: event.data ? event.data.text() : "" }
+  }
+
+  event.waitUntil(
+    self.registration.showNotification(data.title || "Cidade Viva CG", {
+      body: data.body || "",
+      icon: "/icons/icon-192.png",
+      badge: "/icons/icon-96.png",
+      tag: data.tag,
+      renotify: !!data.tag,
+      data: { url: data.url || "/" },
+    })
+  )
+})
+
+// Toque na notificação: reaproveita uma janela do app já aberta ou abre uma nova
+self.addEventListener("notificationclick", (event) => {
+  event.notification.close()
+  const target = new URL(event.notification.data?.url || "/", self.location.origin).href
+
+  event.waitUntil(
+    self.clients.matchAll({ type: "window", includeUncontrolled: true }).then((windows) => {
+      for (const client of windows) {
+        if (new URL(client.url).origin === self.location.origin && "navigate" in client) {
+          return client.navigate(target).then((c) => (c || client).focus())
+        }
+      }
+      return self.clients.openWindow(target)
+    })
+  )
+})

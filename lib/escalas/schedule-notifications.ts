@@ -3,6 +3,7 @@ import { format } from "date-fns"
 import { ptBR } from "date-fns/locale"
 import { signScheduleToken } from "@/lib/escalas/availability-token"
 import { findMinistryManagerEmails, monthLabel } from "@/lib/escalas/availability"
+import { sendPushBatch, sendPushToEmails, type PushPayload } from "@/lib/push"
 import {
   APP_URL,
   assignmentDeclinedEmail,
@@ -102,6 +103,8 @@ export async function notifyPublishedChanges(
 
   const withoutEmail: string[] = []
   const messages: EmailMessage[] = []
+  const pushes: { email: string; payload: PushPayload }[] = []
+  const month = monthLabel(period.month, period.year)
   for (const [servantId, change] of byServant) {
     if (!change.email) {
       withoutEmail.push(change.name)
@@ -109,18 +112,35 @@ export async function notifyPublishedChanges(
     }
     change.added.sort(byChronology)
     change.removed.sort(byChronology)
+    const link = personalScheduleLink(period.availability_token, servantId, period.id)
     const { subject, html } = schedulePublishedEmail({
       name: change.name,
       ministryName,
-      monthLabel: monthLabel(period.month, period.year),
+      monthLabel: month,
       added: change.added,
       removed: change.removed,
-      link: personalScheduleLink(period.availability_token, servantId, period.id),
+      link,
     })
     messages.push({ to: change.email, subject, html })
+    pushes.push({
+      email: change.email,
+      payload: change.added.length > 0
+        ? {
+            title: "Você foi escalado(a)",
+            body: `${ministryName} · ${month}: ${change.added.length === 1 ? change.added[0].label : `${change.added.length} escalas`}. Toque para confirmar.`,
+            url: link,
+            tag: `escala-${period.id}`,
+          }
+        : {
+            title: "Sua escala mudou",
+            body: `${ministryName}: você não está mais escalado(a) em ${change.removed.length === 1 ? change.removed[0].label : `${change.removed.length} eventos`}.`,
+            url: link,
+            tag: `escala-${period.id}`,
+          },
+    })
   }
 
-  const result = await sendEmails(messages)
+  const [result] = await Promise.all([sendEmails(messages), sendPushBatch(supabase, pushes)])
 
   // Só marca como avisado quando o envio deu certo (senão tenta de novo no próximo "Atualizar")
   if (result.failed === 0) {
@@ -181,14 +201,24 @@ export async function respondToAssignment(
   const recipients = await findMinistryManagerEmails(supabase, period.ministry_id)
   if (recipients.length === 0) return
 
+  const servantName = a.servant?.name ?? "Um servo"
+  const label = eventLabel(a.event)
+  const link = `${APP_URL}/admin-escalas/montar/${period.id}`
   const { subject, html } = assignmentDeclinedEmail({
-    servantName: a.servant?.name ?? "Um servo",
+    servantName,
     ministryName: period.ministry?.name ?? "",
-    item: { label: eventLabel(a.event), area: a.area?.name ?? "" },
+    item: { label, area: a.area?.name ?? "" },
     reason: reason?.trim() || null,
-    link: `${APP_URL}/admin-escalas/montar/${period.id}`,
+    link,
   })
-  await sendEmails(recipients.map((to) => ({ to, subject, html })))
+  await Promise.all([
+    sendEmails(recipients.map((to) => ({ to, subject, html }))),
+    sendPushToEmails(supabase, recipients, {
+      title: `${servantName} não poderá servir`,
+      body: `${label} · ${a.area?.name ?? ""}${reason?.trim() ? ` — ${reason.trim()}` : ""}`,
+      url: link,
+    }),
+  ])
 }
 
 /** Data de hoje no fuso de Brasília (UTC-3, sem horário de verão desde 2019) */
@@ -209,6 +239,7 @@ export async function sendAssignmentReminders(
   ]
 
   const messages: EmailMessage[] = []
+  const pushes: { email: string; payload: PushPayload }[] = []
   for (const target of targets) {
     const { data: rows } = await supabase
       .from("schedule_assignments")
@@ -243,9 +274,20 @@ export async function sendAssignmentReminders(
       person.items.sort(byChronology)
       const { subject, html } = assignmentReminderEmail({ name: person.name, whenLabel: target.whenLabel, items: person.items })
       messages.push({ to: email, subject, html })
+      const first = person.items[0]
+      const pending = person.items.find((i) => i.pending)
+      pushes.push({
+        email,
+        payload: {
+          title: `Lembrete: você serve ${target.whenLabel}`,
+          body: `${first.label} · ${first.area}${person.items.length > 1 ? ` (+${person.items.length - 1})` : ""}${pending ? " — confirme sua presença" : ""}`,
+          url: (pending ?? first).link,
+          tag: `lembrete-${target.date}`,
+        },
+      })
     }
   }
 
-  const result = await sendEmails(messages)
+  const [result] = await Promise.all([sendEmails(messages), sendPushBatch(supabase, pushes)])
   return { ...result, recipients: messages.length }
 }
