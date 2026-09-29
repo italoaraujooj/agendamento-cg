@@ -2,17 +2,25 @@ import { NextRequest, NextResponse } from "next/server"
 import { createServerClient } from "@/lib/supabase/server"
 import { requireAuthenticated, requireManagerOf } from "@/lib/escalas/auth"
 import { recordRemovalIfNotified } from "@/lib/escalas/schedule-notifications"
+import { areaCapacity } from "@/lib/escalas/staffing"
+import { actorFromUser, logAssignmentChanges, type LogActor } from "@/lib/escalas/history"
 import type { SupabaseClient } from "@supabase/supabase-js"
 import { z } from "zod"
 
 const REMOVED_FIELDS = "servant_id, schedule_event_id, area_id, notified_at"
 
-// Quem já tinha sido avisado da escala recebe o aviso de remoção no próximo "Atualizar"
+// Remoções: aviso ao servo no próximo "Atualizar" (se já tinha sido avisado) + histórico
 async function recordRemovals(
   supabase: SupabaseClient,
-  rows: { servant_id: string; schedule_event_id: string; area_id: string; notified_at: string | null }[] | null
+  rows: { servant_id: string; schedule_event_id: string; area_id: string; notified_at: string | null }[] | null,
+  actor: LogActor
 ) {
   for (const row of rows ?? []) await recordRemovalIfNotified(supabase, row)
+  await logAssignmentChanges(
+    supabase,
+    (rows ?? []).map((r) => ({ schedule_event_id: r.schedule_event_id, servant_id: r.servant_id, area_id: r.area_id, action: "removed" as const })),
+    actor
+  )
 }
 
 const assignmentSchema = z.object({
@@ -95,7 +103,25 @@ export async function POST(request: NextRequest) {
         .eq("schedule_event_id", schedule_event_id)
         .eq("area_id", area_id)
         .select(REMOVED_FIELDS)
-      await recordRemovals(supabase, replaced)
+      await recordRemovals(supabase, replaced, await actorFromUser(supabase, auth.caller.userId))
+    } else {
+      // Respeita o máximo de pessoas da área (quem recusou não ocupa a vaga)
+      const { data: area } = await supabase.from("areas").select("name, min_servants, max_servants").eq("id", area_id).single()
+      const capacity = area ? areaCapacity(area) : null
+      if (capacity !== null) {
+        const { count } = await supabase
+          .from("schedule_assignments")
+          .select("id", { count: "exact", head: true })
+          .eq("schedule_event_id", schedule_event_id)
+          .eq("area_id", area_id)
+          .neq("status", "declined")
+        if ((count ?? 0) >= capacity) {
+          return NextResponse.json(
+            { error: `${area!.name} já está com o máximo de ${capacity} pessoa(s) neste evento` },
+            { status: 409 }
+          )
+        }
+      }
     }
 
     // Criar nova atribuição
@@ -125,6 +151,12 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: error.message }, { status: 500 })
     }
 
+    await logAssignmentChanges(
+      supabase,
+      [{ schedule_event_id, servant_id, area_id, action: "added" }],
+      await actorFromUser(supabase, auth.caller.userId)
+    )
+
     return NextResponse.json(data, { status: 201 })
   } catch (error) {
     console.error("Erro na API de atribuições:", error)
@@ -153,6 +185,7 @@ export async function DELETE(request: NextRequest) {
     }
     if (!auth.ok) return auth.response
     const { supabase } = auth
+    const actor = await actorFromUser(supabase, auth.caller.userId)
 
     if (id) {
       // Deletar por ID
@@ -166,7 +199,7 @@ export async function DELETE(request: NextRequest) {
         console.error("Erro ao remover atribuição:", error)
         return NextResponse.json({ error: error.message }, { status: 500 })
       }
-      await recordRemovals(supabase, removed)
+      await recordRemovals(supabase, removed, actor)
     } else if (eventId && areaId) {
       // Deletar por evento + área
       const { data: removed, error } = await supabase
@@ -180,7 +213,7 @@ export async function DELETE(request: NextRequest) {
         console.error("Erro ao remover atribuição:", error)
         return NextResponse.json({ error: error.message }, { status: 500 })
       }
-      await recordRemovals(supabase, removed)
+      await recordRemovals(supabase, removed, actor)
     } else {
       return NextResponse.json(
         { error: "ID ou event_id + area_id são obrigatórios" },

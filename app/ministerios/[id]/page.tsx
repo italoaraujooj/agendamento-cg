@@ -630,6 +630,7 @@ export default function MinisterioDetalhePage() {
         areaId={selectedAreaId}
         servant={editingServant}
         areas={ministry.areas.filter(a => a.is_active)}
+        ministryServants={allServants.map((s) => ({ id: s.id, name: s.name }))}
         open={servantFormOpen}
         onOpenChange={setServantFormOpen}
         onSuccess={fetchMinistry}

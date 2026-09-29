@@ -43,11 +43,30 @@ export interface Servant {
   is_active: boolean
   is_leader: boolean
   notes: string | null
+  /** Limite de escalas no mês (null = sem limite) */
+  max_per_month?: number | null
+  /** Servir junto com outra pessoa do mesmo ministério */
+  serve_with_servant_id?: string | null
   created_at: string
   updated_at: string
   // Relacionamentos
   area?: Area
   servant_areas?: { area_id: string; area?: Area }[]
+}
+
+export type AssignmentLogAction = 'added' | 'removed' | 'accepted' | 'declined'
+
+export interface AssignmentLogEntry {
+  id: string
+  schedule_event_id: string | null
+  servant_id: string | null
+  area_id: string | null
+  action: AssignmentLogAction
+  actor_label: string | null
+  servant_name: string | null
+  area_name: string | null
+  details: string | null
+  created_at: string
 }
 
 export interface RegularEvent {

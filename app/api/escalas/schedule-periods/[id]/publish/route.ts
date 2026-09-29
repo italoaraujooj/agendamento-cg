@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
 import { requireManagerOf } from "@/lib/escalas/auth"
+import { countByEventArea, eventCompletion } from "@/lib/escalas/staffing"
 import { notifyPublishedChanges } from "@/lib/escalas/schedule-notifications"
 import { isEmailConfigured } from "@/lib/escalas/email"
 
@@ -39,32 +40,25 @@ export async function POST(
       )
     }
 
-    // Buscar áreas ativas do ministério para saber quais são obrigatórias por padrão
+    // Áreas ativas do ministério (obrigatórias por padrão) com o mínimo de pessoas de cada uma
     const { data: allAreas } = await supabase
       .from("areas")
-      .select("id")
+      .select("id, min_servants, max_servants")
       .eq("ministry_id", period.ministry_id)
       .eq("is_active", true)
 
-    const allAreaIds = (allAreas ?? []).map((a: { id: string }) => a.id)
-
-    // Validar que todas as áreas obrigatórias de cada evento têm atribuição
-    const incompleteEvents = events.filter((event) => {
-      const requiredAreaIds =
-        event.requires_areas && event.requires_areas.length > 0
-          ? event.requires_areas
-          : allAreaIds
-      // Quem recusou não preenche a vaga
-      const assignedAreaIds = new Set(
-        (event.assignments ?? []).filter((a) => a.status !== "declined").map((a) => a.area_id)
-      )
-      return requiredAreaIds.some((areaId) => !assignedAreaIds.has(areaId))
-    })
+    // Cada área exigida precisa do mínimo de pessoas; quem recusou não ocupa a vaga
+    const counts = countByEventArea(
+      events.flatMap((e) => (e.assignments ?? []).map((a) => ({ ...a, schedule_event_id: e.id })))
+    )
+    const incompleteEvents = events.filter(
+      (event) => !eventCompletion(event, allAreas ?? [], counts).complete
+    )
 
     if (incompleteEvents.length > 0 && !force) {
       return NextResponse.json(
         {
-          error: `Existem ${incompleteEvents.length} evento(s) com áreas obrigatórias sem atribuição.`,
+          error: `Existem ${incompleteEvents.length} evento(s) com áreas abaixo do mínimo de pessoas.`,
           incompleteEvents: incompleteEvents.length,
         },
         { status: 400 }

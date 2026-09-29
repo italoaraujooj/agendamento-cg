@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
 import { createServerClient } from "@/lib/supabase/server"
-import { canManageMinistry, requireManagerOf } from "@/lib/escalas/auth"
+import { canManageMinistry, ministryIdFrom, requireManagerOf } from "@/lib/escalas/auth"
 import { z } from "zod"
 
 const servantUpdateSchema = z.object({
@@ -12,6 +12,9 @@ const servantUpdateSchema = z.object({
   is_active: z.boolean().optional(),
   area_id: z.string().uuid().optional(),
   area_ids: z.array(z.string().uuid()).min(1).optional(),
+  // Preferências usadas pela sugestão automática
+  max_per_month: z.number().int().min(1).max(31).optional().nullable(),
+  serve_with_servant_id: z.string().uuid().optional().nullable(),
 })
 
 // GET - Buscar servo por ID
@@ -99,6 +102,20 @@ export async function PUT(
         (targetAreas ?? []).every((a: { ministry_id: string }) => canManageMinistry(caller, a.ministry_id))
       if (!allowed) {
         return NextResponse.json({ error: "Acesso negado" }, { status: 403 })
+      }
+    }
+
+    // "Servir junto com" precisa ser outra pessoa do mesmo ministério
+    if (updateData.serve_with_servant_id) {
+      if (updateData.serve_with_servant_id === id) {
+        return NextResponse.json({ error: "Escolha outra pessoa para servir junto" }, { status: 400 })
+      }
+      const [own, partner] = await Promise.all([
+        ministryIdFrom(supabase, "servant", id),
+        ministryIdFrom(supabase, "servant", updateData.serve_with_servant_id),
+      ])
+      if (!partner || partner !== own) {
+        return NextResponse.json({ error: "A pessoa escolhida precisa ser do mesmo ministério" }, { status: 400 })
       }
     }
 

@@ -4,6 +4,7 @@ import { createAdminClient } from "@/lib/supabase/server"
 import { getEscalasCaller } from "@/lib/escalas/auth"
 import { verifyScheduleToken } from "@/lib/escalas/availability-token"
 import { respondToAssignment } from "@/lib/escalas/schedule-notifications"
+import { logAssignmentChanges } from "@/lib/escalas/history"
 
 const schema = z.object({
   status: z.enum(["accepted", "declined"]),
@@ -33,8 +34,8 @@ export async function POST(
     const { data: assignment } = await supabase
       .from("schedule_assignments")
       .select(`
-        id, servant_id,
-        servant:servants(user_id, email),
+        id, servant_id, area_id, schedule_event_id,
+        servant:servants(name, user_id, email),
         event:schedule_events(event_date, period:schedule_periods(id, status))
       `)
       .eq("id", id)
@@ -47,9 +48,11 @@ export async function POST(
 
     // Autorização: link pessoal assinado ou o próprio servo logado
     let allowed = !!token && verifyScheduleToken(a.servant_id, a.event?.period?.id, token)
+    let actorUserId: string | null = null
     if (!allowed && !token) {
       const caller = await getEscalasCaller()
       if (caller) {
+        actorUserId = caller.userId
         if (a.servant?.user_id === caller.userId) {
           allowed = true
         } else if (a.servant?.email) {
@@ -71,6 +74,11 @@ export async function POST(
     }
 
     await respondToAssignment(supabase, id, status, reason ?? null)
+    await logAssignmentChanges(
+      supabase,
+      [{ schedule_event_id: a.schedule_event_id, servant_id: a.servant_id, area_id: a.area_id, action: status, details: status === "declined" ? reason?.trim() || null : null }],
+      { userId: actorUserId, label: `${a.servant?.name ?? "Servo"} (${token ? "link do e-mail" : "Minha Escala"})` }
+    )
     return NextResponse.json({ success: true, status })
   } catch (error) {
     console.error("Erro ao responder escala:", error)

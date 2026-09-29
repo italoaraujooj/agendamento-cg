@@ -26,13 +26,25 @@ interface ServantFormProps {
   areaId: string
   servant?: Servant
   areas?: Area[]
+  /** Servos do ministério, para a preferência "servir junto com" */
+  ministryServants?: { id: string; name: string }[]
   open: boolean
   onOpenChange: (open: boolean) => void
   onSuccess: () => void
 }
 
-export function ServantForm({ areaId, servant, areas, open, onOpenChange, onSuccess }: ServantFormProps) {
+export function ServantForm({ areaId, servant, areas, ministryServants = [], open, onOpenChange, onSuccess }: ServantFormProps) {
   const isEditing = !!servant
+
+  // Preferências de escala (usadas pela sugestão automática)
+  const [maxPerMonth, setMaxPerMonth] = useState("")
+  const [serveWith, setServeWith] = useState("")
+  useEffect(() => {
+    if (open) {
+      setMaxPerMonth(servant?.max_per_month ? String(servant.max_per_month) : "")
+      setServeWith(servant?.serve_with_servant_id ?? "")
+    }
+  }, [open, servant])
 
   const [loading, setLoading] = useState(false)
   const [formData, setFormData] = useState({
@@ -135,6 +147,11 @@ export function ServantForm({ areaId, servant, areas, open, onOpenChange, onSucc
 
       if (isEditing && areas && areas.length > 0) {
         payload.area_ids = selectedAreaIds.length > 0 ? selectedAreaIds : [areaId]
+      }
+
+      if (isEditing) {
+        payload.max_per_month = maxPerMonth ? Math.min(31, Math.max(1, parseInt(maxPerMonth, 10))) : null
+        payload.serve_with_servant_id = serveWith || null
       }
 
       const response = await fetch(url, {
@@ -333,6 +350,47 @@ export function ServantForm({ areaId, servant, areas, open, onOpenChange, onSucc
                 </div>
                 <p className="text-xs text-muted-foreground">
                   Mínimo de 1 área obrigatória.
+                </p>
+              </div>
+            )}
+
+            {/* Preferências de escala — consideradas pela "Sugerir escala" */}
+            {isEditing && (
+              <div className="space-y-3 rounded-md border p-3">
+                <p className="text-sm font-medium">Preferências de escala</p>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div className="space-y-1.5">
+                    <Label htmlFor="servant-max-month" className="text-xs">Máximo de escalas por mês</Label>
+                    <Input
+                      id="servant-max-month"
+                      type="number"
+                      min={1}
+                      max={31}
+                      placeholder="Sem limite"
+                      value={maxPerMonth}
+                      onChange={(e) => setMaxPerMonth(e.target.value)}
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label htmlFor="servant-serve-with" className="text-xs">Servir junto com</Label>
+                    <select
+                      id="servant-serve-with"
+                      value={serveWith}
+                      onChange={(e) => setServeWith(e.target.value)}
+                      className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                    >
+                      <option value="">Ninguém em especial</option>
+                      {ministryServants
+                        .filter((s) => s.id !== servant?.id)
+                        .sort((a, b) => a.name.localeCompare(b.name))
+                        .map((s) => (
+                          <option key={s.id} value={s.id}>{s.name}</option>
+                        ))}
+                    </select>
+                  </div>
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  A sugestão automática não passa do limite e tenta escalar a dupla no mesmo evento (ex.: casal).
                 </p>
               </div>
             )}

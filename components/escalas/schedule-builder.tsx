@@ -42,6 +42,10 @@ import {
   Clock3,
   AlertTriangle,
   CheckCheck,
+  LayoutGrid,
+  Sparkles,
+  Copy as CopyIcon,
+  History,
 } from "lucide-react"
 import { format, parseISO } from "date-fns"
 import { ptBR } from "date-fns/locale"
@@ -54,6 +58,17 @@ import type {
   ScheduleAssignment,
   ServantConflict,
 } from "@/types/escalas"
+import {
+  areaCapacity,
+  areaNeed,
+  countByEventArea,
+  eventCompletion,
+  type EventCompletion,
+} from "@/lib/escalas/staffing"
+import { suggestAssignments } from "@/lib/escalas/suggest"
+import { ProposalsDialog, type AssignmentProposal } from "@/components/escalas/proposals-dialog"
+import { ScheduleMatrix } from "@/components/escalas/schedule-matrix"
+import { HistoryDialog } from "@/components/escalas/history-dialog"
 
 interface ScheduleBuilderProps {
   periodId: string
@@ -96,6 +111,17 @@ export function ScheduleBuilder({
   const [exporting, setExporting] = useState(false)
   const [summaryOpen, setSummaryOpen] = useState(false)
   const exportRef = useRef<HTMLDivElement>(null)
+  // "event": montagem evento a evento; "month": grade do mês (áreas × eventos)
+  const [view, setView] = useState<"event" | "month">("event")
+  const [historyOpen, setHistoryOpen] = useState(false)
+  const [proposalState, setProposalState] = useState<{
+    source: "suggest" | "copy"
+    title: string
+    description: string
+    proposals: AssignmentProposal[]
+    unfilled?: { event_id: string; area_id: string; missing: number }[]
+  } | null>(null)
+  const [loadingCopy, setLoadingCopy] = useState(false)
 
   // Mapa de indisponíveis: servant_id-event_id → false
   const unavailableSet = useMemo(() => {
@@ -167,8 +193,6 @@ export function ScheduleBuilder({
   }
   // Todas (inclui recusadas) — para exibir os chips
   const getEventAssignments = useMemo(() => groupByEvent(assignments), [assignments])
-  // Só as que preenchem a vaga — para completude
-  const getFilledEventAssignments = useMemo(() => groupByEvent(filledAssignments), [filledAssignments])
 
   const getAreaServants = useMemo(() => {
     const servantMap = new Map<string, Servant[]>()
@@ -396,12 +420,6 @@ export function ScheduleBuilder({
   const formatEventDate = (dateStr: string) =>
     format(parseISO(dateStr), "EEE, dd/MM", { locale: ptBR })
 
-  // Retorna as áreas exigidas para um evento (null/vazio → todas)
-  const getRequiredAreas = (event: ScheduleEvent) => {
-    if (!event.requires_areas || event.requires_areas.length === 0) return areas
-    return areas.filter((a) => event.requires_areas!.includes(a.id))
-  }
-
   const handleToggleAreaRequirement = async (event: ScheduleEvent, areaId: string) => {
     const allAreaIds = areas.map((a) => a.id)
     const currentRequired = event.requires_areas ?? allAreaIds
@@ -433,10 +451,73 @@ export function ScheduleBuilder({
     }
   }
 
-  const completedEvents = events.filter((event) => {
-    const eventAssigns = getFilledEventAssignments(event.id)
-    return getRequiredAreas(event).every((area) => eventAssigns.some((a) => a.area_id === area.id))
-  }).length
+  // Completude por evento: cada área exigida precisa do mínimo de pessoas (recusas não contam)
+  const filledCounts = useMemo(() => countByEventArea(filledAssignments), [filledAssignments])
+  const completionByEvent = useMemo(
+    () => new Map(events.map((e) => [e.id, eventCompletion(e, areas, filledCounts)])),
+    [events, areas, filledCounts]
+  )
+  const completionOf = (eventId: string): EventCompletion =>
+    completionByEvent.get(eventId) ?? { filledAreas: 0, requiredAreas: 0, missingSlots: 0, complete: true }
+
+  const completedEvents = events.filter((event) => completionOf(event.id).complete).length
+
+  const conflictKeys = useMemo(
+    () => new Set(conflicts.map((c) => `${c.servant_id}-${c.event_id}`)),
+    [conflicts]
+  )
+
+  // Sugestão automática: calculada aqui com os dados já carregados; o líder revisa antes de aplicar
+  const handleSuggest = () => {
+    const { proposals, unfilled } = suggestAssignments({
+      events,
+      areas,
+      servants,
+      assignments,
+      unavailable: unavailableSet,
+      responded: respondedSet,
+      conflicts: conflictKeys,
+    })
+    if (proposals.length === 0 && unfilled.length === 0) {
+      toast.info("Todas as áreas já estão com o mínimo de pessoas.")
+      return
+    }
+    setProposalState({
+      source: "suggest",
+      title: "Sugestão de escala",
+      description:
+        "Preenche as vagas que faltam equilibrando quantas vezes cada um serve, respeitando indisponibilidades e conflitos de horário. Revise e desmarque o que não quiser.",
+      proposals,
+      unfilled,
+    })
+  }
+
+  const handleCopyPrevious = async () => {
+    setLoadingCopy(true)
+    try {
+      const res = await fetch(`/api/escalas/schedule-periods/${periodId}/previous-proposals`)
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || "Erro ao buscar o mês anterior")
+      const prevLabel = format(new Date(data.previous.year, data.previous.month - 1), "MMMM", { locale: ptBR })
+      const skipped = data.skipped as Record<string, number>
+      const skippedText = [
+        skipped.unavailable && `${skipped.unavailable} indisponível(is) agora`,
+        skipped.inactiveOrLeftArea && `${skipped.inactiveOrLeftArea} inativo(s) ou fora da área`,
+        skipped.alreadyAssigned && `${skipped.alreadyAssigned} já escalado(s)`,
+        skipped.unmatchedEvent && `${skipped.unmatchedEvent} sem evento equivalente`,
+      ].filter(Boolean).join(", ")
+      setProposalState({
+        source: "copy",
+        title: `Copiar escala de ${prevLabel}`,
+        description: `Eventos pareados pelo dia da semana e horário (ex.: 1º domingo 19h).${skippedText ? ` Ficaram de fora: ${skippedText}.` : ""}`,
+        proposals: data.proposals,
+      })
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Erro ao copiar o mês anterior")
+    } finally {
+      setLoadingCopy(false)
+    }
+  }
 
   // Pré-computar mapa de atribuições por evento+área para a prévia (múltiplos por área)
   const assignmentsByEventArea = useMemo(() => {
@@ -460,6 +541,46 @@ export function ScheduleBuilder({
 
   return (
     <div className="space-y-4">
+      {/* Ações de montagem + alternância de visão */}
+      <div className="flex flex-wrap items-center gap-2">
+        <div className="inline-flex rounded-md border p-0.5" role="tablist" aria-label="Visão da escala">
+          <Button
+            variant={view === "event" ? "secondary" : "ghost"}
+            size="sm"
+            className="h-7"
+            role="tab"
+            aria-selected={view === "event"}
+            onClick={() => setView("event")}
+          >
+            <Calendar className="mr-1.5 h-3.5 w-3.5" />
+            Por evento
+          </Button>
+          <Button
+            variant={view === "month" ? "secondary" : "ghost"}
+            size="sm"
+            className="h-7"
+            role="tab"
+            aria-selected={view === "month"}
+            onClick={() => setView("month")}
+          >
+            <LayoutGrid className="mr-1.5 h-3.5 w-3.5" />
+            Mês
+          </Button>
+        </div>
+        <Button variant="outline" size="sm" onClick={handleSuggest} disabled={events.length === 0}>
+          <Sparkles className="mr-1.5 h-4 w-4" />
+          Sugerir escala
+        </Button>
+        <Button variant="outline" size="sm" onClick={handleCopyPrevious} disabled={loadingCopy || events.length === 0}>
+          {loadingCopy ? <Loader2 className="mr-1.5 h-4 w-4 animate-spin" /> : <CopyIcon className="mr-1.5 h-4 w-4" />}
+          Copiar mês anterior
+        </Button>
+        <Button variant="ghost" size="sm" onClick={() => setHistoryOpen(true)}>
+          <History className="mr-1.5 h-4 w-4" />
+          Histórico
+        </Button>
+      </div>
+
       {/* Toolbar */}
       <div className="flex flex-wrap items-center justify-end gap-2">
         {declinedCount > 0 && (
@@ -494,8 +615,23 @@ export function ScheduleBuilder({
         </Button>
       </div>
 
+      {/* Grade do mês: clicar em uma célula abre o evento na visão "Por evento" */}
+      {view === "month" && (
+        <ScheduleMatrix
+          events={events}
+          areas={areas}
+          assignments={assignments}
+          conflictKeys={conflictKeys}
+          selectedEventId={selectedEventId}
+          onSelectCell={(eventId) => {
+            setSelectedEventId(eventId)
+            setView("event")
+          }}
+        />
+      )}
+
       {/* Mobile: Event Navigator */}
-      <div className="lg:hidden">
+      <div className={view === "event" ? "lg:hidden" : "hidden"}>
         <Card>
           <CardContent className="p-3">
             <div className="flex items-center gap-2">
@@ -517,16 +653,12 @@ export function ScheduleBuilder({
                         {format(parseISO(selectedEvent.event_date), "EEE, dd/MM", { locale: ptBR })}
                       </p>
                       {(() => {
-                        const assigns = getFilledEventAssignments(selectedEvent.id)
-                        const required = getRequiredAreas(selectedEvent)
-                        const done = new Set(
-                          assigns.filter((a) => required.some((r) => r.id === a.area_id)).map((a) => a.area_id)
-                        ).size
-                        return done === required.length ? (
+                        const c = completionOf(selectedEvent.id)
+                        return c.complete ? (
                           <Check className="h-4 w-4 text-green-500 flex-shrink-0" />
                         ) : (
                           <Badge variant="outline" className="text-xs flex-shrink-0">
-                            {done}/{required.length}
+                            {c.filledAreas}/{c.requiredAreas}
                           </Badge>
                         )
                       })()}
@@ -568,7 +700,7 @@ export function ScheduleBuilder({
         </Card>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      <div className={view === "event" ? "grid grid-cols-1 lg:grid-cols-3 gap-6" : "hidden"}>
         {/* Lista de Eventos — desktop only */}
         <div className="hidden lg:block lg:col-span-1">
           <Card>
@@ -602,13 +734,8 @@ export function ScheduleBuilder({
                     </p>
                   ) : null}
                   {sortedFilteredEvents.map((event) => {
-                    const assigns = getFilledEventAssignments(event.id)
-                    const required = getRequiredAreas(event)
-                    const assignedAreaIds = new Set(
-                      assigns.filter((a) => required.some((r) => r.id === a.area_id)).map((a) => a.area_id)
-                    )
-                    const assignedRequired = assignedAreaIds.size
-                    const isComplete = assignedRequired === required.length
+                    const completion = completionOf(event.id)
+                    const isComplete = completion.complete
                     const availableCount = eventAvailableServantCount.get(event.id) ?? 0
                     const isSelected = selectedEventId === event.id
 
@@ -638,8 +765,12 @@ export function ScheduleBuilder({
                           {isComplete ? (
                             <Check className="h-4 w-4 text-green-500 flex-shrink-0" />
                           ) : (
-                            <Badge variant="outline" className="text-xs flex-shrink-0">
-                              {assignedRequired}/{required.length}
+                            <Badge
+                              variant="outline"
+                              className="text-xs flex-shrink-0"
+                              title={`Faltam ${completion.missingSlots} pessoa(s)`}
+                            >
+                              {completion.filledAreas}/{completion.requiredAreas}
                             </Badge>
                           )}
                         </div>
@@ -686,6 +817,11 @@ export function ScheduleBuilder({
                   const isRequired =
                     !selectedEvent.requires_areas ||
                     selectedEvent.requires_areas.includes(area.id)
+                  const need = areaNeed(area)
+                  const capacity = areaCapacity(area)
+                  const filledHere = filledCounts.get(`${selectedEvent.id}-${area.id}`) ?? 0
+                  const atCapacity = capacity !== null && filledHere >= capacity
+                  const showCount = need > 1 || capacity !== null
 
                   return (
                     <div
@@ -701,10 +837,23 @@ export function ScheduleBuilder({
                           {!isRequired && (
                             <Badge variant="outline" className="text-xs">Não aplicável</Badge>
                           )}
+                          {isRequired && showCount && (
+                            <Badge
+                              variant="outline"
+                              className={`text-xs ${filledHere < need ? "border-amber-300 text-amber-700 dark:text-amber-400" : ""}`}
+                              title={
+                                capacity !== null
+                                  ? `Mínimo ${need}, máximo ${capacity} pessoa(s)`
+                                  : `Mínimo ${need} pessoa(s)`
+                              }
+                            >
+                              {filledHere}/{capacity !== null && capacity !== need ? `${need}–${capacity}` : need}
+                            </Badge>
+                          )}
                         </div>
                         <div className="flex items-center gap-1">
-                          {/* Adicionar servo */}
-                          {isRequired && (
+                          {/* Adicionar servo (oculto quando a área atingiu o máximo) */}
+                          {isRequired && !atCapacity && (
                             <Button
                               variant="ghost"
                               size="sm"
@@ -814,7 +963,8 @@ export function ScheduleBuilder({
                           })}
 
                           {/* Select de adição: sempre visível se vazio, ou quando "+" foi clicado */}
-                          {(areaAssignments.length === 0 || isAdding) && (
+                          {/* Seleção visível enquanto faltar gente para o mínimo, ou ao clicar em "+" */}
+                          {!atCapacity && (filledHere < need || isAdding) && (
                             <div className={isAdding && areaAssignments.length > 0 ? "flex items-center gap-1.5" : ""}>
                               <Select
                                 value=""
@@ -861,6 +1011,8 @@ export function ScheduleBuilder({
                                           ? areas.find((a) => a.id === otherAreaId)?.name ?? "outra área"
                                           : null
                                         const conflictOthers = conflictMap.get(`${servant.id}-${selectedEvent.id}`)
+                                        const monthlyLimit = servant.max_per_month ?? null
+                                        const overLimit = monthlyLimit !== null && assignCount >= monthlyLimit
                                         const selectable = available && !otherAreaName
                                         return (
                                           <SelectItem
@@ -906,6 +1058,10 @@ export function ScheduleBuilder({
                                                 ) : available && conflictOthers ? (
                                                   <span className="ml-1 text-xs text-amber-700 dark:text-amber-400">
                                                     (mesmo horário: {describeConflicts(conflictOthers)})
+                                                  </span>
+                                                ) : available && overLimit ? (
+                                                  <span className="ml-1 text-xs text-amber-700 dark:text-amber-400">
+                                                    (limite de {monthlyLimit}/mês atingido)
                                                   </span>
                                                 ) : null}
                                                 {lateSet.has(servant.id) && (
@@ -1080,6 +1236,29 @@ export function ScheduleBuilder({
         </Card>
       )}
 
+      {/* Revisão de propostas (sugestão automática / cópia do mês anterior) */}
+      <ProposalsDialog
+        open={!!proposalState}
+        onOpenChange={(open) => !open && setProposalState(null)}
+        title={proposalState?.title ?? ""}
+        description={proposalState?.description ?? ""}
+        periodId={periodId}
+        proposals={proposalState?.proposals ?? []}
+        unfilled={proposalState?.unfilled}
+        events={events}
+        areas={areas}
+        servants={servants}
+        source={proposalState?.source}
+        onApplied={onAssignmentChange}
+      />
+
+      <HistoryDialog
+        open={historyOpen}
+        onOpenChange={setHistoryOpen}
+        periodId={periodId}
+        events={events}
+      />
+
       {/* Confirmação: conflito de horário */}
       <Dialog open={!!pendingConflict} onOpenChange={(open) => !open && setPendingConflict(null)}>
         <DialogContent className="max-w-md">
@@ -1168,11 +1347,8 @@ export function ScheduleBuilder({
                   {/* Eventos do dia */}
                   <div className="space-y-2">
                     {dayEvents.map((event) => {
-                      const required = getRequiredAreas(event)
-                      const assignedCount = required.filter((area) =>
-                        (assignmentsByEventArea.get(`${event.id}-${area.id}`) ?? []).length > 0
-                      ).length
-                      const isComplete = assignedCount === required.length
+                      const completion = completionOf(event.id)
+                      const isComplete = completion.complete
 
                       return (
                         <div
@@ -1195,7 +1371,7 @@ export function ScheduleBuilder({
                               <Check className="h-4 w-4 text-green-500 flex-shrink-0" />
                             ) : (
                               <span className="text-xs font-medium text-amber-600 dark:text-amber-400 flex-shrink-0">
-                                {assignedCount}/{required.length} áreas
+                                {completion.filledAreas}/{completion.requiredAreas} áreas
                               </span>
                             )}
                           </div>
@@ -1292,10 +1468,7 @@ export function ScheduleBuilder({
               {/* Eventos do dia */}
               <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
                 {dayEvents.map((event) => {
-                  const required = getRequiredAreas(event)
-                  const isComplete = required.every((area) =>
-                    (assignmentsByEventArea.get(`${event.id}-${area.id}`) ?? []).length > 0
-                  )
+                  const isComplete = completionOf(event.id).complete
                   return (
                     <div
                       key={event.id}
