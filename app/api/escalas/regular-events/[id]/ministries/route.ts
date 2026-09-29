@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
 import { createAdminClient } from "@/lib/supabase/server"
+import { requireEscalasAdmin } from "@/lib/escalas/auth"
 import { z } from "zod"
 
 const updateMinistriesSchema = z.object({
@@ -45,10 +46,9 @@ export async function PUT(
 ) {
   try {
     const { id } = await params
-    const supabase = createAdminClient()
-    if (!supabase) {
-      return NextResponse.json({ error: "Erro de configuração" }, { status: 500 })
-    }
+    const auth = await requireEscalasAdmin()
+    if (!auth.ok) return auth.response
+    const { supabase } = auth
 
     const body = await request.json()
     const validationResult = updateMinistriesSchema.safeParse(body)

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server"
-import { createAdminClient, createServerClient } from "@/lib/supabase/server"
+import { requireEscalasAccess, requireManagerOf } from "@/lib/escalas/auth"
 import { z } from "zod"
 
 const servantSchema = z.object({
@@ -14,10 +14,9 @@ const servantSchema = z.object({
 // GET - Listar servos (opcionalmente filtrar por área)
 export async function GET(request: NextRequest) {
   try {
-    const supabase = createAdminClient()
-    if (!supabase) {
-      return NextResponse.json({ error: "Erro de configuração" }, { status: 500 })
-    }
+    const auth = await requireEscalasAccess()
+    if (!auth.ok) return auth.response
+    const { supabase } = auth
 
     const { searchParams } = new URL(request.url)
     const areaId = searchParams.get("area_id")
@@ -70,11 +69,6 @@ export async function GET(request: NextRequest) {
 // POST - Criar servo
 export async function POST(request: NextRequest) {
   try {
-    const supabase = createAdminClient()
-    if (!supabase) {
-      return NextResponse.json({ error: "Erro de configuração" }, { status: 500 })
-    }
-
     const body = await request.json()
     const validationResult = servantSchema.safeParse(body)
 
@@ -86,6 +80,10 @@ export async function POST(request: NextRequest) {
     }
 
     const { area_id, name, email, phone, is_leader, notes } = validationResult.data
+
+    const auth = await requireManagerOf("area", area_id)
+    if (!auth.ok) return auth.response
+    const { supabase } = auth
 
     const { data, error } = await supabase
       .from("servants")

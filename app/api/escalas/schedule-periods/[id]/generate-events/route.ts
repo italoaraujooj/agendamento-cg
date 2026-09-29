@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server"
-import { createAdminClient } from "@/lib/supabase/server"
+import { requireManagerOf } from "@/lib/escalas/auth"
 
 // POST - Gerar eventos do calendário regular para o período
 export async function POST(
@@ -8,10 +8,9 @@ export async function POST(
 ) {
   try {
     const { id: periodId } = await params
-    const supabase = createAdminClient()
-    if (!supabase) {
-      return NextResponse.json({ error: "Erro de configuração" }, { status: 500 })
-    }
+    const auth = await requireManagerOf("period", periodId)
+    if (!auth.ok) return auth.response
+    const { supabase } = auth
 
     // Chamar a função do banco de dados
     const { data, error } = await supabase

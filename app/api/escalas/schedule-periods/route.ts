@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
-import { createAdminClient, createServerClient } from "@/lib/supabase/server"
+import { createServerClient } from "@/lib/supabase/server"
+import { requireMinistryManager } from "@/lib/escalas/auth"
 import { z } from "zod"
 
 const schedulePeriodSchema = z.object({
@@ -56,11 +57,6 @@ export async function GET(request: NextRequest) {
 // POST - Criar período de escala
 export async function POST(request: NextRequest) {
   try {
-    const supabase = createAdminClient()
-    if (!supabase) {
-      return NextResponse.json({ error: "Erro de configuração" }, { status: 500 })
-    }
-
     const body = await request.json()
     const validationResult = schedulePeriodSchema.safeParse(body)
 
@@ -72,6 +68,10 @@ export async function POST(request: NextRequest) {
     }
 
     const { ministry_id, month, year, availability_deadline, notes } = validationResult.data
+
+    const auth = await requireMinistryManager(ministry_id)
+    if (!auth.ok) return auth.response
+    const { supabase } = auth
 
     // Calcular datas de início e fim do período
     const startDate = new Date(year, month - 1, 1)

@@ -1,9 +1,47 @@
 import { NextRequest, NextResponse } from "next/server"
+import { z } from "zod"
 import { createAdminClient } from "@/lib/supabase/server"
+import { getEscalasCaller } from "@/lib/escalas/auth"
+import { signAvailabilityToken, verifyAvailabilityToken } from "@/lib/escalas/availability-token"
+import {
+  findMinistryServants,
+  findOpenPeriodByToken,
+  loadSavedAnswers,
+  samePersonIds,
+  type MinistryServant,
+  type OpenPeriod,
+  type PeriodLookup,
+} from "@/lib/escalas/availability"
+import type { SupabaseClient } from "@supabase/supabase-js"
 
-// GET - Buscar dados do período pelo token de disponibilidade
+function lookupError(lookup: Exclude<PeriodLookup, { ok: true }>) {
+  return NextResponse.json(
+    { error: lookup.error, status: lookup.periodStatus, deadline: lookup.deadline },
+    { status: lookup.status }
+  )
+}
+
+/** Dados do servo identificado + token pessoal + respostas já salvas. */
+async function identifiedPayload(
+  supabase: SupabaseClient,
+  period: OpenPeriod,
+  servants: MinistryServant[],
+  servant: MinistryServant
+) {
+  const saved = await loadSavedAnswers(supabase, period.id, samePersonIds(servants, servant))
+  return {
+    servant: { id: servant.id, name: servant.name },
+    access_token: signAvailabilityToken(servant.id, period.id),
+    answers: saved.answers,
+    submitted_at: saved.submitted_at,
+  }
+}
+
+// GET - Dados públicos do período (sem lista de servos).
+// Se o usuário estiver logado e vinculado a um servo do ministério, já
+// retorna a identificação dele.
 export async function GET(
-  request: NextRequest,
+  _request: NextRequest,
   { params }: { params: Promise<{ token: string }> }
 ) {
   try {
@@ -13,50 +51,13 @@ export async function GET(
       return NextResponse.json({ error: "Erro de configuração" }, { status: 500 })
     }
 
-    // Buscar período pelo token
-    const { data: period, error: periodError } = await supabase
-      .from("schedule_periods")
-      .select(`
-        id,
-        month,
-        year,
-        status,
-        availability_deadline,
-        ministry:ministries(id, name, color)
-      `)
-      .eq("availability_token", token)
-      .single()
+    const lookup = await findOpenPeriodByToken(supabase, token)
+    if (!lookup.ok) return lookupError(lookup)
+    const { period } = lookup
 
-    if (periodError || !period) {
-      return NextResponse.json(
-        { error: "Link inválido ou expirado" },
-        { status: 404 }
-      )
-    }
-
-    // Verificar se ainda está coletando disponibilidade
-    if (period.status !== "collecting") {
-      return NextResponse.json({
-        error: "O prazo para informar disponibilidade já encerrou",
-        status: period.status,
-      }, { status: 400 })
-    }
-
-    // Verificar prazo
-    if (period.availability_deadline) {
-      const deadline = new Date(period.availability_deadline)
-      if (new Date() > deadline) {
-        return NextResponse.json({
-          error: "O prazo para informar disponibilidade já encerrou",
-          deadline: period.availability_deadline,
-        }, { status: 400 })
-      }
-    }
-
-    // Buscar eventos do período
     const { data: events, error: eventsError } = await supabase
       .from("schedule_events")
-      .select("*")
+      .select("id, event_date, event_time, title, description")
       .eq("period_id", period.id)
       .order("event_date")
       .order("event_time")
@@ -66,33 +67,13 @@ export async function GET(
       return NextResponse.json({ error: "Erro ao carregar eventos" }, { status: 500 })
     }
 
-    // Buscar servos do ministério (inclui inativos — um servo marcado como
-    // inativo temporariamente ainda pode se identificar e responder; ao
-    // responder, ele é reativado automaticamente em /api/escalas/availability)
-    const { data: servants, error: servantsError } = await supabase
-      .from("servants")
-      .select(`
-        id,
-        name,
-        email,
-        is_leader,
-        area:areas!servants_area_id_fkey(id, name, ministry_id),
-        servant_areas(area_id, area:areas(id, name, ministry_id))
-      `)
-
-    if (servantsError) {
-      console.error("Erro ao buscar servos:", servantsError)
-      return NextResponse.json({ error: "Erro ao carregar servos" }, { status: 500 })
+    let me = null
+    const caller = await getEscalasCaller()
+    if (caller && period.ministry) {
+      const servants = await findMinistryServants(supabase, period.ministry.id)
+      const mine = servants.find((s) => s.user_id === caller.userId)
+      if (mine) me = await identifiedPayload(supabase, period, servants, mine)
     }
-
-    // Filtrar servos do ministério (área primária ou secundária via junction)
-    const ministryServants = (servants ?? []).filter((s: any) => {
-      const primaryMatch = s.area?.ministry_id === period.ministry?.id
-      const secondaryMatch = s.servant_areas?.some(
-        (sa: any) => sa.area?.ministry_id === period.ministry?.id
-      )
-      return primaryMatch || secondaryMatch
-    })
 
     return NextResponse.json({
       period: {
@@ -103,10 +84,66 @@ export async function GET(
         ministry: period.ministry,
       },
       events: events || [],
-      servants: ministryServants,
+      me,
     })
   } catch (error) {
     console.error("Erro na API de disponibilidade:", error)
+    return NextResponse.json({ error: "Erro interno do servidor" }, { status: 500 })
+  }
+}
+
+const identifySchema = z.union([
+  z.object({ email: z.string().trim().email() }),
+  z.object({ servant_id: z.string().uuid(), access_token: z.string().min(1) }),
+])
+
+// POST - Identificar o servo (por e-mail ou por token salvo no dispositivo)
+export async function POST(
+  request: NextRequest,
+  { params }: { params: Promise<{ token: string }> }
+) {
+  try {
+    const { token } = await params
+    const supabase = createAdminClient()
+    if (!supabase) {
+      return NextResponse.json({ error: "Erro de configuração" }, { status: 500 })
+    }
+
+    const parsed = identifySchema.safeParse(await request.json().catch(() => null))
+    if (!parsed.success) {
+      return NextResponse.json({ error: "Dados inválidos" }, { status: 400 })
+    }
+
+    const lookup = await findOpenPeriodByToken(supabase, token)
+    if (!lookup.ok) return lookupError(lookup)
+    const { period } = lookup
+    if (!period.ministry) {
+      return NextResponse.json({ error: "Período sem ministério" }, { status: 400 })
+    }
+
+    const servants = await findMinistryServants(supabase, period.ministry.id)
+    const body = parsed.data
+
+    let servant: MinistryServant | undefined
+    if ("email" in body) {
+      const email = body.email.toLowerCase()
+      const matches = servants.filter((s) => s.email?.toLowerCase().trim() === email)
+      // Prefere um registro ativo quando a pessoa tem mais de um
+      servant = matches.find((s) => s.is_active) ?? matches[0]
+    } else if (verifyAvailabilityToken(body.servant_id, period.id, body.access_token)) {
+      servant = servants.find((s) => s.id === body.servant_id)
+    }
+
+    if (!servant) {
+      return NextResponse.json(
+        { error: "Email não encontrado. Verifique se você está cadastrado no ministério." },
+        { status: 404 }
+      )
+    }
+
+    return NextResponse.json(await identifiedPayload(supabase, period, servants, servant))
+  } catch (error) {
+    console.error("Erro ao identificar servo:", error)
     return NextResponse.json({ error: "Erro interno do servidor" }, { status: 500 })
   }
 }

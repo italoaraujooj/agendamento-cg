@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
-import { createAdminClient, createServerClient } from "@/lib/supabase/server"
+import { createServerClient } from "@/lib/supabase/server"
+import { requireMinistryManager } from "@/lib/escalas/auth"
 import { z } from "zod"
 
 const areaSchema = z.object({
@@ -58,11 +59,6 @@ export async function GET(request: NextRequest) {
 // POST - Criar área
 export async function POST(request: NextRequest) {
   try {
-    const supabase = createAdminClient()
-    if (!supabase) {
-      return NextResponse.json({ error: "Erro de configuração" }, { status: 500 })
-    }
-
     const body = await request.json()
     const validationResult = areaSchema.safeParse(body)
 
@@ -74,6 +70,10 @@ export async function POST(request: NextRequest) {
     }
 
     const { ministry_id, name, description, min_servants, max_servants, order_index } = validationResult.data
+
+    const auth = await requireMinistryManager(ministry_id)
+    if (!auth.ok) return auth.response
+    const { supabase } = auth
 
     const { data, error } = await supabase
       .from("areas")

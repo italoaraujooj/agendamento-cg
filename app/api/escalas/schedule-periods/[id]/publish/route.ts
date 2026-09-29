@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server"
-import { createAdminClient } from "@/lib/supabase/server"
+import { requireManagerOf } from "@/lib/escalas/auth"
 
 // POST - Publicar escala
 export async function POST(
@@ -10,10 +10,9 @@ export async function POST(
     const { id: periodId } = await params
     const body = await request.json().catch(() => ({}))
     const force = body?.force === true
-    const supabase = createAdminClient()
-    if (!supabase) {
-      return NextResponse.json({ error: "Erro de configuração" }, { status: 500 })
-    }
+    const auth = await requireManagerOf("period", periodId)
+    if (!auth.ok) return auth.response
+    const { supabase } = auth
 
     // Verificar se o período existe
     const { data: period, error: fetchError } = await supabase

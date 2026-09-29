@@ -1,10 +1,13 @@
 import { NextRequest, NextResponse } from "next/server"
 import { createAdminClient } from "@/lib/supabase/server"
 import { z } from "zod"
+import { verifyAvailabilityToken } from "@/lib/escalas/availability-token"
+import { checkPeriodOpen, findMinistryServants, samePersonIds } from "@/lib/escalas/availability"
 
 const availabilitySubmissionSchema = z.object({
   servant_id: z.string().uuid(),
   period_id: z.string().uuid(),
+  access_token: z.string().min(1),
   availabilities: z.array(z.object({
     event_id: z.string().uuid(),
     is_available: z.boolean(),
@@ -12,7 +15,7 @@ const availabilitySubmissionSchema = z.object({
   })),
 })
 
-// POST - Submeter disponibilidade
+// POST - Enviar ou editar disponibilidade
 export async function POST(request: NextRequest) {
   try {
     const supabase = createAdminClient()
@@ -30,12 +33,19 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    const { servant_id, period_id, availabilities } = validationResult.data
+    const { servant_id, period_id, access_token, availabilities } = validationResult.data
 
-    // Verificar se o período existe e está coletando disponibilidade
+    // O token pessoal é emitido ao se identificar no link do período
+    if (!verifyAvailabilityToken(servant_id, period_id, access_token)) {
+      return NextResponse.json(
+        { error: "Sessão inválida. Abra o link novamente e informe seu email." },
+        { status: 403 }
+      )
+    }
+
     const { data: period, error: periodError } = await supabase
       .from("schedule_periods")
-      .select("status, availability_deadline")
+      .select("status, availability_deadline, ministry_id")
       .eq("id", period_id)
       .single()
 
@@ -43,48 +53,50 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Período não encontrado" }, { status: 404 })
     }
 
-    if (period.status !== "collecting") {
+    if (!checkPeriodOpen(period).open) {
       return NextResponse.json(
         { error: "O prazo para informar disponibilidade já encerrou" },
         { status: 400 }
       )
     }
 
-    // Verificar prazo
-    if (period.availability_deadline) {
-      const deadline = new Date(period.availability_deadline)
-      if (new Date() > deadline) {
-        return NextResponse.json(
-          { error: "O prazo para informar disponibilidade já encerrou" },
-          { status: 400 }
-        )
-      }
-    }
-
-    // Deletar disponibilidades anteriores deste servo para este período
-    await supabase
-      .from("servant_availability")
-      .delete()
-      .eq("servant_id", servant_id)
+    // Aceitar apenas eventos deste período
+    const { data: periodEvents } = await supabase
+      .from("schedule_events")
+      .select("id")
       .eq("period_id", period_id)
+    const validEventIds = new Set((periodEvents ?? []).map((e: { id: string }) => e.id))
+    const answers = availabilities.filter((a) => validEventIds.has(a.event_id))
 
-    // Inserir novas disponibilidades
-    const availabilityRecords = availabilities.map((a) => ({
-      servant_id,
-      period_id,
-      event_id: a.event_id,
-      is_available: a.is_available,
-      notes: a.notes || null,
-      submitted_at: new Date().toISOString(),
-    }))
+    // Aplicar a resposta a todos os registros da mesma pessoa no ministério
+    // (o cadastro atual cria um registro de servo por área)
+    const servants = await findMinistryServants(supabase, period.ministry_id)
+    const servant = servants.find((s) => s.id === servant_id)
+    if (!servant) {
+      return NextResponse.json({ error: "Servo não encontrado" }, { status: 404 })
+    }
+    const personIds = samePersonIds(servants, servant)
 
-    const { error: insertError } = await supabase
+    const submittedAt = new Date().toISOString()
+    const records = personIds.flatMap((id) =>
+      answers.map((a) => ({
+        servant_id: id,
+        period_id,
+        event_id: a.event_id,
+        is_available: a.is_available,
+        notes: a.notes?.trim() || null,
+        submitted_at: submittedAt,
+      }))
+    )
+
+    // Upsert evita perder a resposta anterior caso a gravação falhe no meio
+    const { error: upsertError } = await supabase
       .from("servant_availability")
-      .insert(availabilityRecords)
+      .upsert(records, { onConflict: "servant_id,period_id,event_id" })
 
-    if (insertError) {
-      console.error("Erro ao salvar disponibilidade:", insertError)
-      return NextResponse.json({ error: insertError.message }, { status: 500 })
+    if (upsertError) {
+      console.error("Erro ao salvar disponibilidade:", upsertError)
+      return NextResponse.json({ error: "Erro ao salvar disponibilidade" }, { status: 500 })
     }
 
     // Reativar o servo automaticamente: se estava marcado como inativo
@@ -96,92 +108,11 @@ export async function POST(request: NextRequest) {
       .eq("id", servant_id)
       .eq("is_active", false)
 
-    // Propagar disponibilidade para outros servos com mesmo nome no mesmo ministério
-    const { data: periodData } = await supabase
-      .from("schedule_periods")
-      .select("ministry_id")
-      .eq("id", period_id)
-      .single()
-
-    const { data: servantData } = await supabase
-      .from("servants")
-      .select("name")
-      .eq("id", servant_id)
-      .single()
-
-    if (periodData && servantData) {
-      const { data: areas } = await supabase
-        .from("areas")
-        .select("id")
-        .eq("ministry_id", periodData.ministry_id)
-
-      const areaIds = (areas ?? []).map((a: { id: string }) => a.id)
-
-      if (areaIds.length > 0) {
-        // Servos com mesmo nome pela área primária
-        const { data: byPrimary } = await supabase
-          .from("servants")
-          .select("id")
-          .ilike("name", servantData.name)
-          .in("area_id", areaIds)
-          .neq("id", servant_id)
-          .eq("is_active", true)
-
-        // Servos com mesmo nome via servant_areas (área secundária)
-        const { data: bySecondary } = await supabase
-          .from("servant_areas")
-          .select("servant_id, servant:servants!servant_areas_servant_id_fkey(id, name, is_active)")
-          .in("area_id", areaIds)
-
-        const secondaryIds = (bySecondary ?? [])
-          .filter(
-            (sa: any) =>
-              sa.servant?.is_active &&
-              sa.servant_id !== servant_id &&
-              sa.servant?.name?.toLowerCase().trim() === servantData.name.toLowerCase().trim()
-          )
-          .map((sa: any) => sa.servant_id as string)
-
-        const allDuplicateIds = [
-          ...new Set([
-            ...(byPrimary ?? []).map((s: { id: string }) => s.id),
-            ...secondaryIds,
-          ]),
-        ]
-
-        if (allDuplicateIds.length > 0) {
-          const { data: existing } = await supabase
-            .from("servant_availability")
-            .select("servant_id")
-            .in("servant_id", allDuplicateIds)
-            .eq("period_id", period_id)
-
-          const alreadyAnswered = new Set(
-            (existing ?? []).map((r: { servant_id: string }) => r.servant_id)
-          )
-          const pendingDuplicates = allDuplicateIds.filter((id) => !alreadyAnswered.has(id))
-
-          if (pendingDuplicates.length > 0) {
-            const propagated = pendingDuplicates.flatMap((dup_id) =>
-              availabilities.map((a) => ({
-                servant_id: dup_id,
-                period_id,
-                event_id: a.event_id,
-                is_available: a.is_available,
-                notes: a.notes || null,
-                submitted_at: new Date().toISOString(),
-              }))
-            )
-            await supabase.from("servant_availability").insert(propagated)
-          }
-        }
-      }
-    }
-
     return NextResponse.json({
       success: true,
       message: "Disponibilidade registrada com sucesso!",
-      count: availabilities.length,
+      count: answers.length,
+      submitted_at: submittedAt,
     })
   } catch (error) {
     console.error("Erro na API de disponibilidade:", error)

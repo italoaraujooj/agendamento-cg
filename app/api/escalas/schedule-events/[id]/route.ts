@@ -1,5 +1,10 @@
 import { NextRequest, NextResponse } from "next/server"
-import { createAdminClient } from "@/lib/supabase/server"
+import { z } from "zod"
+import { requireManagerOf } from "@/lib/escalas/auth"
+
+const eventPatchSchema = z.object({
+  requires_areas: z.array(z.string().uuid()).nullable(),
+})
 
 // PATCH - Atualizar campos de um evento (ex: requires_areas)
 export async function PATCH(
@@ -8,13 +13,19 @@ export async function PATCH(
 ) {
   try {
     const { id: eventId } = await params
-    const body = await request.json()
-    const supabase = createAdminClient()
-    if (!supabase) {
-      return NextResponse.json({ error: "Erro de configuração" }, { status: 500 })
+    const auth = await requireManagerOf("event", eventId)
+    if (!auth.ok) return auth.response
+    const { supabase } = auth
+
+    const validation = eventPatchSchema.safeParse(await request.json())
+    if (!validation.success) {
+      return NextResponse.json(
+        { error: "Dados inválidos", details: validation.error.errors },
+        { status: 400 }
+      )
     }
 
-    const { requires_areas } = body
+    const { requires_areas } = validation.data
 
     const { error } = await supabase
       .from("schedule_events")
@@ -39,10 +50,9 @@ export async function DELETE(
 ) {
   try {
     const { id: eventId } = await params
-    const supabase = createAdminClient()
-    if (!supabase) {
-      return NextResponse.json({ error: "Erro de configuração" }, { status: 500 })
-    }
+    const auth = await requireManagerOf("event", eventId)
+    if (!auth.ok) return auth.response
+    const { supabase } = auth
 
     // Verificar se o evento existe e se o período está em draft
     const { data: event, error: fetchError } = await supabase
