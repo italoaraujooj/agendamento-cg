@@ -1,6 +1,6 @@
 "use client"
 
-import { createContext, useContext, useEffect, useState, useCallback } from 'react'
+import { createContext, useContext, useEffect, useState, useCallback, useRef } from 'react'
 import { User, Session, AuthChangeEvent, AuthError } from '@supabase/supabase-js'
 import { supabase } from '@/lib/supabase/client'
 
@@ -88,8 +88,14 @@ export function AuthProvider({ children }: AuthProviderProps) {
       })
   }, [])
 
+  // Cada verificação recebe um número; só a mais recente pode gravar o resultado
+  // (evita que uma resposta atrasada sobrescreva uma mais nova)
+  const adminCheckSeq = useRef(0)
+
   // Função para verificar se o usuário é admin e buscar roles de ministério
   const checkAdminStatus = useCallback(async (userId: string | undefined) => {
+    const seq = ++adminCheckSeq.current
+    const isStale = () => seq !== adminCheckSeq.current
     setAdminChecked(false)
 
     if (!userId) {
@@ -100,10 +106,9 @@ export function AuthProvider({ children }: AuthProviderProps) {
     }
 
     try {
-      // Timeout com Promise.race
-      const timeoutPromise = new Promise<null>((resolve) => {
-        setTimeout(() => resolve(null), 5000)
-      })
+      // Timeout com Promise.race (por tentativa)
+      const withTimeout = <T,>(p: Promise<T>) =>
+        Promise.race([p, new Promise<null>((resolve) => setTimeout(() => resolve(null), 5000))])
 
       const fetchAll = async () => {
         const [profileResult, rolesResult, permsResult] = await Promise.all([
@@ -124,10 +129,18 @@ export function AuthProvider({ children }: AuthProviderProps) {
         return { profileResult, rolesResult, permsResult }
       }
 
-      const result = await Promise.race([fetchAll(), timeoutPromise])
+      // Sem resposta a tempo não significa "sem permissão": tenta de novo uma vez
+      // antes de desistir (antes, um timeout exibia "Acesso negado" para admins)
+      let result = await withTimeout(fetchAll())
+      if (isStale()) return
+      if (!result) {
+        console.warn('Verificação de permissões sem resposta; tentando novamente')
+        result = await withTimeout(fetchAll())
+        if (isStale()) return
+      }
 
       if (!result) {
-        // Timeout
+        // Timeout nas duas tentativas
         setIsAdmin(false)
         setMinistryRoles([])
         setPermissions([])
@@ -155,12 +168,13 @@ export function AuthProvider({ children }: AuthProviderProps) {
         setPermissions(permsResult.data?.map((p: { permission: string }) => p.permission) ?? [])
       }
     } catch (err) {
+      if (isStale()) return
       console.warn('Erro ao verificar admin:', err)
       setIsAdmin(false)
       setMinistryRoles([])
       setPermissions([])
     } finally {
-      setAdminChecked(true)
+      if (!isStale()) setAdminChecked(true)
     }
   }, [])
 
@@ -238,9 +252,14 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
     initialize()
 
-    // Listener para mudanças de auth
+    // Listener para mudanças de auth.
+    // IMPORTANTE: não chamar o Supabase (nem com await) dentro deste callback. A
+    // biblioteca segura um lock de autenticação enquanto o callback roda e as
+    // consultas esperam por esse mesmo lock — o resultado era um travamento até o
+    // timeout de 5s, e o usuário era tratado como não-admin ("Acesso negado").
+    // As consultas rodam logo depois, via setTimeout(0).
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      async (event: AuthChangeEvent, newSession: Session | null) => {
+      (event: AuthChangeEvent, newSession: Session | null) => {
         if (!isMounted) return
 
         console.log('🔄 Auth event:', event)
@@ -267,15 +286,23 @@ export function AuthProvider({ children }: AuthProviderProps) {
         setSession(newSession)
         setUser(newSession?.user ?? null)
 
-        if (newSession?.user?.id) {
-          // Aguardar verificação de admin para evitar race condition
-          await checkAdminStatus(newSession.user.id)
-        } else {
-          setIsAdmin(false)
-          setAdminChecked(true)
-        }
+        // INITIAL_SESSION já é tratado por initialize(); renovar o token não muda
+        // quem está logado nem suas permissões
+        if (event === 'INITIAL_SESSION' || event === 'TOKEN_REFRESHED') return
 
-        setLoading(false)
+        const userId = newSession?.user?.id
+        setTimeout(() => {
+          if (!isMounted) return
+          if (userId) {
+            checkAdminStatus(userId).finally(() => {
+              if (isMounted) setLoading(false)
+            })
+          } else {
+            setIsAdmin(false)
+            setAdminChecked(true)
+            setLoading(false)
+          }
+        }, 0)
       }
     )
 
