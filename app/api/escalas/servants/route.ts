@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server"
-import { requireEscalasAccess, requireManagerOf } from "@/lib/escalas/auth"
+import { canManageMinistry, requireEscalasAccess, requireManagerOf } from "@/lib/escalas/auth"
 import { z } from "zod"
 
 const servantSchema = z.object({
@@ -16,7 +16,12 @@ export async function GET(request: NextRequest) {
   try {
     const auth = await requireEscalasAccess()
     if (!auth.ok) return auth.response
-    const { supabase } = auth
+    const { supabase, caller } = auth
+    // Contatos dos servos: admin vê todos; líderes, só dos ministérios que gerenciam
+    const visibleTo = (s: any) =>
+      caller.isAdmin ||
+      canManageMinistry(caller, s.area?.ministry?.id) ||
+      s.servant_areas?.some((sa: any) => canManageMinistry(caller, sa.area?.ministry_id))
 
     const { searchParams } = new URL(request.url)
     const areaId = searchParams.get("area_id")
@@ -48,8 +53,10 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: error.message }, { status: 500 })
     }
 
+    const visible = (allData ?? []).filter(visibleTo)
+
     if (ministryId) {
-      const filtered = (allData ?? []).filter((s: any) => {
+      const filtered = visible.filter((s: any) => {
         const primaryMatch = s.area?.ministry?.id === ministryId
         const secondaryMatch = s.servant_areas?.some(
           (sa: any) => sa.area?.ministry_id === ministryId
@@ -59,7 +66,7 @@ export async function GET(request: NextRequest) {
       return NextResponse.json(filtered)
     }
 
-    return NextResponse.json(allData)
+    return NextResponse.json(visible)
   } catch (error) {
     console.error("Erro na API de servos:", error)
     return NextResponse.json({ error: "Erro interno do servidor" }, { status: 500 })

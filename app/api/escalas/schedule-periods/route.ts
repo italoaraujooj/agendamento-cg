@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
-import { createServerClient } from "@/lib/supabase/server"
-import { requireMinistryManager } from "@/lib/escalas/auth"
+import { createAdminClient, createServerClient } from "@/lib/supabase/server"
+import { getEscalasCaller, requireMinistryManager } from "@/lib/escalas/auth"
 import { z } from "zod"
 
 const schedulePeriodSchema = z.object({
@@ -14,7 +14,11 @@ const schedulePeriodSchema = z.object({
 // GET - Listar períodos de escala
 export async function GET(request: NextRequest) {
   try {
-    const supabase = await createServerClient()
+    // Admin e líderes veem todos os períodos (qualquer status) dos ministérios
+    // que gerenciam; os demais, só o que a RLS permite (escalas publicadas)
+    const caller = await getEscalasCaller()
+    const managesAny = !!caller && (caller.isAdmin || caller.ministryIds.length > 0)
+    const supabase = managesAny ? createAdminClient() : await createServerClient()
     if (!supabase) {
       return NextResponse.json({ error: "Erro de configuração" }, { status: 500 })
     }
@@ -22,6 +26,7 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url)
     const ministryId = searchParams.get("ministry_id")
     const status = searchParams.get("status")
+    const limit = Number(searchParams.get("limit")) || null
 
     let query = supabase
       .from("schedule_periods")
@@ -35,9 +40,15 @@ export async function GET(request: NextRequest) {
     if (ministryId) {
       query = query.eq("ministry_id", ministryId)
     }
+    if (managesAny && !caller!.isAdmin) {
+      query = query.in("ministry_id", caller!.ministryIds)
+    }
 
     if (status) {
       query = query.eq("status", status)
+    }
+    if (limit) {
+      query = query.limit(Math.min(limit, 200))
     }
 
     const { data, error } = await query

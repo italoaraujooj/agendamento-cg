@@ -24,7 +24,7 @@ import {
 import { useAuth } from "@/components/auth/auth-provider"
 import { useSystemMode } from "@/components/system-mode-provider"
 import { ScheduleBuilder } from "@/components/escalas/schedule-builder"
-import { supabase } from "@/lib/supabase/client"
+import type { Blockout } from "@/lib/escalas/blockouts"
 import { toast } from "sonner"
 import Link from "next/link"
 import type { 
@@ -50,7 +50,7 @@ export default function MontarEscalaPage() {
   const params = useParams()
   const periodId = params.periodId as string
   
-  const { isAuthenticated, isAdmin, adminChecked, loading: authLoading } = useAuth()
+  const { isAuthenticated, isAdmin, ministryRoles, adminChecked, loading: authLoading } = useAuth()
   const { setMode } = useSystemMode()
   
   const [period, setPeriod] = useState<PeriodWithDetails | null>(null)
@@ -61,6 +61,7 @@ export default function MontarEscalaPage() {
   const [assignments, setAssignments] = useState<ScheduleAssignment[]>([])
   const [conflicts, setConflicts] = useState<ServantConflict[]>([])
   const [declineReasons, setDeclineReasons] = useState<Record<string, string | null>>({})
+  const [blockouts, setBlockouts] = useState<Record<string, Blockout[]>>({})
   const [loading, setLoading] = useState(true)
   const [publishDialog, setPublishDialog] = useState(false)
   const [publishing, setPublishing] = useState(false)
@@ -71,104 +72,39 @@ export default function MontarEscalaPage() {
     setMode("escalas")
   }, [setMode])
 
+  // Admin ou líder de algum ministério (a API confere se é o ministério deste período)
+  const canManage = isAdmin || ministryRoles.length > 0
+
   useEffect(() => {
     if (!authLoading && adminChecked) {
-      if (!isAuthenticated || !isAdmin) {
+      if (!isAuthenticated || !canManage) {
         toast.error("Acesso negado")
         router.push("/escalas")
       }
     }
-  }, [authLoading, isAuthenticated, isAdmin, adminChecked, router])
+  }, [authLoading, isAuthenticated, canManage, adminChecked, router])
 
   const fetchData = useCallback(async () => {
     try {
-      // Buscar período
-      const { data: periodData, error: periodError } = await supabase
-        .from("schedule_periods")
-        .select(`
-          *,
-          ministry:ministries(*)
-        `)
-        .eq("id", periodId)
-        .single()
-
-      if (periodError || !periodData) {
-        toast.error("Período não encontrado")
+      // Dados da montagem via API (admin ou líder do ministério)
+      const res = await fetch(`/api/escalas/schedule-periods/${periodId}/builder`)
+      if (res.status === 404 || res.status === 403) {
+        toast.error(res.status === 403 ? "Acesso negado" : "Período não encontrado")
         router.push("/admin-escalas/periodos")
         return
       }
+      if (!res.ok) throw new Error("Erro ao carregar dados")
+      const data = await res.json()
 
-      setPeriod(periodData)
-
-      // Buscar eventos
-      const { data: eventsData } = await supabase
-        .from("schedule_events")
-        .select("*")
-        .eq("period_id", periodId)
-        .order("event_date")
-        .order("event_time")
-
-      setEvents(eventsData || [])
-
-      // Buscar áreas do ministério
-      const { data: areasData } = await supabase
-        .from("areas")
-        .select("*")
-        .eq("ministry_id", periodData.ministry_id)
-        .eq("is_active", true)
-        .order("order_index")
-        .order("name")
-
-      setAreas(areasData || [])
-
-      // Buscar servos das áreas (incluindo áreas secundárias via servant_areas)
-      const { data: servantsData } = await supabase
-        .from("servants")
-        .select(`
-          *,
-          area:areas!servants_area_id_fkey(*),
-          servant_areas(area_id, area:areas(id, ministry_id))
-        `)
-        .eq("is_active", true)
-
-      // Filtrar servos do ministério (área primária OU área secundária)
-      const ministryServants = servantsData?.filter(
-        (s) =>
-          s.area?.ministry_id === periodData.ministry_id ||
-          s.servant_areas?.some((sa: any) => sa.area?.ministry_id === periodData.ministry_id)
-      ) || []
-      setServants(ministryServants)
-
-      // Buscar disponibilidades
-      const { data: availData } = await supabase
-        .from("servant_availability")
-        .select("*")
-        .eq("period_id", periodId)
-
-      setAvailabilities(availData || [])
-
-      // Buscar atribuições
-      const eventIds = eventsData?.map((e) => e.id) || []
-      if (eventIds.length > 0) {
-        const { data: assignData } = await supabase
-          .from("schedule_assignments")
-          .select(`
-            *,
-            servant:servants(*),
-            area:areas(*)
-          `)
-          .in("schedule_event_id", eventIds)
-
-        setAssignments(assignData || [])
-
-        // Mesma pessoa escalada em outro evento no mesmo horário (inclusive outros ministérios)
-        const [conflictsRes, declinesRes] = await Promise.all([
-          fetch(`/api/escalas/schedule-periods/${periodId}/conflicts`),
-          fetch(`/api/escalas/schedule-periods/${periodId}/declines`),
-        ])
-        setConflicts(conflictsRes.ok ? await conflictsRes.json() : [])
-        setDeclineReasons(declinesRes.ok ? await declinesRes.json() : {})
-      }
+      setPeriod(data.period)
+      setEvents(data.events)
+      setAreas(data.areas)
+      setServants(data.servants)
+      setAvailabilities(data.availabilities)
+      setAssignments(data.assignments)
+      setConflicts(data.conflicts)
+      setDeclineReasons(data.declineReasons)
+      setBlockouts(data.blockouts)
     } catch (error) {
       console.error("Erro ao buscar dados:", error)
       toast.error("Erro ao carregar dados")
@@ -178,10 +114,10 @@ export default function MontarEscalaPage() {
   }, [periodId, router])
 
   useEffect(() => {
-    if (isAdmin) {
+    if (canManage) {
       fetchData()
     }
-  }, [isAdmin, fetchData])
+  }, [canManage, fetchData])
 
   const handlePublish = async (force = false) => {
     setPublishing(true)
@@ -319,6 +255,7 @@ export default function MontarEscalaPage() {
           periodLabel={`${period.ministry?.name} · ${format(new Date(period.year, period.month - 1), "MMMM 'de' yyyy", { locale: ptBR })}`}
           availabilityDeadline={period.availability_deadline}
           conflicts={conflicts}
+          blockouts={blockouts}
           declineReasons={declineReasons}
           events={events}
           areas={areas}

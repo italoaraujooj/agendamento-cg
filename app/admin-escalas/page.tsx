@@ -17,7 +17,6 @@ import {
 } from "lucide-react"
 import { useAuth } from "@/components/auth/auth-provider"
 import { useSystemMode } from "@/components/system-mode-provider"
-import { supabase } from "@/lib/supabase/client"
 import { toast } from "sonner"
 import Link from "next/link"
 import type { SchedulePeriod, Ministry } from "@/types/escalas"
@@ -31,47 +30,39 @@ interface PeriodWithMinistry extends SchedulePeriod {
 
 export default function AdminEscalasPage() {
   const router = useRouter()
-  const { isAuthenticated, isAdmin, adminChecked, loading: authLoading } = useAuth()
+  const { isAuthenticated, isAdmin, ministryRoles, adminChecked, loading: authLoading } = useAuth()
   const { setMode } = useSystemMode()
   const [periods, setPeriods] = useState<PeriodWithMinistry[]>([])
   const [loading, setLoading] = useState(true)
+  // Admin ou líder de algum ministério (a API limita aos ministérios que ele gerencia)
+  const canManage = isAdmin || ministryRoles.length > 0
 
   useEffect(() => {
     setMode("escalas")
   }, [setMode])
 
-  // Verificar permissão de admin
   useEffect(() => {
     if (!authLoading && adminChecked) {
       if (!isAuthenticated) {
         router.push("/escalas")
         return
       }
-      if (!isAdmin) {
-        toast.error("Acesso negado. Você não tem permissão de administrador.")
+      if (!canManage) {
+        toast.error("Acesso negado. Apenas administradores e líderes de ministério.")
         router.push("/escalas")
         return
       }
     }
-  }, [authLoading, isAuthenticated, isAdmin, adminChecked, router])
+  }, [authLoading, isAuthenticated, canManage, adminChecked, router])
 
   useEffect(() => {
     async function fetchPeriods() {
-      if (!isAdmin) return
-      
-      try {
-        const { data, error } = await supabase
-          .from("schedule_periods")
-          .select(`
-            *,
-            ministry:ministries(*)
-          `)
-          .order("year", { ascending: false })
-          .order("month", { ascending: false })
-          .limit(20)
+      if (!canManage) return
 
-        if (error) throw error
-        setPeriods(data || [])
+      try {
+        const res = await fetch("/api/escalas/schedule-periods?limit=20")
+        if (!res.ok) throw new Error()
+        setPeriods(await res.json())
       } catch (error) {
         console.error("Erro ao buscar períodos:", error)
         toast.error("Erro ao carregar períodos de escala")
@@ -80,10 +71,10 @@ export default function AdminEscalasPage() {
       }
     }
 
-    if (isAdmin) {
+    if (canManage) {
       fetchPeriods()
     }
-  }, [isAdmin])
+  }, [canManage])
 
   const getStatusIcon = (status: string) => {
     switch (status) {
@@ -96,7 +87,7 @@ export default function AdminEscalasPage() {
     }
   }
 
-  if (authLoading || !adminChecked || (isAuthenticated && !isAdmin)) {
+  if (authLoading || !adminChecked || (isAuthenticated && !canManage)) {
     return (
       <div className="container mx-auto p-6">
         <div className="flex items-center justify-center min-h-[400px]">

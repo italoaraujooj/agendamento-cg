@@ -66,6 +66,7 @@ import {
   type EventCompletion,
 } from "@/lib/escalas/staffing"
 import { suggestAssignments } from "@/lib/escalas/suggest"
+import { blockoutFor, blockoutReason, type Blockout } from "@/lib/escalas/blockouts"
 import { ProposalsDialog, type AssignmentProposal } from "@/components/escalas/proposals-dialog"
 import { ScheduleMatrix } from "@/components/escalas/schedule-matrix"
 import { HistoryDialog } from "@/components/escalas/history-dialog"
@@ -79,6 +80,8 @@ interface ScheduleBuilderProps {
   conflicts?: ServantConflict[]
   /** Motivo de recusa por atribuição (visível só para quem gerencia) */
   declineReasons?: Record<string, string | null>
+  /** Datas bloqueadas por servo (férias, viagens) */
+  blockouts?: Record<string, Blockout[]>
   events: ScheduleEvent[]
   areas: Area[]
   servants: Servant[]
@@ -93,6 +96,7 @@ export function ScheduleBuilder({
   availabilityDeadline,
   conflicts = [],
   declineReasons = {},
+  blockouts = {},
   events,
   areas,
   servants,
@@ -123,14 +127,30 @@ export function ScheduleBuilder({
   } | null>(null)
   const [loadingCopy, setLoadingCopy] = useState(false)
 
-  // Mapa de indisponíveis: servant_id-event_id → false
+  // Datas bloqueadas (férias, viagens) que caem em eventos sem resposta explícita:
+  // a resposta de disponibilidade, quando existe, prevalece sobre o bloqueio
+  const blockedReason = useMemo(() => {
+    const answered = new Set(availabilities.map((a) => `${a.servant_id}-${a.event_id}`))
+    const map = new Map<string, string>()
+    for (const [servantId, list] of Object.entries(blockouts)) {
+      for (const e of events) {
+        const key = `${servantId}-${e.id}`
+        if (answered.has(key)) continue
+        const b = blockoutFor(e.event_date, list)
+        if (b) map.set(key, blockoutReason(b))
+      }
+    }
+    return map
+  }, [blockouts, events, availabilities])
+
+  // Mapa de indisponíveis: servant_id-event_id (resposta "não posso" ou data bloqueada)
   const unavailableSet = useMemo(() => {
-    const set = new Set<string>()
+    const set = new Set<string>(blockedReason.keys())
     availabilities.forEach((a) => {
       if (!a.is_available) set.add(`${a.servant_id}-${a.event_id}`)
     })
     return set
-  }, [availabilities])
+  }, [availabilities, blockedReason])
 
   const isServantAvailable = (servantId: string, eventId: string) =>
     !unavailableSet.has(`${servantId}-${eventId}`)
@@ -149,8 +169,9 @@ export function ScheduleBuilder({
       if (deadline && !autoFilled && new Date(a.submitted_at) > deadline) late.add(a.servant_id)
       if (!a.is_available && a.notes) reasons.set(`${a.servant_id}-${a.event_id}`, a.notes)
     })
+    blockedReason.forEach((reason, key) => reasons.set(key, reason))
     return { respondedSet: responded, lateSet: late, unavailableReason: reasons }
-  }, [availabilities, availabilityDeadline])
+  }, [availabilities, availabilityDeadline, blockedReason])
 
   // Conflitos por servo+evento: "Ministério · Evento (Área)" já escalado no mesmo horário
   const conflictMap = useMemo(() => {

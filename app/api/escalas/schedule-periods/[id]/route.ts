@@ -16,7 +16,9 @@ export async function GET(
 ) {
   try {
     const { id } = await params
-    const supabase = await createServerClient()
+    // Quem gerencia o ministério vê o período em qualquer status; os demais, só o que a RLS permite
+    const manager = await requireManagerOf("period", id)
+    const supabase = manager.ok ? manager.supabase : await createServerClient()
     if (!supabase) {
       return NextResponse.json({ error: "Erro de configuração" }, { status: 500 })
     }

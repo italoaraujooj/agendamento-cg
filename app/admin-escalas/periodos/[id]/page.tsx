@@ -399,7 +399,7 @@ export default function PeriodoDetalhePage() {
   const params = useParams()
   const periodId = params.id as string
 
-  const { isAuthenticated, isAdmin, adminChecked, loading: authLoading } = useAuth()
+  const { isAuthenticated, isAdmin, ministryRoles, adminChecked, loading: authLoading } = useAuth()
   const { setMode } = useSystemMode()
 
   const [period, setPeriod] = useState<PeriodWithDetails | null>(null)
@@ -445,14 +445,17 @@ export default function PeriodoDetalhePage() {
     setMode("escalas")
   }, [setMode])
 
+  // Admin ou líder de algum ministério (as APIs conferem se é o ministério deste período)
+  const canManage = isAdmin || ministryRoles.length > 0
+
   useEffect(() => {
     if (!authLoading && adminChecked) {
-      if (!isAuthenticated || !isAdmin) {
+      if (!isAuthenticated || !canManage) {
         toast.error("Acesso negado")
         router.push("/escalas")
       }
     }
-  }, [authLoading, isAuthenticated, isAdmin, adminChecked, router])
+  }, [authLoading, isAuthenticated, canManage, adminChecked, router])
 
   const fetchPeriod = useCallback(async () => {
     try {
@@ -507,10 +510,10 @@ export default function PeriodoDetalhePage() {
   }, [])
 
   useEffect(() => {
-    if (isAdmin) {
+    if (canManage) {
       fetchPeriod()
     }
-  }, [isAdmin, fetchPeriod])
+  }, [canManage, fetchPeriod])
 
   // Fetch availability when period is loaded and status is collecting or beyond
   useEffect(() => {

@@ -10,6 +10,7 @@ import {
   sendEmails,
   type EmailMessage,
 } from "@/lib/escalas/email"
+import type { Blockout } from "@/lib/escalas/blockouts"
 
 /**
  * Helpers do fluxo de disponibilidade (/disponibilidade/[token]).
@@ -107,6 +108,39 @@ export async function findMinistryServants(
       user_id: s.user_id,
       is_active: s.is_active,
     }))
+}
+
+/**
+ * Datas bloqueadas (férias, viagens) dos servos que caem no intervalo,
+ * agrupadas por servo. A ligação servo ↔ bloqueio é pelo e-mail da pessoa.
+ */
+export async function loadBlockoutsForServants(
+  supabase: SupabaseClient,
+  servants: { id: string; email: string | null }[],
+  from: string,
+  to: string
+): Promise<Record<string, Blockout[]>> {
+  const byEmail = new Map<string, string[]>()
+  for (const s of servants) {
+    const email = s.email?.toLowerCase().trim()
+    if (email) byEmail.set(email, [...(byEmail.get(email) ?? []), s.id])
+  }
+  if (byEmail.size === 0) return {}
+
+  const { data } = await supabase
+    .from("servant_blockouts")
+    .select("id, email, starts_on, ends_on, reason")
+    .in("email", Array.from(byEmail.keys()))
+    .lte("starts_on", to)
+    .gte("ends_on", from)
+
+  const result: Record<string, Blockout[]> = {}
+  for (const b of (data ?? []) as (Blockout & { email: string })[]) {
+    for (const servantId of byEmail.get(b.email) ?? []) {
+      ;(result[servantId] ??= []).push({ id: b.id, starts_on: b.starts_on, ends_on: b.ends_on, reason: b.reason })
+    }
+  }
+  return result
 }
 
 export interface SavedAnswers {
