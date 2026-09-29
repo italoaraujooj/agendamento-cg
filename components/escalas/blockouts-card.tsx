@@ -87,7 +87,9 @@ export function BlockoutsCard() {
           Férias, viagens: você não é escalado nessas datas e as coletas de disponibilidade já vêm marcadas.
         </CardDescription>
       </CardHeader>
-      <CardContent className="space-y-4">
+      {/* @container: o layout do formulário depende da largura do card, não da tela
+          (na Minha Escala ele fica na coluna lateral estreita; no celular os campos empilham) */}
+      <CardContent className="space-y-4 @container">
         {items === null ? (
           <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
         ) : items.length === 0 ? (
@@ -96,14 +98,14 @@ export function BlockoutsCard() {
           <ul className="space-y-2">
             {items.map((b) => (
               <li key={b.id} className="flex items-center justify-between gap-3 rounded-md border px-3 py-2">
-                <span className="text-sm">
+                <span className="text-sm min-w-0 break-words">
                   <span className="font-medium">{label(b)}</span>
                   {b.reason && <span className="text-muted-foreground"> · {b.reason}</span>}
                 </span>
                 <Button
                   variant="ghost"
                   size="icon"
-                  className="h-8 w-8"
+                  className="h-8 w-8 shrink-0"
                   onClick={() => remove(b.id)}
                   disabled={removing === b.id}
                   aria-label="Remover período bloqueado"
@@ -115,20 +117,20 @@ export function BlockoutsCard() {
           </ul>
         )}
 
-        <form onSubmit={add} className="grid grid-cols-2 sm:grid-cols-[1fr_1fr_1.4fr_auto] gap-2 items-end">
-          <div className="space-y-1">
+        <form onSubmit={add} className="grid grid-cols-1 @sm:grid-cols-2 @lg:grid-cols-[1fr_1fr_1.4fr_auto] gap-2 items-end">
+          <div className="space-y-1 min-w-0">
             <Label htmlFor="blk-start" className="text-xs">De</Label>
-            <Input id="blk-start" type="date" min={todayBr()} value={startsOn} onChange={(e) => setStartsOn(e.target.value)} required />
+            <Input id="blk-start" type="date" min={todayBr()} value={startsOn} onChange={(e) => setStartsOn(e.target.value)} required className="min-w-0" />
           </div>
-          <div className="space-y-1">
+          <div className="space-y-1 min-w-0">
             <Label htmlFor="blk-end" className="text-xs">Até</Label>
-            <Input id="blk-end" type="date" min={startsOn || todayBr()} value={endsOn} onChange={(e) => setEndsOn(e.target.value)} />
+            <Input id="blk-end" type="date" min={startsOn || todayBr()} value={endsOn} onChange={(e) => setEndsOn(e.target.value)} className="min-w-0" />
           </div>
-          <div className="space-y-1 col-span-2 sm:col-span-1">
+          <div className="space-y-1 min-w-0 @sm:col-span-2 @lg:col-span-1">
             <Label htmlFor="blk-reason" className="text-xs">Motivo (opcional)</Label>
             <Input id="blk-reason" placeholder="Ex.: Férias" maxLength={100} value={reason} onChange={(e) => setReason(e.target.value)} />
           </div>
-          <Button type="submit" disabled={saving || !startsOn} className="col-span-2 sm:col-span-1">
+          <Button type="submit" disabled={saving || !startsOn} className="@sm:col-span-2 @lg:col-span-1">
             {saving ? <Loader2 className="mr-1.5 h-4 w-4 animate-spin" /> : <Plus className="mr-1.5 h-4 w-4" />}
             Bloquear
           </Button>
