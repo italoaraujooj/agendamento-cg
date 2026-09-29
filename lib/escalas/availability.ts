@@ -2,6 +2,7 @@ import type { SupabaseClient } from "@supabase/supabase-js"
 import { format } from "date-fns"
 import { ptBR } from "date-fns/locale"
 import { signAvailabilityToken } from "@/lib/escalas/availability-token"
+import { sendPushBatch, sendPushToEmails } from "@/lib/push"
 import {
   APP_URL,
   availabilityInviteEmail,
@@ -177,21 +178,31 @@ export async function sendAvailabilityInvites(
   }
 
   const withoutEmail = servants.filter((s) => !s.email).map((s) => s.name)
-  const messages: EmailMessage[] = servants
-    .filter((s) => s.email)
-    .map((s) => {
-      const { subject, html } = availabilityInviteEmail({
-        name: s.name,
-        ministryName: ministry.name,
-        monthLabel: monthLabel(period.month, period.year),
-        deadlineLabel: deadlineLabel(period.availability_deadline),
-        link: personalAvailabilityLink(period.availability_token, s.id, period.id),
-        reminder: mode === "pending",
-      })
-      return { to: s.email!, subject, html }
+  const month = monthLabel(period.month, period.year)
+  const deadline = deadlineLabel(period.availability_deadline)
+  const withEmail = servants.filter((s) => s.email)
+  const messages: EmailMessage[] = withEmail.map((s) => {
+    const { subject, html } = availabilityInviteEmail({
+      name: s.name,
+      ministryName: ministry.name,
+      monthLabel: month,
+      deadlineLabel: deadline,
+      link: personalAvailabilityLink(period.availability_token, s.id, period.id),
+      reminder: mode === "pending",
     })
+    return { to: s.email!, subject, html }
+  })
+  const pushes = withEmail.map((s) => ({
+    email: s.email!,
+    payload: {
+      title: mode === "pending" ? "Lembrete: informe sua disponibilidade" : "Informe sua disponibilidade",
+      body: `${ministry.name} · ${month}${deadline ? ` — até ${deadline}` : ""}`,
+      url: personalAvailabilityLink(period.availability_token, s.id, period.id),
+      tag: `disponibilidade-${period.id}`,
+    },
+  }))
 
-  const result = await sendEmails(messages)
+  const [result] = await Promise.all([sendEmails(messages), sendPushBatch(supabase, pushes)])
   return { ...result, withoutEmail, recipients: messages.length }
 }
 
@@ -311,5 +322,12 @@ export async function notifyLateAvailabilityChange(
     link: `${APP_URL}/admin-escalas/montar/${period.id}`,
   })
 
-  await sendEmails(recipients.map((to) => ({ to, subject, html })))
+  await Promise.all([
+    sendEmails(recipients.map((to) => ({ to, subject, html }))),
+    sendPushToEmails(supabase, recipients, {
+      title: `${params.servantName} alterou a disponibilidade`,
+      body: `${ministry.name} · ${changes.length} evento(s) alterado(s) após o prazo`,
+      url: `${APP_URL}/admin-escalas/montar/${period.id}`,
+    }),
+  ])
 }

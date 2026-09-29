@@ -10,6 +10,7 @@ import { format, parseISO } from "date-fns"
 import { ptBR } from "date-fns/locale"
 import { AssignmentResponse } from "@/components/escalas/assignment-response"
 import { CalendarSubscribe } from "@/components/escalas/calendar-subscribe"
+import { PushOptIn } from "@/components/pwa/push-opt-in"
 import type { AssignmentStatus } from "@/types/escalas"
 
 interface PersonalSchedule {
@@ -134,6 +135,14 @@ export default function EscalaPessoalPage() {
           </Card>
         ))}
       </div>
+
+      {signature && (
+        <Card>
+          <CardContent className="pt-4">
+            <PushOptIn schedule={{ periodToken: token, s: data.servant.id, k: signature }} />
+          </CardContent>
+        </Card>
+      )}
 
       {data.assignments.length > 0 && (
         <Card>
