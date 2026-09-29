@@ -24,23 +24,9 @@ export function AuthButton() {
     setMounted(true)
   }, [])
 
-  // Durante a hidratação, mostrar um placeholder
-  if (!mounted) {
-    return (
-      <Button variant="ghost" size="sm" disabled>
-        <div className="w-4 h-4 mr-2" />
-        Carregando...
-      </Button>
-    )
-  }
-
-  if (loading) {
-    return (
-      <Button variant="ghost" disabled>
-        <div className="w-4 h-4 border-2 border-gray-300 border-t-gray-600 rounded-full animate-spin mr-2" />
-        Carregando...
-      </Button>
-    )
+  // Durante a hidratação e a checagem da sessão: espaço do avatar, sem texto
+  if (!mounted || loading) {
+    return <div className="h-8 w-8 rounded-full bg-muted animate-pulse" aria-label="Carregando" />
   }
 
   if (!user) {

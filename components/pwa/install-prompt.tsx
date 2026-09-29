@@ -97,7 +97,7 @@ export function InstallPrompt() {
   if (!mode) return null
 
   return (
-    <div className="fixed inset-x-0 bottom-0 z-50 p-3 md:hidden animate-in slide-in-from-bottom-4">
+    <div className="fixed inset-x-0 bottom-[var(--bottom-nav-h)] z-50 p-3 md:hidden animate-in slide-in-from-bottom-4">
       <div className="mx-auto max-w-md rounded-xl border bg-background shadow-lg p-4">
         <div className="flex items-start gap-3">
           {/* eslint-disable-next-line @next/next/no-img-element */}

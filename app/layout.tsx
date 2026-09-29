@@ -13,6 +13,7 @@ import { CompleteProfileModal } from "@/components/auth/complete-profile-modal"
 import { Toaster } from "@/components/ui/sonner"
 import { ServiceWorkerRegister } from "@/components/pwa/service-worker-register"
 import { InstallPrompt } from "@/components/pwa/install-prompt"
+import { MobileBottomNav } from "@/components/navigation/mobile-bottom-nav"
 
 export const metadata: Metadata = {
   title: "Cidade Viva CG - Agendamentos e Escalas",
@@ -29,6 +30,8 @@ export const metadata: Metadata = {
 }
 
 export const viewport: Viewport = {
+  // Permite usar env(safe-area-inset-*) na barra inferior (iPhone com app instalado)
+  viewportFit: "cover",
   themeColor: [
     { media: "(prefers-color-scheme: light)", color: "#fcf8f0" },
     { media: "(prefers-color-scheme: dark)", color: "#0a0a0a" },
@@ -77,6 +80,7 @@ html {
                 {children}
               </main>
               <Footer />
+              <MobileBottomNav />
               <Toaster />
               <InstallPrompt />
               <ServiceWorkerRegister />

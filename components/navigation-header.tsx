@@ -1,187 +1,80 @@
 "use client"
 
-import { useState } from "react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
+import { Menu } from "lucide-react"
 import { Button } from "@/components/ui/button"
-import { Calendar, CalendarCheck, MapPin, Users, Home, Shield, Users2, CalendarDays, ClipboardList, Menu, Megaphone } from "lucide-react"
 import { ModeToggle } from "@/components/mode-toggle"
 import { AuthButton } from "@/components/auth/auth-button"
 import { CalendarStatusIndicator } from "@/components/calendar-status-indicator"
 import { SystemModeSwitch } from "@/components/system-mode-switch"
-import { useAuth } from "@/components/auth/auth-provider"
 import { useSystemMode } from "@/components/system-mode-provider"
+import { NavMenuSheet } from "@/components/navigation/nav-menu-sheet"
+import { isTokenPage, useNavItems } from "@/components/navigation/use-nav-items"
 import { cn } from "@/lib/utils"
-import {
-  Sheet,
-  SheetContent,
-  SheetHeader,
-  SheetTitle,
-  SheetTrigger,
-} from "@/components/ui/sheet"
 
+/**
+ * Cabeçalho em uma linha. Telas largas (xl): navegação completa inline.
+ * Telas médias: menu completo no hambúrguer. Celular: a navegação fica na
+ * barra inferior (MobileBottomNav), e aqui só logo e conta.
+ */
 export default function NavigationHeader() {
   const pathname = usePathname()
-  const { isAdmin, isAuthenticated, hasPermission, canAccessEscalas, ministryRoles } = useAuth()
   const { isEscalas } = useSystemMode()
-  const [open, setOpen] = useState(false)
-
-  // Menu do módulo de Agendamentos
-  const agendamentosNavItems = [
-    {
-      href: "/",
-      label: "Início",
-      icon: Home,
-      active: pathname === "/",
-    },
-    {
-      href: "/environments",
-      label: "Ambientes",
-      icon: MapPin,
-      active: pathname === "/environments",
-    },
-    {
-      href: "/booking",
-      label: "Agendar",
-      icon: Calendar,
-      active: pathname === "/booking",
-    },
-    {
-      href: "/reservations",
-      label: "Reservas",
-      icon: Users,
-      active: pathname === "/reservations",
-    },
-  ]
-
-  // Menu do módulo de Escalas
-  const escalasNavItems = [
-    {
-      href: "/escalas",
-      label: "Dashboard",
-      icon: Home,
-      active: pathname === "/escalas",
-    },
-    {
-      href: "/ministerios",
-      label: "Ministérios",
-      icon: Users2,
-      active: pathname === "/ministerios" || pathname.startsWith("/ministerios/"),
-    },
-    {
-      href: "/calendario",
-      label: "Calendário",
-      icon: CalendarDays,
-      active: pathname === "/calendario",
-    },
-  ]
-
-  // Selecionar menu baseado no modo
-  const baseNavItems = isEscalas ? escalasNavItems : agendamentosNavItems
-
-  // Admin de agendamentos: qualquer permissão de gestão
-  const canSeeAgendamentosAdmin = isAuthenticated && (isAdmin || hasPermission('approve_bookings') || hasPermission('manage_external_rentals') || hasPermission('manage_avisos'))
-  // Admin ou líder de algum ministério (as telas e APIs limitam aos ministérios que ele gerencia)
-  const canSeeEscalasAdmin = isAuthenticated && (isAdmin || ministryRoles.length > 0)
-
-  const adminNavItem = isEscalas && canSeeEscalasAdmin
-    ? { href: "/admin-escalas", label: "Admin", icon: Shield, active: pathname === "/admin-escalas" || pathname.startsWith("/admin-escalas/") }
-    : !isEscalas && canSeeAgendamentosAdmin
-    ? { href: "/admin", label: "Admin", icon: Shield, active: pathname === "/admin" || pathname.startsWith("/admin/") }
-    : null
-
-  const avisosNavItem = isAuthenticated && !isEscalas
-    ? { href: "/avisos", label: "Avisos", icon: Megaphone, active: pathname === "/avisos" }
-    : null
-
-  // Página do servo: visível para todos, nos dois modos — quem não tem acesso ao
-  // módulo de Escalas (a maioria dos servos) não teria outro caminho até ela.
-  // Sem login, a página busca a escala pelo e-mail.
-  const minhaEscalaNavItem = {
-    href: "/minha-escala",
-    label: "Minha Escala",
-    icon: CalendarCheck,
-    active: pathname === "/minha-escala",
-  }
-
-  // Logo após "Início"/"Dashboard": no celular a barra rola para o lado sem
-  // indicador, e no fim da lista o item ficaria fora da tela
-  const allNavItems = [
-    baseNavItems[0],
-    minhaEscalaNavItem,
-    ...baseNavItems.slice(1),
-    ...(avisosNavItem ? [avisosNavItem] : []),
-    ...(adminNavItem ? [adminNavItem] : []),
-  ]
-
-  // Título e ícone baseado no modo
-  const headerTitle = isEscalas ? "Escalas - Cidade Viva CG" : "Agendamento - Cidade Viva CG"
-  const headerHref = isEscalas ? "/escalas" : "/"
-  const HeaderIcon = isEscalas ? ClipboardList : Calendar
+  const { items, moduleLabel, homeHref } = useNavItems()
+  const showNav = !isTokenPage(pathname)
 
   return (
     <header className="sticky top-0 z-50 bg-background/80 backdrop-blur supports-[backdrop-filter]:bg-background/60 border-b">
-      <div className="container mx-auto px-4">
-        {/* Top bar */}
-        <div className="flex items-center justify-between h-14">
-          <Link href={headerHref} className="flex items-center gap-2">
-            <HeaderIcon className="h-6 w-6 text-primary" />
-            <span className="font-bold text-sm sm:text-base md:text-xl">{headerTitle}</span>
-          </Link>
+      <div className="container mx-auto px-4 flex items-center gap-4 h-14">
+        <Link href={homeHref} className="flex items-center gap-2 shrink-0">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src="/icons/icon-96.png" alt="" className="h-8 w-8 rounded-lg" />
+          <span className="font-bold leading-tight">
+            Cidade Viva CG
+            <span className="block text-xs font-medium text-muted-foreground xl:hidden">{moduleLabel}</span>
+          </span>
+        </Link>
 
-          <div className="flex items-center gap-1">
-            {!isEscalas && <CalendarStatusIndicator className="hidden md:flex" />}
-            <AuthButton />
-            <ModeToggle />
-            {/* Mobile: Sheet para CalendarStatus */}
-            {!isEscalas && (
-              <Sheet open={open} onOpenChange={setOpen}>
-                <SheetTrigger asChild>
-                  <Button variant="ghost" size="icon" className="md:hidden">
-                    <Menu className="h-5 w-5" />
-                    <span className="sr-only">Status do Google Calendar</span>
-                  </Button>
-                </SheetTrigger>
-                <SheetContent side="right" className="w-72">
-                  <SheetHeader>
-                    <SheetTitle className="flex items-center gap-2">
-                      <Calendar className="h-5 w-5 text-primary" />
-                      Google Calendar
-                    </SheetTitle>
-                  </SheetHeader>
-                  <div className="mt-4">
-                    <CalendarStatusIndicator />
-                  </div>
-                </SheetContent>
-              </Sheet>
-            )}
+        {showNav && (
+          <div className="hidden xl:flex items-center gap-3 min-w-0">
+            <SystemModeSwitch />
+            <nav className="flex items-center gap-1">
+              {items.map((item) => {
+                const Icon = item.icon
+                return (
+                  <Link
+                    key={item.href}
+                    href={item.href}
+                    className={cn(
+                      "flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium whitespace-nowrap transition-colors",
+                      item.active
+                        ? "bg-primary/10 text-primary"
+                        : "text-muted-foreground hover:text-foreground hover:bg-muted"
+                    )}
+                  >
+                    <Icon className="h-4 w-4" />
+                    {item.label}
+                  </Link>
+                )
+              })}
+            </nav>
           </div>
-        </div>
+        )}
 
-        {/* Nav bar */}
-        <div className="flex items-center gap-3 h-10 border-t border-border/50 overflow-x-auto scrollbar-hide">
-          <SystemModeSwitch />
-          <div className="w-px h-5 bg-border shrink-0" />
-          <nav className="flex items-center gap-1">
-            {allNavItems.map((item) => {
-              const Icon = item.icon
-              return (
-                <Link
-                  key={item.href}
-                  href={item.href}
-                  className={cn(
-                    "flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium whitespace-nowrap transition-colors",
-                    item.active
-                      ? "bg-primary/10 text-primary"
-                      : "text-muted-foreground hover:text-foreground hover:bg-muted"
-                  )}
-                >
-                  <Icon className="h-4 w-4" />
-                  {item.label}
-                </Link>
-              )
-            })}
-          </nav>
+        <div className="ml-auto flex items-center gap-1">
+          {!isEscalas && <CalendarStatusIndicator className="hidden xl:flex" />}
+          <AuthButton />
+          <div className="hidden md:block">
+            <ModeToggle />
+          </div>
+          {showNav && (
+            <NavMenuSheet>
+              <Button variant="ghost" size="icon" className="hidden md:inline-flex xl:hidden" aria-label="Abrir menu">
+                <Menu className="h-5 w-5" />
+              </Button>
+            </NavMenuSheet>
+          )}
         </div>
       </div>
     </header>

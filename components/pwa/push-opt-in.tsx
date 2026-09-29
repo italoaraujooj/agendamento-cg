@@ -158,9 +158,11 @@ export function PushOptIn({ schedule }: PushOptInProps) {
   }
 
   return (
-    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+    // Consulta de contêiner: lado a lado só quando o card tem largura (na coluna lateral empilha)
+    <div className="@container">
+    <div className="flex flex-col @md:flex-row @md:items-center justify-between gap-3">
       <p className="text-sm text-muted-foreground flex items-center gap-2">
-        {state === "on" ? <BellRing className="h-4 w-4 text-primary" /> : <Bell className="h-4 w-4" />}
+        {state === "on" ? <BellRing className="h-4 w-4 shrink-0 text-primary" /> : <Bell className="h-4 w-4 shrink-0" />}
         {state === "on"
           ? "Notificações ativas neste dispositivo."
           : "Receba um aviso no celular quando for escalado e antes de servir."}
@@ -174,6 +176,7 @@ export function PushOptIn({ schedule }: PushOptInProps) {
         {busy && <Loader2 className="mr-1.5 h-4 w-4 animate-spin" />}
         {state === "on" ? "Desativar" : "Ativar notificações"}
       </Button>
+    </div>
     </div>
   )
 }
