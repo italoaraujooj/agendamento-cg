@@ -41,6 +41,7 @@ import {
   HelpCircle,
   Clock3,
   AlertTriangle,
+  CheckCheck,
 } from "lucide-react"
 import { format, parseISO } from "date-fns"
 import { ptBR } from "date-fns/locale"
@@ -61,6 +62,8 @@ interface ScheduleBuilderProps {
   availabilityDeadline?: string | null
   /** Mesma pessoa escalada em outro evento no mesmo horário (inclusive outros ministérios) */
   conflicts?: ServantConflict[]
+  /** Motivo de recusa por atribuição (visível só para quem gerencia) */
+  declineReasons?: Record<string, string | null>
   events: ScheduleEvent[]
   areas: Area[]
   servants: Servant[]
@@ -74,6 +77,7 @@ export function ScheduleBuilder({
   periodLabel,
   availabilityDeadline,
   conflicts = [],
+  declineReasons = {},
   events,
   areas,
   servants,
@@ -137,21 +141,34 @@ export function ScheduleBuilder({
       .map((o) => `${o.same_ministry ? "" : `${o.ministry} · `}${o.title}${o.area ? ` (${o.area})` : ""}`)
       .join("; ")
 
+  // Quem recusou continua visível (para o líder substituir), mas não preenche a vaga
+  const filledAssignments = useMemo(
+    () => assignments.filter((a) => a.status !== "declined"),
+    [assignments]
+  )
+  const declinedCount = assignments.length - filledAssignments.length
+  // Avisados por e-mail e ainda sem resposta
+  const awaitingCount = assignments.filter((a) => a.status === "pending" && a.notified_at).length
+
   // Atribuições já feitas que batem com outro compromisso no mesmo horário
   const assignedConflictCount = useMemo(
-    () => assignments.filter((a) => conflictMap.has(`${a.servant_id}-${a.schedule_event_id}`)).length,
-    [assignments, conflictMap]
+    () => filledAssignments.filter((a) => conflictMap.has(`${a.servant_id}-${a.schedule_event_id}`)).length,
+    [filledAssignments, conflictMap]
   )
 
-  const getEventAssignments = useMemo(() => {
+  const groupByEvent = (list: ScheduleAssignment[]) => {
     const assignmentMap = new Map<string, ScheduleAssignment[]>()
-    assignments.forEach((a) => {
+    list.forEach((a) => {
       const key = a.schedule_event_id
       if (!assignmentMap.has(key)) assignmentMap.set(key, [])
       assignmentMap.get(key)!.push(a)
     })
     return (eventId: string) => assignmentMap.get(eventId) || []
-  }, [assignments])
+  }
+  // Todas (inclui recusadas) — para exibir os chips
+  const getEventAssignments = useMemo(() => groupByEvent(assignments), [assignments])
+  // Só as que preenchem a vaga — para completude
+  const getFilledEventAssignments = useMemo(() => groupByEvent(filledAssignments), [filledAssignments])
 
   const getAreaServants = useMemo(() => {
     const servantMap = new Map<string, Servant[]>()
@@ -173,11 +190,11 @@ export function ScheduleBuilder({
   // Contador de atribuições por servo
   const servantAssignmentCount = useMemo(() => {
     const countMap = new Map<string, number>()
-    assignments.forEach((a) => {
+    filledAssignments.forEach((a) => {
       countMap.set(a.servant_id, (countMap.get(a.servant_id) || 0) + 1)
     })
     return countMap
-  }, [assignments])
+  }, [filledAssignments])
 
   // Quantidade de eventos em que cada servo está disponível
   const servantAvailableEventCount = useMemo(() => {
@@ -417,20 +434,20 @@ export function ScheduleBuilder({
   }
 
   const completedEvents = events.filter((event) => {
-    const eventAssigns = getEventAssignments(event.id)
+    const eventAssigns = getFilledEventAssignments(event.id)
     return getRequiredAreas(event).every((area) => eventAssigns.some((a) => a.area_id === area.id))
   }).length
 
   // Pré-computar mapa de atribuições por evento+área para a prévia (múltiplos por área)
   const assignmentsByEventArea = useMemo(() => {
     const map = new Map<string, ScheduleAssignment[]>()
-    assignments.forEach((a) => {
+    filledAssignments.forEach((a) => {
       const key = `${a.schedule_event_id}-${a.area_id}`
       if (!map.has(key)) map.set(key, [])
       map.get(key)!.push(a)
     })
     return map
-  }, [assignments])
+  }, [filledAssignments])
 
   const sortedEvents = useMemo(
     () =>
@@ -444,7 +461,23 @@ export function ScheduleBuilder({
   return (
     <div className="space-y-4">
       {/* Toolbar */}
-      <div className="flex items-center justify-end gap-2">
+      <div className="flex flex-wrap items-center justify-end gap-2">
+        {declinedCount > 0 && (
+          <Badge
+            variant="outline"
+            className="border-red-300 text-red-700 dark:text-red-400 gap-1"
+            title="Servos que recusaram — a vaga precisa de substituto"
+          >
+            <X className="h-3 w-3" />
+            {declinedCount} recusa(s)
+          </Badge>
+        )}
+        {awaitingCount > 0 && (
+          <Badge variant="outline" className="gap-1 text-muted-foreground" title="Avisados por e-mail, ainda sem resposta">
+            <Clock className="h-3 w-3" />
+            {awaitingCount} aguardando confirmação
+          </Badge>
+        )}
         {assignedConflictCount > 0 && (
           <Badge
             variant="outline"
@@ -484,7 +517,7 @@ export function ScheduleBuilder({
                         {format(parseISO(selectedEvent.event_date), "EEE, dd/MM", { locale: ptBR })}
                       </p>
                       {(() => {
-                        const assigns = getEventAssignments(selectedEvent.id)
+                        const assigns = getFilledEventAssignments(selectedEvent.id)
                         const required = getRequiredAreas(selectedEvent)
                         const done = new Set(
                           assigns.filter((a) => required.some((r) => r.id === a.area_id)).map((a) => a.area_id)
@@ -569,7 +602,7 @@ export function ScheduleBuilder({
                     </p>
                   ) : null}
                   {sortedFilteredEvents.map((event) => {
-                    const assigns = getEventAssignments(event.id)
+                    const assigns = getFilledEventAssignments(event.id)
                     const required = getRequiredAreas(event)
                     const assignedAreaIds = new Set(
                       assigns.filter((a) => required.some((r) => r.id === a.area_id)).map((a) => a.area_id)
@@ -712,27 +745,51 @@ export function ScheduleBuilder({
                           {/* Chips de servos atribuídos */}
                           {areaAssignments.map((assignment) => {
                             const isRemoving = loading === `remove-${assignment.id}`
-                            const chipConflicts = conflictMap.get(`${assignment.servant_id}-${assignment.schedule_event_id}`)
+                            const declined = assignment.status === "declined"
+                            const chipConflicts = declined
+                              ? undefined
+                              : conflictMap.get(`${assignment.servant_id}-${assignment.schedule_event_id}`)
+                            const declineReason = declineReasons[assignment.id]
                             return (
                               <div
                                 key={assignment.id}
                                 className={`flex items-center justify-between px-2.5 py-1.5 rounded-md border ${
-                                  chipConflicts
-                                    ? "border-amber-400 bg-amber-50 dark:bg-amber-950"
-                                    : "border-green-500 bg-green-50 dark:bg-green-950"
+                                  declined
+                                    ? "border-red-300 bg-red-50 dark:bg-red-950"
+                                    : chipConflicts
+                                      ? "border-amber-400 bg-amber-50 dark:bg-amber-950"
+                                      : "border-green-500 bg-green-50 dark:bg-green-950"
                                 }`}
-                                title={chipConflicts ? `Mesmo horário: ${describeConflicts(chipConflicts)}` : undefined}
+                                title={
+                                  declined
+                                    ? `Recusou${declineReason ? `: ${declineReason}` : ""} — remova e escale um substituto`
+                                    : chipConflicts
+                                      ? `Mesmo horário: ${describeConflicts(chipConflicts)}`
+                                      : undefined
+                                }
                               >
                                 <div className="flex items-center gap-1.5 text-sm min-w-0">
+                                  {declined ? (
+                                    <X className="h-3 w-3 text-red-500 flex-shrink-0" />
+                                  ) : assignment.status === "accepted" ? (
+                                    <CheckCheck className="h-3 w-3 text-green-600 flex-shrink-0" aria-label="Confirmou" />
+                                  ) : assignment.notified_at ? (
+                                    <Clock className="h-3 w-3 text-amber-500 flex-shrink-0" aria-label="Aguardando confirmação" />
+                                  ) : null}
                                   {chipConflicts && (
                                     <AlertTriangle className="h-3 w-3 text-amber-500 flex-shrink-0" />
                                   )}
                                   {(assignment.servant as { is_leader?: boolean } | null)?.is_leader && (
                                     <Crown className="h-3 w-3 text-yellow-500 flex-shrink-0" />
                                   )}
-                                  <span className="font-medium truncate">
+                                  <span className={`font-medium truncate ${declined ? "line-through text-muted-foreground" : ""}`}>
                                     {(assignment.servant as { name?: string } | null)?.name ?? "—"}
                                   </span>
+                                  {declined && (
+                                    <span className="text-xs text-red-700 dark:text-red-400 truncate">
+                                      recusou{declineReason ? `: ${declineReason}` : ""}
+                                    </span>
+                                  )}
                                   {chipConflicts && (
                                     <span className="text-xs text-amber-700 dark:text-amber-400 truncate">
                                       também em {describeConflicts(chipConflicts)}

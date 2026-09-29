@@ -60,6 +60,7 @@ export default function MontarEscalaPage() {
   const [availabilities, setAvailabilities] = useState<ServantAvailability[]>([])
   const [assignments, setAssignments] = useState<ScheduleAssignment[]>([])
   const [conflicts, setConflicts] = useState<ServantConflict[]>([])
+  const [declineReasons, setDeclineReasons] = useState<Record<string, string | null>>({})
   const [loading, setLoading] = useState(true)
   const [publishDialog, setPublishDialog] = useState(false)
   const [publishing, setPublishing] = useState(false)
@@ -161,8 +162,12 @@ export default function MontarEscalaPage() {
         setAssignments(assignData || [])
 
         // Mesma pessoa escalada em outro evento no mesmo horário (inclusive outros ministérios)
-        const conflictsRes = await fetch(`/api/escalas/schedule-periods/${periodId}/conflicts`)
+        const [conflictsRes, declinesRes] = await Promise.all([
+          fetch(`/api/escalas/schedule-periods/${periodId}/conflicts`),
+          fetch(`/api/escalas/schedule-periods/${periodId}/declines`),
+        ])
         setConflicts(conflictsRes.ok ? await conflictsRes.json() : [])
+        setDeclineReasons(declinesRes.ok ? await declinesRes.json() : {})
       }
     } catch (error) {
       console.error("Erro ao buscar dados:", error)
@@ -198,10 +203,21 @@ export default function MontarEscalaPage() {
         throw new Error(data.error || "Erro ao publicar")
       }
 
+      const n = data.notification as { sent: number; failed: number; withoutEmail: string[] } | null
       toast.success(
         period?.status === "published"
           ? "Escala atualizada com sucesso!"
-          : "Escala publicada com sucesso!"
+          : "Escala publicada com sucesso!",
+        {
+          description: n
+            ? [
+                n.sent > 0 ? `${n.sent} servo(s) avisado(s) por e-mail sobre as mudanças.` : "Nenhuma mudança para avisar.",
+                n.failed > 0 ? `${n.failed} e-mail(s) falharam — clique em Atualizar de novo para reenviar.` : null,
+                n.withoutEmail.length > 0 ? `Sem e-mail: ${n.withoutEmail.join(", ")}.` : null,
+              ].filter(Boolean).join(" ")
+            : undefined,
+          duration: 8000,
+        }
       )
       router.push(`/admin-escalas/periodos/${periodId}`)
     } catch (error) {
@@ -303,6 +319,7 @@ export default function MontarEscalaPage() {
           periodLabel={`${period.ministry?.name} · ${format(new Date(period.year, period.month - 1), "MMMM 'de' yyyy", { locale: ptBR })}`}
           availabilityDeadline={period.availability_deadline}
           conflicts={conflicts}
+          declineReasons={declineReasons}
           events={events}
           areas={areas}
           servants={servants}

@@ -7,6 +7,9 @@ import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
 import { Loader2, Search, Calendar, CalendarCheck, Crown, ChevronDown, ChevronUp } from "lucide-react"
 import Link from "next/link"
+import { AssignmentResponse } from "@/components/escalas/assignment-response"
+import { CalendarSubscribe } from "@/components/escalas/calendar-subscribe"
+import type { AssignmentStatus } from "@/types/escalas"
 import { format, parseISO } from "date-fns"
 import { ptBR } from "date-fns/locale"
 import { supabase } from "@/lib/supabase/client"
@@ -15,6 +18,9 @@ interface Assignment {
   servantName: string
   areaName: string
   isMe: boolean
+  status: AssignmentStatus
+  /** Presente só nas próprias atribuições, quando logado */
+  assignmentId?: string
 }
 
 interface EventData {
@@ -38,6 +44,7 @@ interface PeriodData {
 interface ApiResponse {
   servantName: string
   periods: PeriodData[]
+  calendarToken: string | null
 }
 
 /** Coleta de disponibilidade aberta para o usuário logado */
@@ -135,6 +142,22 @@ export default function MinhaEscalaPage() {
       setLoading(false)
     }
   }
+
+  const updateMyStatus = (assignmentId: string, status: AssignmentStatus) =>
+    setData((prev) =>
+      prev
+        ? {
+            ...prev,
+            periods: prev.periods.map((p) => ({
+              ...p,
+              events: p.events.map((e) => ({
+                ...e,
+                assignments: e.assignments.map((a) => (a.assignmentId === assignmentId ? { ...a, status } : a)),
+              })),
+            })),
+          }
+        : prev
+    )
 
   const togglePeriod = (id: string) => {
     setCollapsedPeriods((prev) => {
@@ -272,6 +295,17 @@ export default function MinhaEscalaPage() {
               {" "}Encontramos {data.periods.length} escala(s) publicada(s).
             </p>
 
+            {data.calendarToken && (
+              <Card>
+                <CardContent className="pt-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                  <p className="text-sm text-muted-foreground">
+                    Receba suas escalas no calendário do celular:
+                  </p>
+                  <CalendarSubscribe calendarToken={data.calendarToken} />
+                </CardContent>
+              </Card>
+            )}
+
             {data.periods.map((period) => {
               const isCollapsed = collapsedPeriods.has(period.id)
               const monthLabel = format(
@@ -401,6 +435,20 @@ export default function MinhaEscalaPage() {
                                     Sem atribuições registradas
                                   </p>
                                 )}
+
+                                {/* Confirmar / recusar as próprias escalas (logado) */}
+                                {event.assignments
+                                  .filter((a) => a.isMe && a.assignmentId)
+                                  .map((a) => (
+                                    <div key={a.assignmentId} className="mt-3 pt-3 border-t">
+                                      <AssignmentResponse
+                                        assignmentId={a.assignmentId!}
+                                        status={a.status}
+                                        eventDate={event.event_date}
+                                        onChange={(status) => updateMyStatus(a.assignmentId!, status)}
+                                      />
+                                    </div>
+                                  ))}
                               </div>
                             ))}
                           </div>

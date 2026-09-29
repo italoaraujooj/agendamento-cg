@@ -195,6 +195,33 @@ export async function sendAvailabilityInvites(
   return { ...result, withoutEmail, recipients: messages.length }
 }
 
+/**
+ * Lembrete automático (cron diário): quem ainda não respondeu a disponibilidade
+ * quando falta ~1 dia para o prazo. A janela de 24h garante um único lembrete por período.
+ */
+export async function remindPendingAvailability(supabase: SupabaseClient) {
+  const now = Date.now()
+  const { data: periods, error } = await supabase
+    .from("schedule_periods")
+    .select("id")
+    .eq("status", "collecting")
+    .gt("availability_deadline", new Date(now + 24 * 3600 * 1000).toISOString())
+    .lte("availability_deadline", new Date(now + 48 * 3600 * 1000).toISOString())
+  if (error) throw error
+
+  const results: { periodId: string; sent: number; failed: number }[] = []
+  for (const period of periods ?? []) {
+    try {
+      const result = await sendAvailabilityInvites(supabase, period.id, "pending")
+      results.push({ periodId: period.id, sent: result.sent, failed: result.failed })
+    } catch (err) {
+      console.error(`Erro ao lembrar pendentes do período ${period.id}:`, err)
+      results.push({ periodId: period.id, sent: 0, failed: -1 })
+    }
+  }
+  return results
+}
+
 /** E-mails de quem gerencia o ministério: líder/co-líder e user_ministry_roles. */
 export async function findMinistryManagerEmails(
   supabase: SupabaseClient,
