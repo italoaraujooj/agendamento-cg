@@ -127,6 +127,109 @@ export function availabilityInviteEmail(params: {
   }
 }
 
+export interface ScheduleEmailItem {
+  /** Ex.: "dom, 06/12 às 19:00 — Culto de Celebração" */
+  label: string
+  area: string
+  /** Ordenação cronológica (ex.: "2026-12-06T19:00") */
+  sortKey?: string
+}
+
+export const byChronology = (a: ScheduleEmailItem, b: ScheduleEmailItem) =>
+  (a.sortKey ?? a.label).localeCompare(b.sortKey ?? b.label)
+
+function itemList(items: ScheduleEmailItem[], color: string) {
+  return `<table width="100%" cellpadding="0" cellspacing="0" style="font-size:14px;border-collapse:collapse;margin:8px 0 16px;">
+    ${items
+      .map(
+        (i) => `<tr>
+          <td style="padding:8px 10px;border-left:3px solid ${color};background-color:#f9fafb;">
+            <strong>${escapeHtml(i.label)}</strong><br>
+            <span style="color:#6b7280;">${escapeHtml(i.area)}</span>
+          </td>
+        </tr><tr><td style="height:6px;"></td></tr>`
+      )
+      .join("")}
+  </table>`
+}
+
+/** Escala publicada/atualizada: novas atribuições e remoções do servo */
+export function schedulePublishedEmail(params: {
+  name: string
+  ministryName: string
+  monthLabel: string
+  added: ScheduleEmailItem[]
+  removed: ScheduleEmailItem[]
+  link: string
+}): { subject: string; html: string } {
+  const first = params.name.split(" ")[0]
+  const onlyRemoved = params.added.length === 0
+  const subject = onlyRemoved
+    ? `Atualização na sua escala — ${params.ministryName} (${params.monthLabel})`
+    : `🗓️ Você foi escalado(a) — ${params.ministryName} (${params.monthLabel})`
+
+  const body = `
+    <p style="margin:0 0 12px;">Olá, <strong>${escapeHtml(first)}</strong>!</p>
+    ${params.added.length > 0 ? `
+      <p style="margin:0 0 4px;">Você foi escalado(a) para:</p>
+      ${itemList(params.added, "#16a34a")}
+      <p style="margin:0 0 4px;">Confirme sua presença ou avise se não puder servir:</p>
+      ${button(params.link, "Confirmar ou recusar")}` : ""}
+    ${params.removed.length > 0 ? `
+      <p style="margin:0 0 4px;">Você <strong>não está mais escalado(a)</strong> em:</p>
+      ${itemList(params.removed, "#9ca3af")}` : ""}
+    ${onlyRemoved ? button(params.link, "Ver minha escala") : ""}`
+
+  return {
+    subject,
+    html: layout({ title: onlyRemoved ? "Sua escala mudou" : "Você foi escalado(a)", subtitle: `${params.ministryName} · ${params.monthLabel}`, body }),
+  }
+}
+
+/** Aviso ao líder: servo recusou uma escala */
+export function assignmentDeclinedEmail(params: {
+  servantName: string
+  ministryName: string
+  item: ScheduleEmailItem
+  reason: string | null
+  link: string
+}): { subject: string; html: string } {
+  const body = `
+    <p style="margin:0 0 12px;">
+      <strong>${escapeHtml(params.servantName)}</strong> não poderá servir em:
+    </p>
+    ${itemList([params.item], "#dc2626")}
+    ${params.reason ? `<p style="margin:0 0 12px;">Motivo: <em>${escapeHtml(params.reason)}</em></p>` : ""}
+    <p style="margin:0 0 4px;">A vaga precisa de um substituto.</p>
+    ${button(params.link, "Abrir montagem da escala")}`
+
+  return {
+    subject: `❌ ${params.servantName} recusou a escala — ${params.item.label}`,
+    html: layout({ title: "Escala recusada", subtitle: params.ministryName, body }),
+  }
+}
+
+/** Lembrete antes do evento (D-3 / D-1) */
+export function assignmentReminderEmail(params: {
+  name: string
+  whenLabel: string
+  items: (ScheduleEmailItem & { ministry: string; pending: boolean; link: string })[]
+}): { subject: string; html: string } {
+  const first = params.name.split(" ")[0]
+  const anyPending = params.items.some((i) => i.pending)
+  const body = `
+    <p style="margin:0 0 12px;">Olá, <strong>${escapeHtml(first)}</strong>! Lembrete da sua escala ${escapeHtml(params.whenLabel)}:</p>
+    ${itemList(params.items.map((i) => ({ label: i.label, area: `${i.ministry} · ${i.area}${i.pending ? " · aguardando sua confirmação" : ""}` })), "#eabc08")}
+    ${anyPending
+      ? button(params.items.find((i) => i.pending)!.link, "Confirmar presença")
+      : button(params.items[0].link, "Ver minha escala")}`
+
+  return {
+    subject: `⏰ Lembrete: você serve ${params.whenLabel}`,
+    html: layout({ title: "Lembrete de escala", subtitle: params.whenLabel, body }),
+  }
+}
+
 export function lateAvailabilityChangeEmail(params: {
   servantName: string
   ministryName: string

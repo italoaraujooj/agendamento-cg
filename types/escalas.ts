@@ -131,11 +131,25 @@ export interface ServantAvailability {
   event?: ScheduleEvent
 }
 
+export type AssignmentStatus = 'pending' | 'accepted' | 'declined'
+
+export const ASSIGNMENT_STATUS_LABELS: Record<AssignmentStatus, string> = {
+  pending: 'Aguardando confirmação',
+  accepted: 'Confirmado',
+  declined: 'Recusou',
+}
+
 export interface ScheduleAssignment {
   id: string
   schedule_event_id: string
   servant_id: string
   area_id: string
+  /** Confirmação do servo (substitui `confirmed`) */
+  status: AssignmentStatus
+  responded_at: string | null
+  /** Quando o servo foi avisado desta atribuição por e-mail */
+  notified_at: string | null
+  /** @deprecated use status */
   confirmed: boolean
   confirmed_at: string | null
   notes: string | null

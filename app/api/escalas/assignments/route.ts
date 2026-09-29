@@ -1,7 +1,19 @@
 import { NextRequest, NextResponse } from "next/server"
 import { createServerClient } from "@/lib/supabase/server"
 import { requireAuthenticated, requireManagerOf } from "@/lib/escalas/auth"
+import { recordRemovalIfNotified } from "@/lib/escalas/schedule-notifications"
+import type { SupabaseClient } from "@supabase/supabase-js"
 import { z } from "zod"
+
+const REMOVED_FIELDS = "servant_id, schedule_event_id, area_id, notified_at"
+
+// Quem já tinha sido avisado da escala recebe o aviso de remoção no próximo "Atualizar"
+async function recordRemovals(
+  supabase: SupabaseClient,
+  rows: { servant_id: string; schedule_event_id: string; area_id: string; notified_at: string | null }[] | null
+) {
+  for (const row of rows ?? []) await recordRemovalIfNotified(supabase, row)
+}
 
 const assignmentSchema = z.object({
   schedule_event_id: z.string().uuid(),
@@ -77,11 +89,13 @@ export async function POST(request: NextRequest) {
 
     // No modo "replace", remove a atribuição existente antes de inserir
     if (mode !== "add") {
-      await supabase
+      const { data: replaced } = await supabase
         .from("schedule_assignments")
         .delete()
         .eq("schedule_event_id", schedule_event_id)
         .eq("area_id", area_id)
+        .select(REMOVED_FIELDS)
+      await recordRemovals(supabase, replaced)
     }
 
     // Criar nova atribuição
@@ -142,27 +156,31 @@ export async function DELETE(request: NextRequest) {
 
     if (id) {
       // Deletar por ID
-      const { error } = await supabase
+      const { data: removed, error } = await supabase
         .from("schedule_assignments")
         .delete()
         .eq("id", id)
+        .select(REMOVED_FIELDS)
 
       if (error) {
         console.error("Erro ao remover atribuição:", error)
         return NextResponse.json({ error: error.message }, { status: 500 })
       }
+      await recordRemovals(supabase, removed)
     } else if (eventId && areaId) {
       // Deletar por evento + área
-      const { error } = await supabase
+      const { data: removed, error } = await supabase
         .from("schedule_assignments")
         .delete()
         .eq("schedule_event_id", eventId)
         .eq("area_id", areaId)
+        .select(REMOVED_FIELDS)
 
       if (error) {
         console.error("Erro ao remover atribuição:", error)
         return NextResponse.json({ error: error.message }, { status: 500 })
       }
+      await recordRemovals(supabase, removed)
     } else {
       return NextResponse.json(
         { error: "ID ou event_id + area_id são obrigatórios" },

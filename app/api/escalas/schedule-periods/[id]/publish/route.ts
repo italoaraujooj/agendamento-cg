@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { requireManagerOf } from "@/lib/escalas/auth"
+import { notifyPublishedChanges } from "@/lib/escalas/schedule-notifications"
+import { isEmailConfigured } from "@/lib/escalas/email"
 
 // POST - Publicar escala
 export async function POST(
@@ -10,6 +12,8 @@ export async function POST(
     const { id: periodId } = await params
     const body = await request.json().catch(() => ({}))
     const force = body?.force === true
+    // Avisar os servos por e-mail (padrão: sim)
+    const notify = body?.notify !== false
     const auth = await requireManagerOf("period", periodId)
     if (!auth.ok) return auth.response
     const { supabase } = auth
@@ -17,7 +21,7 @@ export async function POST(
     // Verificar se o período existe
     const { data: period, error: fetchError } = await supabase
       .from("schedule_periods")
-      .select("*, events:schedule_events(id, requires_areas, assignments:schedule_assignments(area_id))")
+      .select("*, events:schedule_events(id, requires_areas, assignments:schedule_assignments(area_id, status))")
       .eq("id", periodId)
       .single()
 
@@ -25,7 +29,7 @@ export async function POST(
       return NextResponse.json({ error: "Período não encontrado" }, { status: 404 })
     }
 
-    const events: { id: string; requires_areas: string[] | null; assignments: { area_id: string }[] }[] =
+    const events: { id: string; requires_areas: string[] | null; assignments: { area_id: string; status: string }[] }[] =
       period.events || []
 
     if (events.length === 0) {
@@ -50,7 +54,10 @@ export async function POST(
         event.requires_areas && event.requires_areas.length > 0
           ? event.requires_areas
           : allAreaIds
-      const assignedAreaIds = new Set((event.assignments ?? []).map((a) => a.area_id))
+      // Quem recusou não preenche a vaga
+      const assignedAreaIds = new Set(
+        (event.assignments ?? []).filter((a) => a.status !== "declined").map((a) => a.area_id)
+      )
       return requiredAreaIds.some((areaId) => !assignedAreaIds.has(areaId))
     })
 
@@ -80,9 +87,20 @@ export async function POST(
       return NextResponse.json({ error: error.message }, { status: 500 })
     }
 
+    // Envia a cada servo só o que mudou desde o último aviso
+    let notification = null
+    if (notify && isEmailConfigured()) {
+      try {
+        notification = await notifyPublishedChanges(supabase, periodId)
+      } catch (notifyError) {
+        console.error("Erro ao avisar servos da escala publicada:", notifyError)
+      }
+    }
+
     return NextResponse.json({
       success: true,
       period: data,
+      notification,
       message: "Escala publicada com sucesso!",
     })
   } catch (error) {

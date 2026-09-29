@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
 import { createAdminClient, createServerClient } from "@/lib/supabase/server"
+import { signCalendarToken } from "@/lib/escalas/availability-token"
 
 export async function GET(request: NextRequest) {
   const email = request.nextUrl.searchParams.get("email")?.trim().toLowerCase()
@@ -87,7 +88,7 @@ export async function GET(request: NextRequest) {
       const eventIds = events.map((e) => e.id)
       const { data: assignments } = await supabase
         .from("schedule_assignments")
-        .select("id, schedule_event_id, servant_id, area_id, servant:servants(name), area:areas(name)")
+        .select("id, schedule_event_id, servant_id, area_id, status, servant:servants(name), area:areas(name)")
         .in("schedule_event_id", eventIds)
 
       const myAssignmentEventIds = new Set(
@@ -110,11 +111,17 @@ export async function GET(request: NextRequest) {
           isMyEvent: myAssignmentEventIds.has(event.id),
           assignments: (assignments ?? [])
             .filter((a) => a.schedule_event_id === event.id)
-            .map((a) => ({
-              servantName: (a.servant as unknown as { name: string } | null)?.name ?? "—",
-              areaName: (a.area as unknown as { name: string } | null)?.name ?? "—",
-              isMe: servantIds.includes(a.servant_id),
-            })),
+            .map((a) => {
+              const isMe = servantIds.includes(a.servant_id)
+              return {
+                servantName: (a.servant as unknown as { name: string } | null)?.name ?? "—",
+                areaName: (a.area as unknown as { name: string } | null)?.name ?? "—",
+                isMe,
+                status: a.status,
+                // Id só para as próprias atribuições (confirmar/recusar exige estar logado)
+                assignmentId: isMe && resolvedUserId ? a.id : undefined,
+              }
+            }),
         })),
       }
     })
@@ -125,5 +132,7 @@ export async function GET(request: NextRequest) {
   return NextResponse.json({
     servantName,
     periods: result,
+    // Feed de calendário só para o próprio usuário logado (busca por e-mail não é autenticada)
+    calendarToken: resolvedUserId ? signCalendarToken(servantIds[0]) : null,
   })
 }
