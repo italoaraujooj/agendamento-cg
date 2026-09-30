@@ -389,6 +389,16 @@ export function ScheduleBuilder({
         throw new Error(data.error || "Erro ao atribuir")
       }
 
+      // Escalar quem disse "não posso" é permitido: a pessoa fica aguardando
+      // confirmação e pode confirmar ou recusar quando for avisada
+      if (!isServantAvailable(servantId, eventId)) {
+        const name = servants.find((s) => s.id === servantId)?.name ?? "A pessoa"
+        const reason = unavailableReason.get(`${servantId}-${eventId}`)
+        toast.warning(`${name} tinha sinalizado indisponibilidade${reason ? ` (${reason})` : ""}`, {
+          description: "Escalado mesmo assim — fica aguardando a confirmação da pessoa.",
+        })
+      }
+
       onAssignmentChange()
     } catch (error) {
       console.error("Erro:", error)
@@ -647,6 +657,7 @@ export function ScheduleBuilder({
           areas={areas}
           assignments={assignments}
           conflictKeys={conflictKeys}
+          unavailableKeys={unavailableSet}
           selectedEventId={selectedEventId}
           onSelectCell={(eventId) => {
             setSelectedEventId(eventId)
@@ -923,6 +934,14 @@ export function ScheduleBuilder({
                             const chipConflicts = declined
                               ? undefined
                               : conflictMap.get(`${assignment.servant_id}-${assignment.schedule_event_id}`)
+                            // Escalado apesar de ter dito "não posso" (ou de ter a data bloqueada)
+                            const chipUnavailable =
+                              !declined &&
+                              assignment.status !== "accepted" &&
+                              !isServantAvailable(assignment.servant_id, assignment.schedule_event_id)
+                            const chipUnavailableReason = chipUnavailable
+                              ? unavailableReason.get(`${assignment.servant_id}-${assignment.schedule_event_id}`)
+                              : undefined
                             const declineReason = declineReasons[assignment.id]
                             return (
                               <div
@@ -930,7 +949,7 @@ export function ScheduleBuilder({
                                 className={`flex items-center justify-between px-2.5 py-1.5 rounded-md border ${
                                   declined
                                     ? "border-destructive/30 bg-destructive/10"
-                                    : chipConflicts
+                                    : chipConflicts || chipUnavailable
                                       ? "border-warning/60 bg-warning/10"
                                       : "border-success/60 bg-success/10"
                                 }`}
@@ -939,7 +958,9 @@ export function ScheduleBuilder({
                                     ? `Recusou${declineReason ? `: ${declineReason}` : ""} — remova e escale um substituto`
                                     : chipConflicts
                                       ? `Mesmo horário: ${describeConflicts(chipConflicts)}`
-                                      : undefined
+                                      : chipUnavailable
+                                        ? `Sinalizou indisponibilidade${chipUnavailableReason ? `: ${chipUnavailableReason}` : ""} — aguardando a confirmação da pessoa`
+                                        : undefined
                                 }
                               >
                                 <div className="flex items-center gap-1.5 text-sm min-w-0">
@@ -952,6 +973,9 @@ export function ScheduleBuilder({
                                   ) : null}
                                   {chipConflicts && (
                                     <AlertTriangle className="h-3 w-3 text-warning flex-shrink-0" />
+                                  )}
+                                  {chipUnavailable && !chipConflicts && (
+                                    <AlertCircle className="h-3 w-3 text-warning flex-shrink-0" aria-label="Sinalizou indisponibilidade" />
                                   )}
                                   {(assignment.servant as { is_leader?: boolean } | null)?.is_leader && (
                                     <Crown className="h-3 w-3 text-primary flex-shrink-0" />
@@ -967,6 +991,11 @@ export function ScheduleBuilder({
                                   {chipConflicts && (
                                     <span className="text-xs text-warning truncate">
                                       também em {describeConflicts(chipConflicts)}
+                                    </span>
+                                  )}
+                                  {chipUnavailable && (
+                                    <span className="text-xs text-warning truncate">
+                                      disse que não pode{chipUnavailableReason ? `: ${chipUnavailableReason}` : ""}
                                     </span>
                                   )}
                                 </div>
@@ -1038,13 +1067,15 @@ export function ScheduleBuilder({
                                         const conflictOthers = conflictMap.get(`${servant.id}-${selectedEvent.id}`)
                                         const monthlyLimit = servant.max_per_month ?? null
                                         const overLimit = monthlyLimit !== null && assignCount >= monthlyLimit
-                                        const selectable = available && !otherAreaName
+                                        // Indisponível continua selecionável (com aviso); só não dá para
+                                        // repetir a pessoa em duas áreas do mesmo evento
+                                        const selectable = !otherAreaName
                                         return (
                                           <SelectItem
                                             key={servant.id}
                                             value={servant.id}
                                             disabled={!selectable}
-                                            className={!selectable ? "opacity-50" : ""}
+                                            className={!selectable ? "opacity-50" : !available ? "opacity-80" : ""}
                                           >
                                             <div
                                               className="flex items-center gap-2 w-full"
@@ -1052,7 +1083,7 @@ export function ScheduleBuilder({
                                                 otherAreaName
                                                   ? `Já escalado em ${otherAreaName} neste evento`
                                                   : !available
-                                                    ? `Indisponível${reason ? `: ${reason}` : ""}`
+                                                    ? `Sinalizou indisponibilidade${reason ? `: ${reason}` : ""} — pode escalar mesmo assim`
                                                     : conflictOthers
                                                       ? `Mesmo horário: ${describeConflicts(conflictOthers)}`
                                                       : !responded
@@ -1078,8 +1109,10 @@ export function ScheduleBuilder({
                                                 )}
                                                 {otherAreaName ? (
                                                   <span className="ml-1 text-xs text-muted-foreground">(já em {otherAreaName})</span>
-                                                ) : !available && reason ? (
-                                                  <span className="ml-1 text-xs text-muted-foreground">({reason})</span>
+                                                ) : !available ? (
+                                                  <span className="ml-1 text-xs text-destructive">
+                                                    (indisponível{reason ? `: ${reason}` : ""})
+                                                  </span>
                                                 ) : available && conflictOthers ? (
                                                   <span className="ml-1 text-xs text-warning">
                                                     (mesmo horário: {describeConflicts(conflictOthers)})
