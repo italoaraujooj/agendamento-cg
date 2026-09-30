@@ -110,8 +110,10 @@ export function ScheduleBuilder({
   )
   const [loading, setLoading] = useState<string | null>(null)
   const [addingAreaId, setAddingAreaId] = useState<string | null>(null)
-  const [summarySort, setSummarySort] = useState<"name" | "available" | "area">("name")
+  const [summarySort, setSummarySort] = useState<"name" | "available" | "assigned" | "area">("name")
   const [filteredServantId, setFilteredServantId] = useState<string | null>(null)
+  // Ao filtrar por uma pessoa: só os eventos em que ela está escalada, ou em que está disponível
+  const [servantFilterMode, setServantFilterMode] = useState<"assigned" | "available">("assigned")
   const [previewOpen, setPreviewOpen] = useState(false)
   const [exporting, setExporting] = useState(false)
   const [summaryOpen, setSummaryOpen] = useState(false)
@@ -288,6 +290,8 @@ export function ScheduleBuilder({
     const copy = [...servantSummary]
     if (summarySort === "available") {
       copy.sort((a, b) => b.availCount - a.availCount || a.name.localeCompare(b.name))
+    } else if (summarySort === "assigned") {
+      copy.sort((a, b) => b.assignCount - a.assignCount || a.name.localeCompare(b.name))
     } else if (summarySort === "area") {
       copy.sort((a, b) => {
         const aArea = a.areas[0] || ""
@@ -299,10 +303,19 @@ export function ScheduleBuilder({
     return copy
   }, [servantSummary, summarySort])
 
+  // Eventos em que cada pessoa está escalada (sem contar recusas)
+  const eventsOfServant = (servantId: string, mode: "assigned" | "available") =>
+    mode === "assigned"
+      ? events.filter((e) =>
+          filledAssignments.some((a) => a.servant_id === servantId && a.schedule_event_id === e.id)
+        )
+      : events.filter((e) => !unavailableSet.has(`${servantId}-${e.id}`))
+
   const filteredEvents = useMemo(() => {
     if (!filteredServantId) return events
-    return events.filter((e) => !unavailableSet.has(`${filteredServantId}-${e.id}`))
-  }, [filteredServantId, events, unavailableSet])
+    return eventsOfServant(filteredServantId, servantFilterMode)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [filteredServantId, servantFilterMode, events, unavailableSet, filledAssignments])
 
   const sortedFilteredEvents = useMemo(
     () =>
@@ -327,21 +340,26 @@ export function ScheduleBuilder({
     }
   }
 
+  // Aplica o filtro por pessoa e mantém o evento selecionado dentro da lista filtrada
+  const applyServantFilter = (servantId: string, mode: "assigned" | "available") => {
+    setFilteredServantId(servantId)
+    setServantFilterMode(mode)
+    const list = eventsOfServant(servantId, mode).sort((a, b) => {
+      const dc = a.event_date.localeCompare(b.event_date)
+      return dc !== 0 ? dc : a.event_time.localeCompare(b.event_time)
+    })
+    if (!selectedEventId || !list.some((e) => e.id === selectedEventId)) {
+      setSelectedEventId(list.length > 0 ? list[0].id : selectedEventId)
+    }
+  }
+
   const handleServantFilter = (servantId: string) => {
     if (filteredServantId === servantId) {
       setFilteredServantId(null)
-    } else {
-      setFilteredServantId(servantId)
-      const available = events
-        .filter((e) => !unavailableSet.has(`${servantId}-${e.id}`))
-        .sort((a, b) => {
-          const dc = a.event_date.localeCompare(b.event_date)
-          return dc !== 0 ? dc : a.event_time.localeCompare(b.event_time)
-        })
-      if (!selectedEventId || !available.some((e) => e.id === selectedEventId)) {
-        setSelectedEventId(available.length > 0 ? available[0].id : null)
-      }
+      return
     }
+    // Quem já está escalado abre nas próprias escalas; quem não está, nos dias disponíveis
+    applyServantFilter(servantId, (servantAssignmentCount.get(servantId) ?? 0) > 0 ? "assigned" : "available")
   }
 
   const handleExportImage = async () => {
@@ -666,6 +684,39 @@ export function ScheduleBuilder({
         />
       )}
 
+      {/* Filtro por pessoa (clicando no Resumo dos Servos): escalas dela ou dias disponíveis */}
+      {view === "event" && filteredServantId && filteredServantName && (
+        <div className="flex flex-wrap items-center gap-2 rounded-lg border bg-muted/40 px-3 py-2 text-sm">
+          <span className="text-muted-foreground">
+            Eventos de <span className="font-medium text-foreground">{filteredServantName}</span>:
+          </span>
+          <div className="flex rounded-md bg-muted p-0.5">
+            {(["assigned", "available"] as const).map((mode) => {
+              const count = eventsOfServant(filteredServantId, mode).length
+              return (
+                <button
+                  key={mode}
+                  type="button"
+                  onClick={() => applyServantFilter(filteredServantId, mode)}
+                  className={`rounded px-2.5 py-1 text-xs font-medium transition-colors ${
+                    servantFilterMode === mode
+                      ? "bg-background text-foreground shadow-sm"
+                      : "text-muted-foreground hover:text-foreground"
+                  }`}
+                  aria-pressed={servantFilterMode === mode}
+                >
+                  {mode === "assigned" ? "Escalado" : "Disponível"} ({count})
+                </button>
+              )
+            })}
+          </div>
+          <Button variant="ghost" size="sm" className="h-7 px-2 text-xs ml-auto" onClick={() => setFilteredServantId(null)}>
+            <X className="h-3.5 w-3.5 mr-1" />
+            Limpar filtro
+          </Button>
+        </div>
+      )}
+
       {/* Mobile: Event Navigator */}
       <div className={view === "event" ? "lg:hidden" : "hidden"}>
         <Card>
@@ -703,7 +754,11 @@ export function ScheduleBuilder({
                       {selectedEvent.event_time.slice(0, 5)} — {selectedEvent.title}
                     </p>
                     <p className="text-xs text-muted-foreground mt-1">
-                      {currentFilteredIndex + 1} / {sortedFilteredEvents.length}
+                      {sortedFilteredEvents.length === 0
+                        ? servantFilterMode === "assigned"
+                          ? "Sem escalas neste mês"
+                          : "Nenhum evento disponível"
+                        : `${currentFilteredIndex + 1} / ${sortedFilteredEvents.length}`}
                       {filteredServantName && (
                         <span className="ml-1.5 text-primary font-medium">
                           · {filteredServantName.split(" ")[0]}
@@ -766,7 +821,9 @@ export function ScheduleBuilder({
                 <div className="space-y-1 p-2">
                   {sortedFilteredEvents.length === 0 && filteredServantName ? (
                     <p className="text-sm text-muted-foreground text-center py-8">
-                      Nenhum evento disponível para {filteredServantName.split(" ")[0]}
+                      {servantFilterMode === "assigned"
+                        ? `${filteredServantName.split(" ")[0]} ainda não tem escalas neste mês`
+                        : `Nenhum evento disponível para ${filteredServantName.split(" ")[0]}`}
                     </p>
                   ) : null}
                   {sortedFilteredEvents.map((event) => {
@@ -1203,9 +1260,9 @@ export function ScheduleBuilder({
                   <ChevronDown className="h-4 w-4 text-muted-foreground lg:hidden" />
                 )}
               </button>
-              <div className={`flex items-center gap-1 ${!summaryOpen ? "hidden lg:flex" : ""}`}>
+              <div className={`flex flex-wrap items-center gap-1 ${!summaryOpen ? "hidden lg:flex" : ""}`}>
                 <span className="text-xs text-muted-foreground mr-1">Ordenar:</span>
-                {(["name", "available", "area"] as const).map((mode) => (
+                {(["name", "available", "assigned", "area"] as const).map((mode) => (
                   <Button
                     key={mode}
                     variant={summarySort === mode ? "secondary" : "ghost"}
@@ -1213,7 +1270,13 @@ export function ScheduleBuilder({
                     className="h-7 px-2 text-xs"
                     onClick={() => setSummarySort(mode)}
                   >
-                    {mode === "name" ? "A–Z" : mode === "available" ? "Disponíveis" : "Área"}
+                    {mode === "name"
+                      ? "A–Z"
+                      : mode === "available"
+                        ? "Disponíveis"
+                        : mode === "assigned"
+                          ? "Escalas"
+                          : "Área"}
                   </Button>
                 ))}
               </div>
