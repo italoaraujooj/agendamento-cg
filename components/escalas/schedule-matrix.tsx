@@ -3,7 +3,7 @@
 import { useMemo } from "react"
 import { format, parseISO } from "date-fns"
 import { ptBR } from "date-fns/locale"
-import { AlertTriangle, CheckCheck, Clock, X } from "lucide-react"
+import { AlertCircle, AlertTriangle, CheckCheck, Clock, X } from "lucide-react"
 import type { Area, ScheduleAssignment, ScheduleEvent } from "@/types/escalas"
 import { areaCapacity, areaNeed, isFilling } from "@/lib/escalas/staffing"
 import { plural } from "@/lib/plural"
@@ -14,6 +14,8 @@ interface ScheduleMatrixProps {
   assignments: ScheduleAssignment[]
   /** `${servant_id}-${event_id}` com conflito de horário */
   conflictKeys: Set<string>
+  /** `${servant_id}-${event_id}` de quem sinalizou indisponibilidade */
+  unavailableKeys: Set<string>
   selectedEventId: string | null
   onSelectCell: (eventId: string) => void
 }
@@ -27,6 +29,7 @@ export function ScheduleMatrix({
   areas,
   assignments,
   conflictKeys,
+  unavailableKeys,
   selectedEventId,
   onSelectCell,
 }: ScheduleMatrixProps) {
@@ -110,6 +113,8 @@ export function ScheduleMatrix({
                           {list.map((a) => {
                             const declined = a.status === "declined"
                             const conflict = !declined && conflictKeys.has(`${a.servant_id}-${a.schedule_event_id}`)
+                            const unavailable =
+                              !declined && a.status !== "accepted" && unavailableKeys.has(`${a.servant_id}-${a.schedule_event_id}`)
                             return (
                               <div key={a.id} className="flex items-center gap-1 text-xs">
                                 {declined ? (
@@ -120,6 +125,9 @@ export function ScheduleMatrix({
                                   <Clock className="h-3 w-3 text-warning flex-shrink-0" />
                                 ) : null}
                                 {conflict && <AlertTriangle className="h-3 w-3 text-warning flex-shrink-0" />}
+                                {unavailable && !conflict && (
+                                  <AlertCircle className="h-3 w-3 text-warning flex-shrink-0" aria-label="Sinalizou indisponibilidade" />
+                                )}
                                 <span className={`truncate max-w-[110px] ${declined ? "line-through text-muted-foreground" : ""}`}>
                                   {firstName(a)}
                                 </span>
