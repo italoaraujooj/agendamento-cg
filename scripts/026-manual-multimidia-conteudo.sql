@@ -158,8 +158,9 @@ Não inicie o culto sem testar os vídeos e confirmar que estão funcionando.', 
 4. Feche outros programas abertos no computador.', 7);
   INSERT INTO manual_troubleshooting (ministry_id, area_id, problem, solution, order_index) VALUES (m, (SELECT id FROM areas WHERE ministry_id = m AND name = 'Projeção'), 'A projeção aparece na tela do computador (ou o telão repete a tela)', 'O Windows precisa estar no modo Estender. Pressione Windows + P e escolha "Estender". Veja o vídeo "Holyrics em duas telas" na aba Vídeos.', 8);
   INSERT INTO manual_troubleshooting (ministry_id, area_id, problem, solution, order_index) VALUES (m, (SELECT id FROM areas WHERE ministry_id = m AND name = 'Projeção'), 'TV de retorno sem a letra', '1. Confira se a TV de retorno e a TV box estão ligadas (a TV box liga no controle).
-2. Se o retorno vem pela rede, no Holyrics vá em Ferramentas → Plugin Holyrics e confira se o servidor está iniciado; depois recarregue a página de retorno na TV box.
-3. Se não voltar, avise no grupo da multimídia.', 9);
+2. O retorno chega pela rede, pelo plugin do Holyrics: no Holyrics, vá em Ferramentas → Plugin Holyrics e confira se o servidor está iniciado.
+3. Na TV box, recarregue a página de retorno do Holyrics.
+4. Se não voltar, avise no grupo da multimídia.', 9);
   INSERT INTO manual_troubleshooting (ministry_id, area_id, problem, solution, order_index) VALUES (m, (SELECT id FROM areas WHERE ministry_id = m AND name = 'Projeção'), 'Aparece o slide de título/artista antes da letra', 'Esse slide não pode ser removido, mas dá para começar direto na letra com Shift + F5, ou com um duplo clique no primeiro parágrafo da letra.', 10);
   INSERT INTO manual_troubleshooting (ministry_id, area_id, problem, solution, order_index) VALUES (m, (SELECT id FROM areas WHERE ministry_id = m AND name = 'Projeção'), 'O erro continua', 'Peça ajuda no grupo da multimídia sem receio. Estamos todos aprendendo juntos :)', 11);
   INSERT INTO manual_troubleshooting (ministry_id, area_id, problem, solution, order_index) VALUES (m, (SELECT id FROM areas WHERE ministry_id = m AND name = 'Transmissão'), 'OBS sem áudio (o Reaper está recebendo)', 'O áudio vai do Reaper para o OBS pelo ReaStream:
@@ -169,8 +170,8 @@ Não inicie o culto sem testar os vídeos e confirmar que estão funcionando.', 
 4. Se ainda não vier, feche e abra o OBS (mantenha o Reaper aberto).', 0);
   INSERT INTO manual_troubleshooting (ministry_id, area_id, problem, solution, order_index) VALUES (m, (SELECT id FROM areas WHERE ministry_id = m AND name = 'Transmissão'), 'Reaper sem sinal da mesa', '1. Confira se o cabo USB da mesa está conectado no computador.
 2. No Reaper: Options → Preferences → Audio → Device. A interface USB da X32 precisa estar selecionada.
-3. Confira se as trilhas estão com o monitoramento de entrada ligado.
-4. Se você reconectou o cabo USB com o Reaper aberto, feche e abra o Reaper.', 1);
+3. Se você reconectou o cabo USB com o Reaper aberto, feche e abra o Reaper.
+4. Se os medidores continuarem parados, chame o líder.', 1);
   INSERT INTO manual_troubleshooting (ministry_id, area_id, problem, solution, order_index) VALUES (m, (SELECT id FROM areas WHERE ministry_id = m AND name = 'Transmissão'), 'Áudio fora de sincronia com o vídeo', 'No OBS: mixer de áudio → engrenagem → Propriedades avançadas de áudio. Ajuste o "Deslocamento de sincronia" (em ms) da fonte do Reaper até a boca e a voz baterem. Normalmente o áudio chega antes da imagem e precisa de atraso.', 2);
   INSERT INTO manual_troubleshooting (ministry_id, area_id, problem, solution, order_index) VALUES (m, (SELECT id FROM areas WHERE ministry_id = m AND name = 'Transmissão'), 'Áudio estourado ou distorcido na transmissão', 'O medidor do OBS está chegando no vermelho. Reduza o nível no Reaper (master) ou na fonte do OBS: os picos devem ficar por volta de -6 dB. Confira também se o LR da mesa não está clipando.', 3);
   INSERT INTO manual_troubleshooting (ministry_id, area_id, problem, solution, order_index) VALUES (m, (SELECT id FROM areas WHERE ministry_id = m AND name = 'Transmissão'), 'Transmissão travando (quadros perdidos)', 'Veja a barra de status do OBS:
