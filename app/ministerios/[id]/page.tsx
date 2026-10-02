@@ -16,7 +16,8 @@ import {
   Crown,
   Save,
   UserX,
-  UserCheck
+  UserCheck,
+  BookOpen,
 } from "lucide-react"
 import {
   DropdownMenu,
@@ -279,14 +280,22 @@ export default function MinisterioDetalhePage() {
               )}
             </div>
           </div>
-          {canEdit && (
+          <div className="flex flex-wrap gap-2">
             <Button variant="outline" asChild>
-              <Link href={`/ministerios/${ministry.id}/editar`}>
-                <Pencil className="mr-2 h-4 w-4" />
-                Editar
+              <Link href={`/manual?ministry_id=${ministry.id}`}>
+                <BookOpen className="mr-2 h-4 w-4" />
+                Manual
               </Link>
             </Button>
-          )}
+            {canEdit && (
+              <Button variant="outline" asChild>
+                <Link href={`/ministerios/${ministry.id}/editar`}>
+                  <Pencil className="mr-2 h-4 w-4" />
+                  Editar
+                </Link>
+              </Button>
+            )}
+          </div>
         </div>
       </div>
 

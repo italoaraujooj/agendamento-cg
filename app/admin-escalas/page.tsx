@@ -13,7 +13,8 @@ import {
   Users,
   Clock,
   CheckCircle,
-  AlertCircle
+  AlertCircle,
+  BookOpen,
 } from "lucide-react"
 import { useAuth } from "@/components/auth/auth-provider"
 import { useSystemMode } from "@/components/system-mode-provider"
@@ -107,12 +108,20 @@ export default function AdminEscalasPage() {
             Gerencie os períodos de escala e monte as escalas mensais
           </p>
         </div>
-        <Button asChild>
-          <Link href="/admin-escalas/periodos/novo">
-            <Plus className="mr-2 h-4 w-4" />
-            Novo Período
-          </Link>
-        </Button>
+        <div className="flex flex-wrap gap-2">
+          <Button variant="outline" asChild>
+            <Link href="/admin-escalas/manual">
+              <BookOpen className="mr-2 h-4 w-4" />
+              Manual de Serviço
+            </Link>
+          </Button>
+          <Button asChild>
+            <Link href="/admin-escalas/periodos/novo">
+              <Plus className="mr-2 h-4 w-4" />
+              Novo Período
+            </Link>
+          </Button>
+        </div>
       </div>
 
       {/* Stats */}
