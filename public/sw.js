@@ -2,17 +2,31 @@
  * Service worker do PWA Cidade Viva CG.
  *
  * Escopo deliberadamente pequeno:
- * - Assets estáticos com hash (/_next/static) e ícones: cache-first.
+ * - Assets estáticos com hash (/_next/static) e ícones: cache-first, com
+ *   limite de entradas: a cada deploy os arquivos ganham nomes novos, e os
+ *   antigos (que não serão mais pedidos) saem do cache, do mais antigo
+ *   para o mais novo, quando o limite é ultrapassado.
  * - Navegação: sempre pela rede; sem conexão, mostra a página /offline.
  * - Nunca cacheia /api, respostas do Supabase nem páginas renderizadas,
  *   para não exibir escalas/agendamentos desatualizados nem dados de
  *   outra sessão após logout.
  */
 
-const VERSION = "v1"
+// Trocar a versão apaga todos os caches anteriores no "activate"
+const VERSION = "v2"
 const STATIC_CACHE = `cv-static-${VERSION}`
 const OFFLINE_CACHE = `cv-offline-${VERSION}`
 const OFFLINE_URL = "/offline"
+// Um deploy usa algumas dezenas de arquivos; 150 cobre a versão atual com folga
+const MAX_STATIC_ENTRIES = 150
+
+/** Remove as entradas mais antigas (ordem de inserção) além do limite */
+async function trimCache(cacheName, maxEntries) {
+  const cache = await caches.open(cacheName)
+  const keys = await cache.keys()
+  const excess = keys.length - maxEntries
+  if (excess > 0) await Promise.all(keys.slice(0, excess).map((key) => cache.delete(key)))
+}
 
 self.addEventListener("install", (event) => {
   event.waitUntil(
@@ -65,7 +79,12 @@ self.addEventListener("fetch", (event) => {
           (cached) =>
             cached ||
             fetch(request).then((response) => {
-              if (response.ok) cache.put(request, response.clone())
+              if (response.ok) {
+                cache
+                  .put(request, response.clone())
+                  .then(() => trimCache(STATIC_CACHE, MAX_STATIC_ENTRIES))
+                  .catch(() => {})
+              }
               return response
             })
         )
