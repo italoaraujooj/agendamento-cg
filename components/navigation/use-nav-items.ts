@@ -2,7 +2,7 @@
 
 import { usePathname } from "next/navigation"
 import type { LucideIcon } from "lucide-react"
-import { Calendar, CalendarCheck, MapPin, Users, Home, Shield, Users2, CalendarDays, Megaphone } from "lucide-react"
+import { BookOpen, Calendar, CalendarCheck, MapPin, Users, Home, Shield, Users2, CalendarDays, Megaphone } from "lucide-react"
 import { useAuth } from "@/components/auth/auth-provider"
 import { useSystemMode } from "@/components/system-mode-provider"
 
@@ -38,6 +38,8 @@ export function useNavItems() {
   // Página do servo: visível para todos, nos dois modos — quem não tem acesso ao
   // módulo de Escalas (a maioria dos servos) não teria outro caminho até ela.
   const minhaEscala = item("/minha-escala", "Minha Escala", CalendarCheck)
+  // Manual de Serviço: para qualquer pessoa logada, nos dois módulos
+  const manual = isAuthenticated ? item("/manual", "Manual", BookOpen) : null
 
   // Admin de agendamentos: qualquer permissão de gestão
   const canSeeAgendamentosAdmin =
@@ -56,14 +58,14 @@ export function useNavItems() {
   if (isEscalas) {
     const ministerios = item("/ministerios", "Ministérios", Users2, true)
     const calendario = item("/calendario", "Calendário", CalendarDays)
-    items = [home, minhaEscala, ministerios, calendario, ...(admin ? [admin] : [])]
+    items = [home, minhaEscala, ...(manual ? [manual] : []), ministerios, calendario, ...(admin ? [admin] : [])]
     primary = [home, minhaEscala, calendario, admin ?? ministerios]
   } else {
     const ambientes = item("/environments", "Ambientes", MapPin)
     const agendar = item("/booking", "Agendar", Calendar)
     const reservas = item("/reservations", "Reservas", Users)
     const avisos = isAuthenticated ? item("/avisos", "Avisos", Megaphone) : null
-    items = [home, minhaEscala, ambientes, agendar, reservas, ...(avisos ? [avisos] : []), ...(admin ? [admin] : [])]
+    items = [home, minhaEscala, ...(manual ? [manual] : []), ambientes, agendar, reservas, ...(avisos ? [avisos] : []), ...(admin ? [admin] : [])]
     primary = [home, agendar, reservas, minhaEscala]
   }
 
