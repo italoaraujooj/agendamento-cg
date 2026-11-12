@@ -6,9 +6,7 @@ import { User } from "lucide-react"
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet"
 import { ModeToggle } from "@/components/mode-toggle"
 import { SystemModeSwitch } from "@/components/system-mode-switch"
-import { CalendarStatusIndicator } from "@/components/calendar-status-indicator"
 import { useAuth } from "@/components/auth/auth-provider"
-import { useSystemMode } from "@/components/system-mode-provider"
 import { useNavItems } from "./use-nav-items"
 import { cn } from "@/lib/utils"
 
@@ -17,7 +15,6 @@ export function NavMenuSheet({ children, side = "right" }: { children: ReactNode
   const [open, setOpen] = useState(false)
   const { items } = useNavItems()
   const { isAuthenticated } = useAuth()
-  const { isEscalas } = useSystemMode()
 
   const linkClass = (active: boolean) =>
     cn(
@@ -63,7 +60,6 @@ export function NavMenuSheet({ children, side = "right" }: { children: ReactNode
               <span>Tema</span>
               <ModeToggle />
             </div>
-            {!isEscalas && <CalendarStatusIndicator className="w-full justify-start" />}
           </div>
         </div>
       </SheetContent>

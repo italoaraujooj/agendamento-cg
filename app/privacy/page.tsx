@@ -37,6 +37,7 @@ export default function PrivacyPolicyPage() {
               <Link href="#coleta" className="text-info hover:underline">• Coleta de Dados</Link>
               <Link href="#uso" className="text-info hover:underline">• Uso dos Dados</Link>
               <Link href="#retencao" className="text-info hover:underline">• Retenção de Dados</Link>
+              <Link href="#google" className="text-info hover:underline">• Login com Google e Agenda</Link>
               <Link href="#transferencia" className="text-info hover:underline">• Transferência de Dados</Link>
               <Link href="#seguranca" className="text-info hover:underline">• Segurança</Link>
               <Link href="#criancas" className="text-info hover:underline">• Privacidade de Menores</Link>
@@ -192,6 +193,42 @@ export default function PrivacyPolicyPage() {
               <p>
                 A Empresa também reterá Dados de Uso para fins de análise interna. Os Dados de Uso são geralmente retidos por um período mais curto, 
                 exceto quando esses dados são usados para fortalecer a segurança ou melhorar a funcionalidade do nosso Serviço.
+              </p>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Login com Google */}
+        <Card className="mb-8" id="google">
+          <CardHeader>
+            <CardTitle className="flex items-center">
+              <Lock className="h-5 w-5 mr-2" />
+              Login com Google e Agenda
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="prose prose-gray dark:prose-invert max-w-none">
+              <p>
+                Quando você entra com sua conta Google, recebemos do Google apenas seu nome, seu
+                endereço de email e sua foto de perfil (permissões <code>openid</code>,{" "}
+                <code>email</code> e <code>profile</code>). Usamos esses dados só para identificar
+                você no sistema, preencher seus dados nas reservas e nas escalas e enviar avisos
+                sobre elas.
+              </p>
+              <p>
+                Não pedimos acesso ao seu Google Agenda, Gmail, Google Drive ou a qualquer outro
+                dado da sua conta Google. Para ver suas reservas e escalas na sua agenda, você
+                pode assinar um link pessoal de calendário gerado pelo próprio sistema; é o seu
+                aplicativo de agenda que busca esse link, sem que o sistema acesse sua conta.
+              </p>
+              <p>
+                Os dados recebidos do Google não são vendidos, não são usados para publicidade e
+                não são compartilhados com terceiros. Você pode remover o acesso do sistema à sua
+                conta a qualquer momento em{" "}
+                <a href="https://myaccount.google.com/connections" target="_blank" rel="noopener noreferrer" className="text-info hover:underline">
+                  myaccount.google.com/connections
+                </a>
+                .
               </p>
             </div>
           </CardContent>

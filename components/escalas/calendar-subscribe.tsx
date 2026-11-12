@@ -5,12 +5,19 @@ import { CalendarPlus, Copy } from "lucide-react"
 import { toast } from "sonner"
 
 /**
- * Assinar a escala no calendário do celular/computador (feed ICS).
- * O calendário se atualiza sozinho quando a escala muda.
+ * Assinar um feed ICS no calendário do celular/computador (escala ou reservas).
+ * O calendário se atualiza sozinho quando os dados mudam.
  */
-export function CalendarSubscribe({ calendarToken }: { calendarToken: string }) {
+export function CalendarSubscribe({
+  calendarToken,
+  feedPath = "/api/escalas/ics",
+}: {
+  calendarToken: string
+  /** Rota do feed, sem o token (padrão: escala) */
+  feedPath?: string
+}) {
   const origin = typeof window !== "undefined" ? window.location.origin : ""
-  const httpsUrl = `${origin}/api/escalas/ics/${calendarToken}`
+  const httpsUrl = `${origin}${feedPath}/${calendarToken}`
   const webcalUrl = httpsUrl.replace(/^https?:/, "webcal:")
   const googleUrl = `https://calendar.google.com/calendar/r?cid=${encodeURIComponent(webcalUrl)}`
 

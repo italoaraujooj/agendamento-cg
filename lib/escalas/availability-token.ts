@@ -61,3 +61,18 @@ export function verifyCalendarToken(token: string): string | null {
   if (!servantId || !sig) return null
   return safeEqual(sign(`ics:${servantId}`), sig) ? servantId : null
 }
+
+/**
+ * Feed de calendário (ICS) das reservas da pessoa: `${userId}.${assinatura}`.
+ * Prefixo próprio na assinatura, para um token de escala não valer como de
+ * reservas (e vice-versa).
+ */
+export function signBookingsCalendarToken(userId: string): string {
+  return `${userId}.${sign(`ics-bookings:${userId}`)}`
+}
+
+export function verifyBookingsCalendarToken(token: string): string | null {
+  const [userId, sig] = token.split(".")
+  if (!userId || !sig) return null
+  return safeEqual(sign(`ics-bookings:${userId}`), sig) ? userId : null
+}

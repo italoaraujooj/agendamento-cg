@@ -482,11 +482,6 @@ function BookingCard({ booking, compact = false, isPast = false, user, isAuthent
                     Passada
                   </Badge>
                 )}
-                {booking.google_event_id && (
-                  <Badge variant="outline" className="text-xs bg-success/10 text-success border-success/30">
-                    📅 Calendar
-                  </Badge>
-                )}
               </div>
             </CardTitle>
             <CardDescription className={`flex items-center gap-4 mt-1 ${descriptionClassName}`}>

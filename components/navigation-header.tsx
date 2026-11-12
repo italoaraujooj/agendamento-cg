@@ -6,9 +6,7 @@ import { Menu } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { ModeToggle } from "@/components/mode-toggle"
 import { AuthButton } from "@/components/auth/auth-button"
-import { CalendarStatusIndicator } from "@/components/calendar-status-indicator"
 import { SystemModeSwitch } from "@/components/system-mode-switch"
-import { useSystemMode } from "@/components/system-mode-provider"
 import { NavMenuSheet } from "@/components/navigation/nav-menu-sheet"
 import { isTokenPage, useNavItems } from "@/components/navigation/use-nav-items"
 import { cn } from "@/lib/utils"
@@ -20,7 +18,6 @@ import { cn } from "@/lib/utils"
  */
 export default function NavigationHeader() {
   const pathname = usePathname()
-  const { isEscalas } = useSystemMode()
   const { items, moduleLabel, homeHref } = useNavItems()
   const showNav = !isTokenPage(pathname)
 
@@ -63,7 +60,6 @@ export default function NavigationHeader() {
         )}
 
         <div className="ml-auto flex items-center gap-1">
-          {!isEscalas && <CalendarStatusIndicator className="hidden xl:flex" />}
           <AuthButton />
           <div className="hidden md:block">
             <ModeToggle />
