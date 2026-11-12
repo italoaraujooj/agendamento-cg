@@ -45,6 +45,7 @@ interface Booking {
   reviewed_by?: string
   reviewed_at?: string
   review_notes?: string
+  blocks_all_environments?: boolean
   environments: {
     id: string
     name: string
@@ -154,7 +155,8 @@ export default function ReservationsView({ bookings, pastBookings, currentBookin
     (acc, env) => {
       acc[env.id] = {
         environment: env,
-        bookings: currentBookings.filter((booking) => getEnvironmentData(booking.environments).id === env.id),
+        // Reservas da igreja inteira aparecem em todos os ambientes
+        bookings: currentBookings.filter((booking) => booking.blocks_all_environments || getEnvironmentData(booking.environments).id === env.id),
       }
       return acc
     },
@@ -166,7 +168,7 @@ export default function ReservationsView({ bookings, pastBookings, currentBookin
     (acc, env) => {
       acc[env.id] = {
         environment: env,
-        bookings: pastBookings.filter((booking) => getEnvironmentData(booking.environments).id === env.id),
+        bookings: pastBookings.filter((booking) => booking.blocks_all_environments || getEnvironmentData(booking.environments).id === env.id),
       }
       return acc
     },

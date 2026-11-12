@@ -36,7 +36,7 @@ serve(async (req) => {
     if (!summary) {
       const { data: booking } = await supabaseClient
         .from('bookings')
-        .select('name, occasion, booking_date, start_time, end_time, environments(name)')
+        .select('name, occasion, booking_date, start_time, end_time, blocks_all_environments, environments(name)')
         .eq('id', booking_id)
         .single()
 
@@ -46,7 +46,7 @@ serve(async (req) => {
           description: `Ocasião: ${booking.occasion}`,
           start_date: `${booking.booking_date}T${booking.start_time}`,
           end_date: `${booking.booking_date}T${booking.end_time}`,
-          location: booking.environments?.name || 'Local não informado'
+          location: booking.blocks_all_environments ? 'Igreja inteira' : booking.environments?.name || 'Local não informado'
         }
       }
     }

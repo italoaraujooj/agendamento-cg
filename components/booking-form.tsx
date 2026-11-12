@@ -21,6 +21,7 @@ import { toast } from "sonner"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
 import { Info } from "lucide-react"
 import { plural } from "@/lib/plural"
+import { WHOLE_CHURCH_DESCRIPTION, WHOLE_CHURCH_LABEL, environmentOrWholeChurchFilter } from "@/lib/bookings"
 
 interface Environment {
   id: string
@@ -58,6 +59,8 @@ export default function BookingForm({ environments, preselectedEnvironment }: Bo
   const [formData, setFormData] = useState({
     environmentId: preselectedEnvironment || "",
     environmentIds: [] as string[],
+    /** Reserva da igreja inteira: uma reserva que ocupa todos os ambientes */
+    wholeChurch: false,
     name: "",
     email: "",
     phone: "",
@@ -92,16 +95,17 @@ export default function BookingForm({ environments, preselectedEnvironment }: Bo
   // Disponibilidades e reservas do dia (para calcular horários e ambientes disponíveis)
   const [availability, setAvailability] = useState<EnvironmentAvailability[]>([])
   const [bookingsForDate, setBookingsForDate] = useState<
-    { environment_id: string | number; start_time: string; end_time: string }[]
+    { environment_id: string | number | null; start_time: string; end_time: string; blocks_all_environments?: boolean }[]
   >([])
   const [isLoadingAvailability, setIsLoadingAvailability] = useState(false)
 
   // Detecta se o Salão Principal está entre os ambientes selecionados
   const isSalaoPrincipalSelected = useMemo(() => {
+    if (formData.wholeChurch) return true
     return environments
       .filter(env => formData.environmentIds.includes(String(env.id)))
       .some(env => env.name === "Salão Principal")
-  }, [environments, formData.environmentIds])
+  }, [environments, formData.environmentIds, formData.wholeChurch])
 
   // Busca ministérios ativos quando o Salão Principal é selecionado
   useEffect(() => {
@@ -167,7 +171,7 @@ export default function BookingForm({ environments, preselectedEnvironment }: Bo
           formData.bookingDate
             ? supabase
               .from("bookings")
-              .select("environment_id, start_time, end_time")
+              .select("environment_id, start_time, end_time, blocks_all_environments")
               .eq("booking_date", formData.bookingDate)
             : Promise.resolve({ data: [], error: null } as any),
         ])
@@ -578,9 +582,13 @@ export default function BookingForm({ environments, preselectedEnvironment }: Bo
       return acc
     }, {})
     const bookingsByEnv = bookingsForDate.reduce<Record<string, { start: number; end: number }[]>>((acc, b) => {
-      const key = String(b.environment_id)
-      if (!acc[key]) acc[key] = []
-      acc[key].push({ start: Number.parseInt(b.start_time.split(":")[0]), end: Number.parseInt(b.end_time.split(":")[0]) })
+      const slot = { start: Number.parseInt(b.start_time.split(":")[0]), end: Number.parseInt(b.end_time.split(":")[0]) }
+      // Reserva da igreja inteira ocupa todos os ambientes
+      const keys = b.blocks_all_environments ? environments.map((env) => String(env.id)) : [String(b.environment_id)]
+      for (const key of keys) {
+        if (!acc[key]) acc[key] = []
+        acc[key].push(slot)
+      }
       return acc
     }, {})
     const overlaps = (aStart: number, aEnd: number, bStart: number, bEnd: number) => aStart < bEnd && aEnd > bStart
@@ -600,6 +608,23 @@ export default function BookingForm({ environments, preselectedEnvironment }: Bo
 
   // Fallback: se não houver ambientes disponíveis calculados, exibir todos para não ficar vazio
   const environmentsToShow = availableEnvironments.length > 0 ? availableEnvironments : environments
+
+  // Igreja inteira: só quando todos os ambientes estão livres e disponíveis no horário
+  const unavailableForWholeChurch = useMemo(() => {
+    if (!formData.bookingDate || !formData.startTime || !formData.duration) return [] as Environment[]
+    const free = new Set(availableEnvironments.map((env) => String(env.id)))
+    return environments.filter((env) => !free.has(String(env.id)))
+  }, [availableEnvironments, environments, formData.bookingDate, formData.startTime, formData.duration])
+  const canBookWholeChurch =
+    !!formData.startTime && environments.length > 0 && unavailableForWholeChurch.length === 0
+  const wholeChurchCapacity = environments.reduce((sum, env) => sum + (env.capacity || 0), 0)
+
+  // Se o horário mudar e algum ambiente deixar de estar livre, desmarca a igreja inteira
+  useEffect(() => {
+    if (formData.wholeChurch && formData.startTime && !canBookWholeChurch && !isLoadingAvailability) {
+      setFormData((prev) => ({ ...prev, wholeChurch: false }))
+    }
+  }, [canBookWholeChurch, formData.wholeChurch, formData.startTime, isLoadingAvailability])
 
   const handleInputChange = (field: string, value: string) => {
     setFormData((prev) => ({ ...prev, [field]: value }))
@@ -661,8 +686,8 @@ export default function BookingForm({ environments, preselectedEnvironment }: Bo
     }
     
     // Verificar se ao menos um ambiente foi selecionado
-    if (!formData.environmentIds || formData.environmentIds.length === 0) {
-      return "Selecione ao menos um ambiente"
+    if (!formData.wholeChurch && (!formData.environmentIds || formData.environmentIds.length === 0)) {
+      return "Selecione ao menos um ambiente ou a igreja inteira"
     }
 
     if (!/\S+@\S+\.\S+/.test(formData.email)) {
@@ -673,7 +698,10 @@ export default function BookingForm({ environments, preselectedEnvironment }: Bo
       return "Número de participantes deve ser maior que zero"
     }
 
-    const selectedEnvs = environments.filter((env) => formData.environmentIds.includes(String(env.id)))
+    if (formData.wholeChurch && Number.parseInt(formData.estimatedParticipants || "0") > wholeChurchCapacity) {
+      return `Número de participantes excede a capacidade da igreja inteira (máx: ${wholeChurchCapacity})`
+    }
+    const selectedEnvs = formData.wholeChurch ? [] : environments.filter((env) => formData.environmentIds.includes(String(env.id)))
     const overCap = selectedEnvs.find((env) => Number.parseInt(formData.estimatedParticipants || "0") > env.capacity)
     if (overCap) return `Número de participantes excede a capacidade do ambiente ${overCap.name} (máx: ${overCap.capacity})`
 
@@ -767,7 +795,13 @@ export default function BookingForm({ environments, preselectedEnvironment }: Bo
 
     try {
       // Pré-checagem de disponibilidade por dia da semana por ambiente selecionado
-      const envIds = (formData.environmentIds.length ? formData.environmentIds : [formData.environmentId]).map((id) => Number(id))
+      // Igreja inteira: confere disponibilidade e conflitos em todos os ambientes
+      const envIds = (
+        formData.wholeChurch
+          ? environments.map((env) => String(env.id))
+          : formData.environmentIds.length ? formData.environmentIds : [formData.environmentId]
+      ).map((id) => Number(id))
+      const envName = (id: number) => environments.find((env) => Number(env.id) === id)?.name ?? `Ambiente ${id}`
       const { data: allEnvAvail } = await supabase
         .from("environment_availabilities")
         .select("weekday,start_time,end_time,environment_id")
@@ -811,7 +845,7 @@ export default function BookingForm({ environments, preselectedEnvironment }: Bo
           const wk = weekdayOf(occ.date)
           const windows = (windowsByEnvByWeekday[envId] || {})[wk] || []
           const fits = windows.some((w) => occ.start >= w.s && occ.end <= w.e)
-          if (!fits) invalidByAvailability.push(`${occ.date} (Ambiente ${envId})`)
+          if (!fits) invalidByAvailability.push(`${occ.date} (${envName(envId)})`)
         }
       }
 
@@ -829,8 +863,8 @@ export default function BookingForm({ environments, preselectedEnvironment }: Bo
       const queryDates = Array.from(new Set(targetOccurrences.map((o) => o.date)))
       const { data: existing } = await supabase
         .from("bookings")
-        .select("booking_date,start_time,end_time,environment_id")
-        .in("environment_id", envIds)
+        .select("booking_date,start_time,end_time,environment_id,blocks_all_environments")
+        .or(environmentOrWholeChurchFilter(envIds))
         .in("booking_date", queryDates)
 
       const overlaps = (aStart: number, aEnd: number, bStart: number, bEnd: number) => aStart < bEnd && aEnd > bStart
@@ -844,12 +878,18 @@ export default function BookingForm({ environments, preselectedEnvironment }: Bo
       }, {})
       for (const row of existing || []) {
         const d = (row as any).booking_date as string
+        const bS = timeStringToHour((row as any).start_time)
+        const bE = timeStringToHour((row as any).end_time)
+        // Reserva existente da igreja inteira conflita com qualquer ambiente
+        if ((row as any).blocks_all_environments) {
+          const target = (byEnvByDate[envIds[0]] || {})[d]
+          if (target && overlaps(target.start, target.end, bS, bE)) conflicting.push(`${d} (${WHOLE_CHURCH_LABEL})`)
+          continue
+        }
         const env = Number((row as any).environment_id)
         const target = (byEnvByDate[env] || {})[d]
         if (!target) continue
-        const bS = timeStringToHour((row as any).start_time)
-        const bE = timeStringToHour((row as any).end_time)
-        if (overlaps(target.start, target.end, bS, bE)) conflicting.push(`${d} (Ambiente ${env})`)
+        if (overlaps(target.start, target.end, bS, bE)) conflicting.push(`${d} (${envName(env)})`)
       }
       if (conflicting.length) {
         setError(
@@ -900,10 +940,12 @@ export default function BookingForm({ environments, preselectedEnvironment }: Bo
         return
       }
 
-      // Inserção em lote para todos os ambientes selecionados
-      const rows = envIds.flatMap((envId) =>
+      // Inserção em lote: igreja inteira é uma reserva por data (sem ambiente);
+      // senão, uma por ambiente selecionado e data
+      const rows = (formData.wholeChurch ? [null] : envIds).flatMap((envId) =>
         targetOccurrences.map((o) => ({
           environment_id: envId,
+          ...(formData.wholeChurch ? { blocks_all_environments: true } : {}),
           user_id: user?.id,
           name: formData.name,
           email: formData.email,
@@ -958,8 +1000,8 @@ export default function BookingForm({ environments, preselectedEnvironment }: Bo
           try {
             const salaoPrincipal = environments.find(e => e.name === "Salão Principal")
             const salaoBookings = salaoPrincipal
-              ? (bookingsToProcess as any[]).filter(b => String(b.environment_id) === String(salaoPrincipal.id))
-              : []
+              ? (bookingsToProcess as any[]).filter(b => b.blocks_all_environments || String(b.environment_id) === String(salaoPrincipal.id))
+              : (bookingsToProcess as any[]).filter(b => b.blocks_all_environments)
 
             if (salaoBookings.length > 0) {
               const ministryRequests = salaoBookings.flatMap((b: any) =>
@@ -981,14 +1023,10 @@ export default function BookingForm({ environments, preselectedEnvironment }: Bo
           if (user?.email && bookingsToProcess && bookingsToProcess.length > 0) {
 
             const calendarPromises = (bookingsToProcess as any[]).map(async (insertedBooking: any) => {
-              // Buscar dados do ambiente para o título do evento
-              const { data: environmentData } = await supabase
-                .from('environments')
-                .select('name')
-                .eq('id', insertedBooking.environment_id)
-                .single()
-
-              const environmentName = environmentData?.name || 'Ambiente'
+              // Nome do lugar para o título do evento
+              const environmentName = insertedBooking.blocks_all_environments
+                ? WHOLE_CHURCH_LABEL
+                : environments.find((env) => String(env.id) === String(insertedBooking.environment_id))?.name || 'Ambiente'
               
               // Construir as datas ISO para o evento
               const startDateTime = new Date(`${insertedBooking.booking_date}T${insertedBooking.start_time}`)
@@ -1066,12 +1104,10 @@ export default function BookingForm({ environments, preselectedEnvironment }: Bo
             const firstBooking = bookingsToProcess[0] as any
             console.log('📧 Primeira reserva:', firstBooking)
             
-            // Buscar nome do ambiente
-            const { data: envData } = await supabase
-              .from('environments')
-              .select('name')
-              .eq('id', firstBooking.environment_id)
-              .single()
+            // Nome do lugar (igreja inteira ou ambiente)
+            const envData = firstBooking.blocks_all_environments
+              ? { name: `${WHOLE_CHURCH_LABEL} (${WHOLE_CHURCH_DESCRIPTION.toLowerCase()})` }
+              : environments.find((env) => String(env.id) === String(firstBooking.environment_id))
 
             console.log('📧 Ambiente:', envData)
 
@@ -1546,6 +1582,42 @@ export default function BookingForm({ environments, preselectedEnvironment }: Bo
               <Building className="h-4 w-4" />
               Ambientes
             </Label>
+
+            {/* Igreja inteira: uma reserva que ocupa todos os espaços, em vez de marcar um por um */}
+            <label
+              className={cn(
+                "flex items-start gap-3 rounded-xl border px-3 py-3 select-none transition-colors",
+                canBookWholeChurch ? "cursor-pointer" : "cursor-not-allowed opacity-60",
+                formData.wholeChurch ? "border-primary bg-brand/10" : canBookWholeChurch && "hover:bg-muted/60"
+              )}
+            >
+              <input
+                type="checkbox"
+                className="accent-current mt-1"
+                checked={formData.wholeChurch}
+                disabled={!canBookWholeChurch}
+                aria-describedby="whole-church-help"
+                onChange={(e) => {
+                  const checked = e.target.checked
+                  setFormData((prev) => ({ ...prev, wholeChurch: checked, environmentIds: checked ? [] : prev.environmentIds }))
+                }}
+              />
+              <span className="flex-1 min-w-0">
+                <span className="flex items-center justify-between gap-2">
+                  <span className="font-semibold">{WHOLE_CHURCH_LABEL}</span>
+                  <span className="text-xs text-muted-foreground">Cap.: {wholeChurchCapacity}</span>
+                </span>
+                <span id="whole-church-help" className="block text-sm text-muted-foreground">
+                  {!formData.startTime
+                    ? `${WHOLE_CHURCH_DESCRIPTION}. Escolha a data e o horário para ver se está livre.`
+                    : canBookWholeChurch
+                      ? `${WHOLE_CHURCH_DESCRIPTION}, numa reserva só.`
+                      : `Indisponível neste horário: ${unavailableForWholeChurch.map((env) => env.name).join(", ")}.`}
+                </span>
+              </span>
+            </label>
+
+            {!formData.wholeChurch && (
             <div className="grid md:grid-cols-2 gap-2">
               {environmentsToShow.map((env) => {
                 const id = String(env.id)
@@ -1571,6 +1643,7 @@ export default function BookingForm({ environments, preselectedEnvironment }: Bo
                 )
               })}
             </div>
+            )}
           </div>
             </>
           )}

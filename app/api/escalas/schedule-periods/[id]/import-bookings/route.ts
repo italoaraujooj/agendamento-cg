@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server"
+import { bookingEnvironment, bookingPlaceName } from "@/lib/bookings"
 import { requireManagerOf } from "@/lib/escalas/auth"
 import { plural } from "@/lib/plural"
 
@@ -28,7 +29,7 @@ export async function GET(
     // Filtra pelo salão principal por padrão
     const { data: bookings, error: bookingsError } = await supabase
       .from("bookings")
-      .select("id, booking_date, start_time, end_time, occasion, responsible_person, name, environment_id, environments(id, name)")
+      .select("id, booking_date, start_time, end_time, occasion, responsible_person, name, environment_id, blocks_all_environments, environments(id, name)")
       .eq("status", "approved")
       .gte("booking_date", period.start_date)
       .lte("booking_date", period.end_date)
@@ -52,6 +53,8 @@ export async function GET(
 
     const result = (bookings || []).map((b) => ({
       ...b,
+      // Igreja inteira (sem ambiente) aparece como "Igreja inteira"
+      environments: b.blocks_all_environments ? bookingEnvironment(b as any) : b.environments,
       already_imported: importedIds.has(String(b.id)),
     }))
 
@@ -83,7 +86,7 @@ export async function POST(
     // Buscar os agendamentos selecionados
     const { data: bookings, error: bookingsError } = await supabase
       .from("bookings")
-      .select("id, booking_date, start_time, occasion, responsible_person, name, environments(name)")
+      .select("id, booking_date, start_time, occasion, responsible_person, name, blocks_all_environments, environments(name)")
       .in("id", bookingIds)
       .eq("status", "approved")
 
@@ -103,7 +106,7 @@ export async function POST(
       event_time: b.start_time,
       event_type: "imported" as const,
       title: b.occasion || "Evento importado",
-      description: `Reserva: ${b.occasion} | Responsável: ${b.responsible_person} | Local: ${(b.environments as any)?.name || "N/A"}`,
+      description: `Reserva: ${b.occasion} | Responsável: ${b.responsible_person} | Local: ${bookingPlaceName(b as any)}`,
       source: "booking_system" as const,
       external_id: String(b.id),
     }))
