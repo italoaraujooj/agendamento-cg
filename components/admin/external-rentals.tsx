@@ -442,13 +442,13 @@ export function ExternalRentalsManager({ userId }: ExternalRentalsManagerProps) 
       // Se blocks_all_environments, busca em todos os ambientes; senão, só no ambiente alugado
       const bookingsQuery = supabase
         .from('bookings')
-        .select('id, booking_date, start_time, end_time, name, status, environment_id')
+        .select('id, booking_date, start_time, end_time, name, status, environment_id, blocks_all_environments')
         .eq('booking_date', rentalDate)
         .neq('status', 'rejected')
 
       const { data: existingBookings, error: bookingsError } = rentalForm.blocks_all_environments
         ? await bookingsQuery
-        : await bookingsQuery.eq('environment_id', envId)
+        : await bookingsQuery.or(`environment_id.eq.${envId},blocks_all_environments.eq.true`)
 
       if (bookingsError) {
         console.error('Erro ao verificar agendamentos:', bookingsError)
@@ -461,8 +461,9 @@ export function ExternalRentalsManager({ userId }: ExternalRentalsManagerProps) 
       })
 
       // Conflitos no próprio ambiente → bloqueante; em outros ambientes (blocks_all) → aviso
-      const directConflicts = conflictingBookings.filter(b => b.environment_id === envId)
-      const otherConflicts = conflictingBookings.filter(b => b.environment_id !== envId)
+      // Reserva da igreja inteira ocupa também o ambiente alugado
+      const directConflicts = conflictingBookings.filter(b => b.blocks_all_environments || b.environment_id === envId)
+      const otherConflicts = conflictingBookings.filter(b => !b.blocks_all_environments && b.environment_id !== envId)
 
       if (directConflicts.length > 0) {
         const conflictNames = directConflicts.map(b => b.name).join(', ')

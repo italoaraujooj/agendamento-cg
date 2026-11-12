@@ -9,6 +9,7 @@ import { Badge } from "@/components/ui/badge"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Textarea } from "@/components/ui/textarea"
 import { Label } from "@/components/ui/label"
+import { bookingEnvironment } from "@/lib/bookings"
 import {
   Calendar as CalendarIcon,
   Clock,
@@ -164,7 +165,7 @@ export default function AdminPage() {
             .from('bookings')
             .select(`
               *,
-              environments!inner (
+              environments (
                 id,
                 name,
                 capacity
@@ -177,7 +178,12 @@ export default function AdminPage() {
         if (bookingsRes.error) throw bookingsRes.error
         if (environmentsRes.error) throw environmentsRes.error
 
-        setBookings(bookingsRes.data || [])
+        // Igreja inteira (sem ambiente) vira um ambiente virtual "Igreja inteira"
+        setBookings(
+          (bookingsRes.data || []).map((b: any) =>
+            b.blocks_all_environments ? { ...b, environments: bookingEnvironment(b) } : b
+          )
+        )
         setEnvironments(environmentsRes.data || [])
       } catch (error) {
         console.error('Erro ao carregar dados:', error)

@@ -1,4 +1,5 @@
-import { createServerClient } from '@supabase/ssr'
+import { createServerClient } from '@supabase/ssr'
+import { bookingPlaceName } from '@/lib/bookings'
 import { NextResponse, type NextRequest } from 'next/server'
 
 export async function POST(request: NextRequest) {
@@ -132,8 +133,8 @@ export async function POST(request: NextRequest) {
     const endDateTime = new Date(`${booking.booking_date}T${booking.end_time}`)
 
     const event = {
-      summary: `${booking.name} - ${booking.environments?.name}`,
-      description: `Reserva: ${booking.name}\nLocal: ${booking.environments?.name}\nLocalização: ${booking.environments?.location}\nParticipantes: ${booking.estimated_participants}\n\nCriado via Sistema de Agendamento - Cidade Viva CG`,
+      summary: `${booking.name} - ${bookingPlaceName(booking)}`,
+      description: `Reserva: ${booking.name}\nLocal: ${bookingPlaceName(booking)}\nLocalização: ${booking.environments?.location}\nParticipantes: ${booking.estimated_participants}\n\nCriado via Sistema de Agendamento - Cidade Viva CG`,
       start: {
         dateTime: startDateTime.toISOString(),
         timeZone: 'America/Sao_Paulo',

@@ -153,7 +153,8 @@ export async function POST(request: NextRequest) {
           const { data: bookings } = await supabase
             .from("bookings")
             .select("id, booking_date, start_time, occasion, responsible_person, name")
-            .eq("environment_id", salaoEnv.id)
+            // Salão Principal ou igreja inteira (que inclui o salão)
+            .or(`environment_id.eq.${salaoEnv.id},blocks_all_environments.eq.true`)
             .eq("status", "approved")
             .gte("booking_date", startDateStr)
             .lte("booking_date", endDateStr)

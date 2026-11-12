@@ -3,6 +3,7 @@ import ReservationsView from "@/components/reservations-view"
 import { Button } from "@/components/ui/button"
 import { ArrowLeft } from "lucide-react"
 import Link from "next/link"
+import { bookingEnvironment, environmentOrWholeChurchFilter } from "@/lib/bookings"
 
 interface Booking {
   id: string
@@ -22,6 +23,7 @@ interface Booking {
   reviewed_by?: string
   reviewed_at?: string
   review_notes?: string
+  blocks_all_environments?: boolean
   environments: {
     id: string
     name: string
@@ -90,7 +92,8 @@ export default async function ReservationsPage({
       reviewed_by,
       reviewed_at,
       review_notes,
-      environments!inner (
+      blocks_all_environments,
+      environments (
         id,
         name,
         capacity
@@ -103,7 +106,8 @@ export default async function ReservationsPage({
 
   // Apply filters
   if (sp.environment) {
-    query = query.eq("environment_id", sp.environment)
+    // Inclui as reservas da igreja inteira, que também ocupam o ambiente
+    query = query.or(environmentOrWholeChurchFilter([sp.environment.replace(/\D/g, "") || "0"]))
   }
 
   if (sp.date) {
@@ -124,7 +128,12 @@ export default async function ReservationsPage({
   const pastBookings: Booking[] = []
   const currentBookings: Booking[] = []
 
-  bookings?.forEach(booking => {
+  // Igreja inteira (sem ambiente) vira um ambiente virtual "Igreja inteira"
+  const normalized = (bookings || []).map((booking) =>
+    booking.blocks_all_environments ? { ...booking, environments: bookingEnvironment(booking) } : booking
+  ) as Booking[]
+
+  normalized.forEach(booking => {
     if (isBookingPast(booking)) {
       pastBookings.push(booking)
     } else {
@@ -148,7 +157,7 @@ export default async function ReservationsPage({
         </div>
 
         <ReservationsView
-          bookings={bookings || []}
+          bookings={normalized}
           pastBookings={pastBookings}
           currentBookings={currentBookings}
           environments={environments || []}
