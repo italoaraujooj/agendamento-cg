@@ -239,13 +239,16 @@
 
 @layer components {
   /* Ladrilho de cor de um ministério/ambiente: fundo suave da cor, ícone/texto na cor
-     escurecida (claro) ou clareada (escuro). Defina --tone com a cor do ministério. */
+     escurecida (claro) ou clareada (escuro). Defina --tone com a cor do ministério.
+     A parte da cor no texto é baixa de propósito: qualquer cor que o seletor de
+     ministério aceite (até #ffffff ou #000000) fica acima de 4.5:1 no ladrilho
+     (pior caso: 5.1:1 no claro, 5.8:1 no escuro). */
   .tone-tile {
     background: color-mix(in srgb, var(--tone, var(--brand)) 16%, var(--card));
-    color: color-mix(in srgb, var(--tone, var(--brand)) 70%, var(--foreground));
+    color: color-mix(in srgb, var(--tone, var(--brand)) 35%, var(--foreground));
   }
   .dark .tone-tile {
     background: color-mix(in srgb, var(--tone, var(--brand)) 22%, var(--card));
-    color: color-mix(in srgb, var(--tone, var(--brand)) 55%, var(--foreground));
+    color: color-mix(in srgb, var(--tone, var(--brand)) 40%, var(--foreground));
   }
 }
