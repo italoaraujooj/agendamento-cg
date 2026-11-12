@@ -458,7 +458,7 @@ function BookingCard({ booking, compact = false, isPast = false, user, isAuthent
 
   // Estilos condicionais baseados no status da reserva
   const cardClassName = compact 
-    ? `border-l-4 ${isPast ? "border-l-muted-foreground bg-muted/30" : "border-l-blue-500"}` 
+    ? `border-l-4 ${isPast ? "border-l-muted-foreground bg-muted/30" : "border-l-brand"}` 
     : isPast ? "bg-muted/30 opacity-90" : ""
 
   const titleClassName = isPast ? "text-muted-foreground" : "text-lg"
