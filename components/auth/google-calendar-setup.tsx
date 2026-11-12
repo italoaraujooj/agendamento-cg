@@ -9,6 +9,7 @@ import { Calendar, CheckCircle, AlertTriangle, RefreshCw, ExternalLink, Info } f
 import { useAuth } from './auth-provider'
 import { supabase } from '@/lib/supabase/client'
 import { toast } from 'sonner'
+import { GOOGLE_CALENDAR_CONNECT_COOKIE, GOOGLE_CALENDAR_SCOPES } from '@/lib/google-oauth'
 
 interface GoogleTokenStatus {
   hasTokens: boolean
@@ -87,10 +88,14 @@ export function GoogleCalendarSetup() {
     setIsConnecting(true)
 
     try {
+      // Marca que este retorno do Google é a conexão da agenda: só então o
+      // callback guarda os tokens (ver GOOGLE_CALENDAR_CONNECT_COOKIE)
+      document.cookie = `${GOOGLE_CALENDAR_CONNECT_COOKIE}=1; path=/; max-age=600; samesite=lax`
+
       const { error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
         options: {
-          scopes: 'openid email profile https://www.googleapis.com/auth/calendar.events https://www.googleapis.com/auth/calendar.readonly https://www.googleapis.com/auth/calendar.calendarlist',
+          scopes: GOOGLE_CALENDAR_SCOPES,
           redirectTo: `${window.location.origin}/auth/callback`,
           queryParams: {
             access_type: 'offline',

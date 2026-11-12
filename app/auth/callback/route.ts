@@ -1,6 +1,7 @@
 import { createServerClient } from '@supabase/ssr'
 import { NextRequest, NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/server'
+import { GOOGLE_CALENDAR_CONNECT_COOKIE } from '@/lib/google-oauth'
 
 export async function GET(request: NextRequest) {
   const { searchParams, origin } = new URL(request.url)
@@ -156,8 +157,14 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    // Se há provider_token, armazenar no banco para Google Calendar
-    if (data.session?.provider_token) {
+    // Guarda os tokens do Google só quando a pessoa veio do botão "Conectar
+    // Google Calendar" (cookie marcado lá). O login comum não pede a agenda, e
+    // seu token sem escopo de agenda não pode sobrescrever a conexão existente.
+    const isCalendarConnect = request.cookies.get(GOOGLE_CALENDAR_CONNECT_COOKIE)?.value === '1'
+    if (isCalendarConnect) {
+      response.cookies.set({ name: GOOGLE_CALENDAR_CONNECT_COOKIE, value: '', path: '/', maxAge: 0 })
+    }
+    if (isCalendarConnect && data.session?.provider_token) {
       console.log('🔄 Armazenando tokens do Google Calendar...')
       try {
         const { error: storeError } = await supabase.rpc('store_google_oauth_token', {
