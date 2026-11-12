@@ -39,8 +39,6 @@ interface Booking {
   start_time: string
   end_time: string
   created_at: string
-  google_event_id?: string
-  synced_at?: string
   status?: 'pending' | 'approved' | 'rejected'
   reviewed_by?: string
   reviewed_at?: string

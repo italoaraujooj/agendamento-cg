@@ -86,8 +86,6 @@ export default async function ReservationsPage({
       start_time,
       end_time,
       created_at,
-      google_event_id,
-      synced_at,
       status,
       reviewed_by,
       reviewed_at,
