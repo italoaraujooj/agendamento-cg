@@ -6,7 +6,7 @@ const resend = new Resend(process.env.RESEND_API_KEY)
 
 const FROM_EMAIL = process.env.RESEND_FROM_EMAIL || 'onboarding@resend.dev'
 const APP_NAME = 'Sistema de Agendamento - Cidade Viva CG'
-const APP_URL = process.env.NEXT_PUBLIC_APP_URL || 'https://agendamento-cg.vercel.app'
+const APP_URL = process.env.NEXT_PUBLIC_APP_URL || 'https://agendamento.icvcg.com.br'
 
 interface BookingData {
   id: string

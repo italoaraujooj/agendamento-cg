@@ -11,7 +11,7 @@ const BRAND = "#eabc08"
 const BRAND_DARK = "#4f4f4d"
 const BATCH_SIZE = 100 // limite do resend.batch.send
 
-export const APP_URL = process.env.NEXT_PUBLIC_APP_URL || "https://agendamento-cg.vercel.app"
+export const APP_URL = process.env.NEXT_PUBLIC_APP_URL || "https://agendamento.icvcg.com.br"
 
 export interface EmailMessage {
   to: string
