@@ -3,6 +3,7 @@
 import { createContext, useContext, useEffect, useState, useCallback, useRef } from 'react'
 import { User, Session, AuthChangeEvent, AuthError } from '@supabase/supabase-js'
 import { supabase } from '@/lib/supabase/client'
+import { GOOGLE_LOGIN_SCOPES } from '@/lib/google-oauth'
 
 const AUTH_ERROR_MESSAGES: Record<string, string> = {
   'Invalid login credentials': 'Email ou senha incorretos',
@@ -315,14 +316,17 @@ export function AuthProvider({ children }: AuthProviderProps) {
   const signInWithGoogle = async () => {
     console.log('🔄 Iniciando login com Google...')
 
+    // Login pede só nome e e-mail (escopos não sensíveis): assim o Google não
+    // mostra a tela "O Google não verificou este app". O acesso à agenda é
+    // pedido à parte, só por quem conecta o Google Calendar no Perfil
+    // (components/auth/google-calendar-setup.tsx).
     const { error } = await supabase.auth.signInWithOAuth({
       provider: 'google',
       options: {
-        scopes: 'openid email profile https://www.googleapis.com/auth/calendar.events https://www.googleapis.com/auth/calendar.readonly https://www.googleapis.com/auth/calendar.calendarlist',
+        scopes: GOOGLE_LOGIN_SCOPES,
         redirectTo: `${window.location.origin}/auth/callback`,
         queryParams: {
-          access_type: 'offline',
-          prompt: 'consent'
+          prompt: 'select_account'
         }
       }
     })
