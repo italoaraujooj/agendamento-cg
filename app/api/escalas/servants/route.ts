@@ -158,7 +158,7 @@ export async function POST(request: NextRequest) {
           .eq("id", data.id)
       } else {
         // Sem conta → enviar convite pelo Supabase Auth
-        const APP_URL = process.env.NEXT_PUBLIC_APP_URL || "https://agendamento-cg.vercel.app"
+        const APP_URL = process.env.NEXT_PUBLIC_APP_URL || "https://agendamento.icvcg.com.br"
         try {
           await supabase.auth.admin.inviteUserByEmail(email, {
             redirectTo: `${APP_URL}/completar-cadastro`,
