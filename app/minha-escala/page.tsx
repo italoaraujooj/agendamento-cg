@@ -218,11 +218,11 @@ export default function MinhaEscalaPage() {
   const orderClass = (n: number) => `${ORDER[n]} lg:order-none`
 
   return (
-    <div className="min-h-screen bg-muted/30">
-      <div className="container max-w-5xl mx-auto px-4 py-8 space-y-6">
+    <div className="min-h-screen">
+      <div className="container max-w-5xl mx-auto px-4 py-6 sm:py-8 space-y-6">
         {/* Header */}
         <div className="space-y-1">
-          <h1 className="text-2xl font-bold">Minha Escala</h1>
+          <h1 className="text-[28px] sm:text-[34px] font-bold tracking-[-0.02em] leading-tight">Minha Escala</h1>
           <p className="text-muted-foreground text-sm">
             {data
               ? `Olá, ${data.servantName}!`
@@ -294,8 +294,12 @@ export default function MinhaEscalaPage() {
                       const mine = event.assignments.filter((a) => a.isMe)
                       const date = parseISO(event.event_date)
                       return (
-                        <div key={event.id} className="flex gap-3 rounded-lg border p-3">
-                          <div className="flex flex-col items-center justify-center rounded-md bg-brand/15 text-primary w-12 shrink-0 py-1.5 self-start">
+                        <div key={event.id} className="flex gap-3 rounded-2xl bg-muted/60 p-3">
+                          {/* Ladrilho do dia na cor do ministério */}
+                          <div
+                            className="tone-tile flex flex-col items-center justify-center rounded-xl w-12 shrink-0 py-1.5 self-start"
+                            style={{ "--tone": period.ministry.color } as React.CSSProperties}
+                          >
                             <span className="text-lg font-bold leading-none">{format(date, "dd")}</span>
                             <span className="text-[11px] font-medium uppercase mt-0.5">
                               {format(date, "EEEE", { locale: ptBR }).slice(0, 3)}
@@ -410,10 +414,10 @@ export default function MinhaEscalaPage() {
                                 {dayEvents.map((event) => (
                                   <div
                                     key={event.id}
-                                    className={`rounded-lg border p-3 transition-colors ${
+                                    className={`rounded-2xl p-3 transition-colors ${
                                       event.isMyEvent
-                                        ? "border-primary/40 bg-primary/5"
-                                        : "bg-muted/30"
+                                        ? "bg-brand-soft/70 ring-1 ring-primary/25"
+                                        : "bg-muted/60"
                                     }`}
                                   >
                                     {/* Título do evento */}
@@ -515,7 +519,7 @@ export default function MinhaEscalaPage() {
                     {openCollections.map((c) => (
                       <div
                         key={c.id}
-                        className="flex items-center justify-between gap-3 rounded-lg border p-3"
+                        className="flex items-center justify-between gap-3 rounded-2xl bg-muted/60 p-3"
                       >
                         <div className="flex items-start gap-3 min-w-0">
                           <div

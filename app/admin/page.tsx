@@ -1493,9 +1493,9 @@ function ReportModal({
                                 <div
                                   key={booking.id}
                                   className={`text-sm p-3 rounded-lg border-l-4 ${
-                                    booking.status === 'approved' ? 'border-l-green-500 bg-success/10' :
-                                    booking.status === 'rejected' ? 'border-l-red-500 bg-destructive/10' :
-                                    'border-l-yellow-500 bg-warning/10'
+                                    booking.status === 'approved' ? 'border-l-success bg-success/10' :
+                                    booking.status === 'rejected' ? 'border-l-destructive bg-destructive/10' :
+                                    'border-l-warning bg-warning/10'
                                   }`}
                                 >
                                   {/* Linha 1: Data, Horário e Status */}
@@ -1618,9 +1618,9 @@ function BookingAdminCard({
 
   return (
     <Card className={`border-l-4 ${
-      booking.status === 'pending' ? 'border-l-yellow-500' :
-      booking.status === 'approved' ? 'border-l-green-500' :
-      'border-l-red-500'
+      booking.status === 'pending' ? 'border-l-warning' :
+      booking.status === 'approved' ? 'border-l-success' :
+      'border-l-destructive'
     }`}>
       <CardHeader>
         <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-2">

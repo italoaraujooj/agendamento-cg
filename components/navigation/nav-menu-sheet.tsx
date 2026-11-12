@@ -21,8 +21,8 @@ export function NavMenuSheet({ children, side = "right" }: { children: ReactNode
 
   const linkClass = (active: boolean) =>
     cn(
-      "flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors",
-      active ? "bg-primary/10 text-primary" : "text-foreground hover:bg-muted"
+      "flex items-center gap-3 rounded-xl px-3 py-2.5 text-[15px] font-medium transition-colors",
+      active ? "bg-brand-soft text-brand-soft-foreground font-semibold" : "text-foreground hover:bg-muted"
     )
 
   return (

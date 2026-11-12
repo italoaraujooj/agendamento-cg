@@ -40,12 +40,12 @@ export function SystemModeSwitch({ className, labelClassName = "hidden 2xl:inlin
 
   const buttonClass = (active: boolean) =>
     cn(
-      "flex flex-1 items-center justify-center gap-1.5 rounded-md px-2.5 py-1 text-sm font-medium transition-all",
-      active ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"
+      "flex flex-1 items-center justify-center gap-1.5 rounded-[9px] px-2.5 py-1.5 text-[13px] font-semibold transition-all",
+      active ? "bg-card text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"
     )
 
   return (
-    <div className={cn("flex bg-muted rounded-lg p-0.5", className)}>
+    <div className={cn("flex bg-muted rounded-xl p-[3px]", className)}>
       <button
         onClick={() => handleSwitch("agendamentos")}
         aria-label="Agendamentos"

@@ -1,6 +1,5 @@
 import type React from "react"
 import type { Metadata, Viewport } from "next"
-import { GeistSans } from "geist/font/sans"
 import { GeistMono } from "geist/font/mono"
 import "./globals.css"
 import NavigationHeader from "@/components/navigation-header"
@@ -14,6 +13,7 @@ import { Toaster } from "@/components/ui/sonner"
 import { ServiceWorkerRegister } from "@/components/pwa/service-worker-register"
 import { InstallPrompt } from "@/components/pwa/install-prompt"
 import { MobileBottomNav } from "@/components/navigation/mobile-bottom-nav"
+import { AppSidebar } from "@/components/navigation/app-sidebar"
 
 export const metadata: Metadata = {
   title: "Cidade Viva CG - Agendamentos e Escalas",
@@ -33,8 +33,8 @@ export const viewport: Viewport = {
   // Permite usar env(safe-area-inset-*) na barra inferior (iPhone com app instalado)
   viewportFit: "cover",
   themeColor: [
-    { media: "(prefers-color-scheme: light)", color: "#fcf8f0" },
-    { media: "(prefers-color-scheme: dark)", color: "#0a0a0a" },
+    { media: "(prefers-color-scheme: light)", color: "#f2f2f7" },
+    { media: "(prefers-color-scheme: dark)", color: "#0e0e11" },
   ],
 }
 
@@ -48,8 +48,6 @@ export default function RootLayout({
       <head>
         <style>{`
 html {
-  font-family: ${GeistSans.style.fontFamily};
-  --font-sans: ${GeistSans.variable};
   --font-mono: ${GeistMono.variable};
 }
         `}</style>
@@ -75,6 +73,7 @@ html {
             <SystemModeProvider>
               <AutoMigrateBookings />
               <CompleteProfileModal />
+              <AppSidebar />
               <NavigationHeader />
               <main className="flex-1">
                 {children}
