@@ -90,7 +90,7 @@ export default function PrivacyPolicyPage() {
                 <li><strong>Serviço</strong> refere-se ao Site.</li>
                 <li><strong>Provedor de Serviços</strong> significa qualquer pessoa física ou jurídica que processa os dados em nome da Empresa.</li>
                 <li><strong>Dados de Uso</strong> refere-se aos dados coletados automaticamente, gerados pelo uso do Serviço.</li>
-                <li><strong>Site</strong> refere-se ao Agendamento ICVCG, acessível em <a href="https://agendamento-cg.vercel.app/" target="_blank" rel="noopener noreferrer" className="text-info hover:underline">https://agendamento-cg.vercel.app/</a></li>
+                <li><strong>Site</strong> refere-se ao Agendamento ICVCG, acessível em <a href="https://agendamento.icvcg.com.br" target="_blank" rel="noopener noreferrer" className="text-info hover:underline">https://agendamento.icvcg.com.br</a></li>
                 <li><strong>Você</strong> significa o indivíduo que acessa ou usa o Serviço.</li>
               </ul>
             </div>

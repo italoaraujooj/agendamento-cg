@@ -59,7 +59,7 @@ export async function PATCH(
       return NextResponse.json({ error: error.message }, { status: 500 })
     }
 
-    const appUrl = process.env.NEXT_PUBLIC_APP_URL || "https://agendamento-cg.vercel.app"
+    const appUrl = process.env.NEXT_PUBLIC_APP_URL || "https://agendamento.icvcg.com.br"
     fetch(`${appUrl}/api/announcements/notify`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },

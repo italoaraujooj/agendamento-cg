@@ -7,7 +7,7 @@ import { ptBR } from "date-fns/locale"
 
 const resend = new Resend(process.env.RESEND_API_KEY)
 const FROM_EMAIL = process.env.RESEND_FROM_EMAIL || "onboarding@resend.dev"
-const APP_URL = process.env.NEXT_PUBLIC_APP_URL || "https://agendamento-cg.vercel.app"
+const APP_URL = process.env.NEXT_PUBLIC_APP_URL || "https://agendamento.icvcg.com.br"
 
 function formatDate(iso: string) {
   try { return format(parseISO(iso), "dd/MM/yyyy", { locale: ptBR }) } catch { return iso }

@@ -145,7 +145,7 @@ export async function POST(request: NextRequest) {
     if (error) return NextResponse.json({ error: error.message }, { status: 500 })
 
     // Notificar admins/manage_avisos em background
-    const appUrl = process.env.NEXT_PUBLIC_APP_URL || "https://agendamento-cg.vercel.app"
+    const appUrl = process.env.NEXT_PUBLIC_APP_URL || "https://agendamento.icvcg.com.br"
     fetch(`${appUrl}/api/announcements/notify`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
