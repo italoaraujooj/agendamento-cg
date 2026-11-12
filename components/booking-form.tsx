@@ -173,6 +173,7 @@ export default function BookingForm({ environments, preselectedEnvironment }: Bo
               .from("bookings")
               .select("environment_id, start_time, end_time, blocks_all_environments")
               .eq("booking_date", formData.bookingDate)
+              .neq("status", "rejected")
             : Promise.resolve({ data: [], error: null } as any),
         ])
         setAvailability(availRes.data || [])
@@ -866,6 +867,7 @@ export default function BookingForm({ environments, preselectedEnvironment }: Bo
         .select("booking_date,start_time,end_time,environment_id,blocks_all_environments")
         .or(environmentOrWholeChurchFilter(envIds))
         .in("booking_date", queryDates)
+        .neq("status", "rejected")
 
       const overlaps = (aStart: number, aEnd: number, bStart: number, bEnd: number) => aStart < bEnd && aEnd > bStart
       const conflicting: string[] = []
