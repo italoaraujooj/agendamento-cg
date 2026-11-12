@@ -124,19 +124,9 @@ export const OAUTH_CONFIG = {
 } as const
 
 /**
- * Login comum: só escopos não sensíveis (nome e e-mail). Não exigem a
+ * Login com Google: só escopos não sensíveis (nome e e-mail). Não exigem a
  * verificação do app no Google e não mostram a tela "O Google não verificou
- * este app". Os escopos de agenda (sensíveis) ficam só no botão "Conectar
- * Google Calendar" do Perfil.
+ * este app". As reservas chegam à agenda da pessoa por um link de assinatura
+ * (ICS, /api/reservas/ics), sem pedir acesso ao Google Calendar.
  */
 export const GOOGLE_LOGIN_SCOPES = "openid email profile"
-
-/** Escopos da conexão com o Google Calendar, no formato do Supabase (espaços) */
-export const GOOGLE_CALENDAR_SCOPE_STRING = GOOGLE_CALENDAR_SCOPES.join(" ")
-
-/**
- * Cookie curto marcado antes de ir ao Google pelo botão de conectar a agenda.
- * O callback só guarda os tokens do Google quando ele existe: um login comum
- * (sem escopos de agenda) não pode sobrescrever a conexão com a agenda.
- */
-export const GOOGLE_CALENDAR_CONNECT_COOKIE = "gcal_connect"
