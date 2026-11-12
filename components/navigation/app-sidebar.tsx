@@ -4,9 +4,7 @@ import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { ModeToggle } from "@/components/mode-toggle"
 import { AuthButton } from "@/components/auth/auth-button"
-import { CalendarStatusIndicator } from "@/components/calendar-status-indicator"
 import { SystemModeSwitch } from "@/components/system-mode-switch"
-import { useSystemMode } from "@/components/system-mode-provider"
 import { isTokenPage, useNavItems } from "./use-nav-items"
 import { cn } from "@/lib/utils"
 
@@ -17,7 +15,6 @@ import { cn } from "@/lib/utils"
  */
 export function AppSidebar() {
   const pathname = usePathname()
-  const { isEscalas } = useSystemMode()
   const { items, moduleLabel, homeHref } = useNavItems()
 
   if (isTokenPage(pathname)) return null
@@ -62,7 +59,6 @@ export function AppSidebar() {
       </nav>
 
       <div className="mt-auto flex flex-col gap-2 border-t pt-3">
-        {!isEscalas && <CalendarStatusIndicator className="w-full justify-start" />}
         <div className="flex items-center justify-between gap-2 px-1">
           <AuthButton />
           <ModeToggle />

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { createAdminClient } from "@/lib/supabase/server"
 import { verifyCalendarToken } from "@/lib/escalas/availability-token"
+import { icsEscape, icsResponse, nowStamp, utcStamp } from "@/lib/ics"
 
 /**
  * GET - Feed de calendário (ICS) com as escalas publicadas da pessoa, em todos
@@ -9,34 +10,6 @@ import { verifyCalendarToken } from "@/lib/escalas/availability-token"
  */
 
 const EVENT_DURATION_HOURS = 2
-const BRT_OFFSET_HOURS = 3 // Brasília = UTC-3 (sem horário de verão desde 2019)
-
-const icsEscape = (v: string) =>
-  v.replace(/\\/g, "\\\\").replace(/;/g, "\\;").replace(/,/g, "\\,").replace(/\r?\n/g, "\\n")
-
-/** Quebra linhas longas (RFC 5545: máx. 75 octetos por linha) */
-function fold(line: string): string {
-  const out: string[] = []
-  let current = ""
-  for (const ch of line) {
-    if (Buffer.byteLength(current + ch) > 73) {
-      out.push(current)
-      current = " " + ch
-    } else {
-      current += ch
-    }
-  }
-  out.push(current)
-  return out.join("\r\n")
-}
-
-function utcStamp(date: string, time: string, plusHours = 0): string {
-  const [y, m, d] = date.split("-").map(Number)
-  const [hh, mm] = time.split(":").map(Number)
-  const dt = new Date(Date.UTC(y, m - 1, d, hh + BRT_OFFSET_HOURS + plusHours, mm))
-  return dt.toISOString().replace(/[-:]/g, "").replace(/\.\d{3}/, "")
-}
-
 export async function GET(
   _request: NextRequest,
   { params }: { params: Promise<{ token: string }> }
@@ -89,7 +62,7 @@ export async function GET(
     .gte("schedule_events.event_date", since)
     .eq("schedule_events.schedule_periods.status", "published")
 
-  const now = new Date().toISOString().replace(/[-:]/g, "").replace(/\.\d{3}/, "")
+  const now = nowStamp()
   const lines = [
     "BEGIN:VCALENDAR",
     "VERSION:2.0",
@@ -121,11 +94,5 @@ export async function GET(
   }
   lines.push("END:VCALENDAR")
 
-  return new NextResponse(lines.map(fold).join("\r\n") + "\r\n", {
-    headers: {
-      "Content-Type": "text/calendar; charset=utf-8",
-      "Content-Disposition": 'inline; filename="escalas.ics"',
-      "Cache-Control": "public, max-age=900",
-    },
-  })
+  return icsResponse(lines, "escalas.ics")
 }

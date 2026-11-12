@@ -1,4 +1,5 @@
-import { GoogleCalendarSetup } from '@/components/auth/google-calendar-setup'
+import { CalendarSubscribe } from '@/components/escalas/calendar-subscribe'
+import { signBookingsCalendarToken } from '@/lib/escalas/availability-token'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { User, Mail, Calendar, Shield, Info } from 'lucide-react'
@@ -101,6 +102,9 @@ export default async function ProfilePage() {
     .eq('id', session.user.id)
     .single()
 
+  // Link pessoal do feed de reservas (ICS)
+  const bookingsCalendarToken = signBookingsCalendarToken(session.user.id)
+
   const { data: bookingStats } = await supabase
     .from('bookings')
     .select('id', { count: 'exact' })
@@ -173,33 +177,33 @@ export default async function ProfilePage() {
           </CardContent>
         </Card>
 
-        {/* Google Calendar Integration */}
+        {/* Reservas na agenda: link de assinatura (ICS), sem acesso à conta Google */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-          {session.user.app_metadata?.provider === 'google' ? (
-            <GoogleCalendarSetup />
-          ) : (
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Calendar className="h-5 w-5" />
-                  Google Calendar
-                </CardTitle>
-                <CardDescription>
-                  Sincronize suas reservas com o Google Calendar
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="flex items-start gap-3 p-4 rounded-lg bg-muted/50">
-                  <Info className="h-5 w-5 text-muted-foreground mt-0.5 shrink-0" />
-                  <p className="text-sm text-muted-foreground">
-                    A integração com o Google Calendar está disponível apenas para contas
-                    que fizeram login via Google. Para usar esta funcionalidade, faça logout
-                    e entre novamente com sua conta Google.
-                  </p>
-                </div>
-              </CardContent>
-            </Card>
-          )}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Calendar className="h-5 w-5" />
+                Minhas reservas na agenda
+              </CardTitle>
+              <CardDescription>
+                Assine suas reservas no Google Agenda, no iPhone ou no Outlook
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <p className="text-sm text-muted-foreground">
+                Suas reservas aprovadas e em análise aparecem na sua agenda e se atualizam
+                sozinhas. O app de agenda busca as mudanças de tempos em tempos, então uma
+                reserva nova pode levar algumas horas para aparecer.
+              </p>
+              <CalendarSubscribe calendarToken={bookingsCalendarToken} feedPath="/api/reservas/ics" />
+              <div className="flex items-start gap-3 p-3 rounded-lg bg-muted/50">
+                <Info className="h-4 w-4 text-muted-foreground mt-0.5 shrink-0" />
+                <p className="text-xs text-muted-foreground">
+                  O link é pessoal: quem tiver ele consegue ver suas reservas. Não compartilhe.
+                </p>
+              </div>
+            </CardContent>
+          </Card>
 
           {/* Account Stats */}
           <Card>

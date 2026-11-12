@@ -317,9 +317,8 @@ export function AuthProvider({ children }: AuthProviderProps) {
     console.log('🔄 Iniciando login com Google...')
 
     // Login pede só nome e e-mail (escopos não sensíveis): assim o Google não
-    // mostra a tela "O Google não verificou este app". O acesso à agenda é
-    // pedido à parte, só por quem conecta o Google Calendar no Perfil
-    // (components/auth/google-calendar-setup.tsx).
+    // mostra a tela "O Google não verificou este app". As reservas chegam à
+    // agenda da pessoa por um link de assinatura (Perfil → /api/reservas/ics).
     const { error } = await supabase.auth.signInWithOAuth({
       provider: 'google',
       options: {
