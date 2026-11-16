@@ -812,7 +812,7 @@ export default function AdminPage() {
   return (
     <div className="min-h-screen bg-background">
       {/* Subheader fixo */}
-      <div className="sticky top-16 z-40 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 border-b">
+      <div className="sticky top-[calc(3.5rem+env(safe-area-inset-top))] lg:top-0 z-40 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 border-b">
         <div className="container mx-auto px-4">
           <div className="flex items-center justify-between py-4">
             <div className="flex items-center gap-3">
@@ -832,30 +832,30 @@ export default function AdminPage() {
       <div className="container mx-auto px-4 py-6">
         {/* Tabs Principais no Subheader */}
         <Tabs defaultValue={canSeeBookings ? 'bookings' : canSeeRentals ? 'rentals' : canSeeAvisos ? 'avisos' : 'users'} className="w-full">
-          <TabsList className="flex w-full mb-6 h-auto overflow-x-auto">
+          <TabsList className="flex w-full mb-6 h-auto justify-start overflow-x-auto">
             {canSeeBookings && (
-              <TabsTrigger value="bookings" className="flex items-center gap-2 text-sm md:text-base py-3">
+              <TabsTrigger value="bookings" className="flex flex-1 items-center gap-2 text-sm md:text-base py-3">
                 <ClipboardList className="h-4 w-4 md:h-5 md:w-5" />
                 <span className="hidden sm:inline">Agendamentos Internos</span>
                 <span className="sm:hidden">Agendamentos</span>
               </TabsTrigger>
             )}
             {canSeeRentals && (
-              <TabsTrigger value="rentals" className="flex items-center gap-2 text-sm md:text-base py-3">
+              <TabsTrigger value="rentals" className="flex flex-1 items-center gap-2 text-sm md:text-base py-3">
                 <DollarSign className="h-4 w-4 md:h-5 md:w-5" />
                 <span className="hidden sm:inline">Locações Externas</span>
                 <span className="sm:hidden">Locações</span>
               </TabsTrigger>
             )}
             {canSeeAvisos && (
-              <TabsTrigger value="avisos" className="flex items-center gap-2 text-sm md:text-base py-3">
+              <TabsTrigger value="avisos" className="flex flex-1 items-center gap-2 text-sm md:text-base py-3">
                 <Megaphone className="h-4 w-4 md:h-5 md:w-5" />
                 <span className="hidden sm:inline">Avisos no Culto</span>
                 <span className="sm:hidden">Avisos</span>
               </TabsTrigger>
             )}
             {canSeeUsers && (
-              <TabsTrigger value="users" className="flex items-center gap-2 text-sm md:text-base py-3">
+              <TabsTrigger value="users" className="flex flex-1 items-center gap-2 text-sm md:text-base py-3">
                 <UserCog className="h-4 w-4 md:h-5 md:w-5" />
                 <span className="hidden sm:inline">Gerenciar Usuários</span>
                 <span className="sm:hidden">Usuários</span>
@@ -945,20 +945,20 @@ export default function AdminPage() {
 
             {/* Tabs de status de reservas */}
             <Tabs defaultValue="pending" className="w-full">
-              <TabsList className="flex w-full overflow-x-auto">
-                <TabsTrigger value="pending" className="flex items-center gap-1.5">
+              <TabsList className="flex w-full justify-start overflow-x-auto">
+                <TabsTrigger value="pending" className="flex flex-1 items-center gap-1.5">
                   <Clock3 className="h-4 w-4" />
                   <span className="hidden sm:inline">Pendentes</span> ({pendingBookings.length})
                 </TabsTrigger>
-                <TabsTrigger value="approved" className="flex items-center gap-1.5">
+                <TabsTrigger value="approved" className="flex flex-1 items-center gap-1.5">
                   <CheckCircle className="h-4 w-4" />
                   <span className="hidden sm:inline">Aprovadas</span> ({approvedBookings.length})
                 </TabsTrigger>
-                <TabsTrigger value="completed" className="flex items-center gap-1.5">
+                <TabsTrigger value="completed" className="flex flex-1 items-center gap-1.5">
                   <CalendarIcon className="h-4 w-4" />
                   <span className="hidden sm:inline">Finalizadas</span> ({completedBookings.length})
                 </TabsTrigger>
-                <TabsTrigger value="rejected" className="flex items-center gap-1.5">
+                <TabsTrigger value="rejected" className="flex flex-1 items-center gap-1.5">
                   <XCircle className="h-4 w-4" />
                   <span className="hidden sm:inline">Rejeitadas</span> ({rejectedBookings.length})
                 </TabsTrigger>
