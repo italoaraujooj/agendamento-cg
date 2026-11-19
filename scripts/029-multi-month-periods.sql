@@ -6,8 +6,11 @@
 -- final (end_date). month/year continuam sendo o mês inicial.
 -- A regra "um período por mês por ministério" vira "períodos do mesmo
 -- ministério não podem se sobrepor".
--- Pode rodar de novo.
+-- Pode rodar de novo. Tudo numa transação: a regra antiga só sai junto com
+-- a nova (sem janela em que períodos possam se sobrepor).
 -- ============================================================
+
+BEGIN;
 
 CREATE EXTENSION IF NOT EXISTS btree_gist;
 
@@ -30,3 +33,5 @@ ALTER TABLE public.schedule_periods
 
 COMMENT ON TABLE public.schedule_periods IS
   'Períodos de escala: um ou mais meses seguidos (start_date a end_date)';
+
+COMMIT;

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server"
 import { requireManagerOf } from "@/lib/escalas/auth"
 import { findMinistryServants, loadBlockoutsForServants } from "@/lib/escalas/availability"
 import { isDateBlocked } from "@/lib/escalas/blockouts"
+import { fetchAll } from "@/lib/supabase/fetch-all"
 
 /**
  * GET - Propõe copiar a escala do mês anterior do mesmo ministério.
@@ -60,7 +61,7 @@ export async function GET(
       return NextResponse.json({ error: "Não há escala do mês anterior neste ministério" }, { status: 404 })
     }
 
-    const [{ data: prevEvents }, { data: curEvents }, servants, { data: availability }] = await Promise.all([
+    const [{ data: prevEvents }, { data: curEvents }, servants, availabilityResult] = await Promise.all([
       // Só o último mês do período anterior
       supabase
         .from("schedule_events")
@@ -69,7 +70,13 @@ export async function GET(
         .gte("event_date", `${previous.end_date.slice(0, 7)}-01`),
       supabase.from("schedule_events").select("id, event_date, event_time, title").eq("period_id", periodId),
       findMinistryServants(supabase, period.ministry_id),
-      supabase.from("servant_availability").select("servant_id, event_id, is_available").eq("period_id", periodId),
+      fetchAll(() =>
+        supabase
+          .from("servant_availability")
+          .select("servant_id, event_id, is_available")
+          .eq("period_id", periodId)
+          .order("id")
+      ),
     ])
 
     // Um evento por slot em cada mês do período atual
@@ -90,15 +97,42 @@ export async function GET(
 
     const prevEventIds = (prevEvents ?? []).map((e: EventRow) => e.id)
     const curEventIds = (curEvents ?? []).map((e: EventRow) => e.id)
-    const [{ data: prevAssignments }, { data: curAssignments }, { data: memberships }] = await Promise.all([
+    const noRows = Promise.resolve({ data: [] as any[], error: null })
+    const [prevAssignmentsResult, curAssignmentsResult, membershipsResult] = await Promise.all([
       prevEventIds.length
-        ? supabase.from("schedule_assignments").select("schedule_event_id, servant_id, area_id, status").in("schedule_event_id", prevEventIds)
-        : Promise.resolve({ data: [] as any[] }),
+        ? fetchAll<any>(() =>
+            supabase
+              .from("schedule_assignments")
+              .select("schedule_event_id, servant_id, area_id, status")
+              .in("schedule_event_id", prevEventIds)
+              .order("id")
+          )
+        : noRows,
       curEventIds.length
-        ? supabase.from("schedule_assignments").select("schedule_event_id, servant_id").in("schedule_event_id", curEventIds)
-        : Promise.resolve({ data: [] as any[] }),
-      supabase.from("servant_areas").select("servant_id, area_id"),
+        ? fetchAll<any>(() =>
+            supabase
+              .from("schedule_assignments")
+              .select("schedule_event_id, servant_id")
+              .in("schedule_event_id", curEventIds)
+              .order("id")
+          )
+        : noRows,
+      fetchAll<any>(() =>
+        supabase.from("servant_areas").select("servant_id, area_id").order("servant_id").order("area_id")
+      ),
     ])
+
+    // Sem todas as respostas e escalações, a proposta poderia incluir quem
+    // marcou indisponível: melhor falhar do que propor com dados parciais
+    const failed = [availabilityResult, prevAssignmentsResult, curAssignmentsResult, membershipsResult].find((r) => r.error)
+    if (failed) {
+      console.error("Erro ao carregar dados para copiar a escala:", failed.error)
+      return NextResponse.json({ error: "Erro ao carregar os dados da escala" }, { status: 500 })
+    }
+    const availability = availabilityResult.data!
+    const prevAssignments = prevAssignmentsResult.data!
+    const curAssignments = curAssignmentsResult.data!
+    const memberships = membershipsResult.data!
 
     const active = new Set(servants.filter((s) => s.is_active).map((s) => s.id))
     const inArea = new Set((memberships ?? []).map((m: any) => `${m.servant_id}-${m.area_id}`))
