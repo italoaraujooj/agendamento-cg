@@ -59,6 +59,7 @@ import { PERIOD_STATUS_LABELS, PERIOD_STATUS_COLORS, EVENT_SOURCE_LABELS } from 
 import { format } from "date-fns"
 import { ptBR } from "date-fns/locale"
 import { plural } from "@/lib/plural"
+import { periodLabel } from "@/lib/escalas/period-label"
 
 interface PeriodWithDetails extends SchedulePeriod {
   ministry: Ministry
@@ -775,7 +776,7 @@ export default function PeriodoDetalhePage() {
   const handleOpenReport = () => {
     if (!period || !period.events?.length) return
 
-    const monthLabel = format(new Date(period.year, period.month - 1), "MMMM 'de' yyyy", { locale: ptBR })
+    const monthLabel = periodLabel(period)
     const header = `*${period.ministry?.name?.toUpperCase()} - ${monthLabel.toUpperCase()}*`
 
     const grouped = period.events.reduce((acc, event) => {
@@ -888,7 +889,7 @@ export default function PeriodoDetalhePage() {
             />
             <div>
               <h1 className="text-2xl sm:text-3xl font-bold">
-                {format(new Date(period.year, period.month - 1), "MMMM 'de' yyyy", { locale: ptBR })}
+                {periodLabel(period)}
               </h1>
               <p className="text-muted-foreground">{period.ministry?.name}</p>
               <Badge
@@ -1162,7 +1163,7 @@ export default function PeriodoDetalhePage() {
                 availabilityData={availabilityData}
                 events={period.events || []}
                 servants={servants}
-                periodLabel={format(new Date(period.year, period.month - 1), "MMMM-yyyy", { locale: ptBR })}
+                periodLabel={periodLabel(period, "slug")}
                 deadline={period.availability_deadline}
                 onRefresh={fetchAvailability}
               />

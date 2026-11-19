@@ -17,6 +17,7 @@ import { format, parseISO } from "date-fns"
 import { ptBR } from "date-fns/locale"
 import { supabase } from "@/lib/supabase/client"
 import { plural } from "@/lib/plural"
+import { periodLabel } from "@/lib/escalas/period-label"
 
 /** Hoje no fuso de Brasília (YYYY-MM-DD) */
 const todayBr = () => new Date(Date.now() - 3 * 3600 * 1000).toISOString().slice(0, 10)
@@ -44,6 +45,7 @@ interface PeriodData {
   id: string
   month: number
   year: number
+  end_date?: string | null
   ministry: { name: string; color: string }
   events: EventData[]
 }
@@ -59,6 +61,7 @@ interface OpenCollection {
   id: string
   month: number
   year: number
+  end_date?: string | null
   ministry: { name: string; color: string }
   availability_deadline: string | null
   late: boolean
@@ -352,11 +355,7 @@ export default function MinhaEscalaPage() {
                 <h2 className="text-sm font-semibold text-muted-foreground">Escala completa</h2>
                 {data.periods.map((period) => {
                   const isCollapsed = collapsedPeriods.has(period.id)
-                  const monthLabel = format(
-                    new Date(period.year, period.month - 1),
-                    "MMMM 'de' yyyy",
-                    { locale: ptBR }
-                  )
+                  const monthLabel = periodLabel(period)
                   const myEventsCount = period.events.filter((e) => e.isMyEvent).length
                   const dateGroups = groupByDate(period.events)
 
@@ -530,7 +529,7 @@ export default function MinhaEscalaPage() {
                             <p className="text-sm font-medium truncate">
                               {c.ministry.name} ·{" "}
                               <span className="inline-block first-letter:uppercase">
-                                {format(new Date(c.year, c.month - 1), "MMMM", { locale: ptBR })}
+                                {periodLabel(c, "short")}
                               </span>
                             </p>
                             <p className="text-xs text-muted-foreground">

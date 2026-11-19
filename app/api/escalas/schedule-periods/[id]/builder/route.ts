@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server"
 import { requireManagerOf } from "@/lib/escalas/auth"
 import { loadBlockoutsForServants } from "@/lib/escalas/availability"
 import { findPeriodConflicts } from "@/lib/escalas/conflicts"
+import { fetchAll } from "@/lib/supabase/fetch-all"
 
 /**
  * GET - Tudo o que a tela de montagem precisa, para admin ou líder do
@@ -25,7 +26,7 @@ export async function GET(
       .single()
     if (!period) return NextResponse.json({ error: "Período não encontrado" }, { status: 404 })
 
-    const [{ data: events }, { data: areas }, { data: allServants }, { data: availabilities }] = await Promise.all([
+    const [{ data: events }, { data: areas }, { data: allServants }, availabilitiesResult] = await Promise.all([
       supabase.from("schedule_events").select("*").eq("period_id", periodId).order("event_date").order("event_time"),
       supabase
         .from("areas")
@@ -38,7 +39,8 @@ export async function GET(
         .from("servants")
         .select("*, area:areas!servants_area_id_fkey(*), servant_areas(area_id, area:areas(id, ministry_id))")
         .eq("is_active", true),
-      supabase.from("servant_availability").select("*").eq("period_id", periodId),
+      // Períodos de vários meses passam do limite de 1.000 linhas por consulta
+      fetchAll(() => supabase.from("servant_availability").select("*").eq("period_id", periodId).order("id")),
     ])
 
     // Servos do ministério (área primária ou secundária)
@@ -49,10 +51,16 @@ export async function GET(
     )
 
     const eventIds = (events ?? []).map((e: { id: string }) => e.id)
-    const [{ data: assignments }, { data: declines }, conflicts, blockouts] = await Promise.all([
+    const [assignmentsResult, { data: declines }, conflicts, blockouts] = await Promise.all([
       eventIds.length
-        ? supabase.from("schedule_assignments").select("*, servant:servants(*), area:areas(*)").in("schedule_event_id", eventIds)
-        : Promise.resolve({ data: [] as any[] }),
+        ? fetchAll<any>(() =>
+            supabase
+              .from("schedule_assignments")
+              .select("*, servant:servants(*), area:areas(*)")
+              .in("schedule_event_id", eventIds)
+              .order("id")
+          )
+        : Promise.resolve({ data: [] as any[], error: null }),
       eventIds.length
         ? supabase
             .from("schedule_assignment_declines")
@@ -62,6 +70,15 @@ export async function GET(
       eventIds.length ? findPeriodConflicts(supabase, periodId) : Promise.resolve([]),
       loadBlockoutsForServants(supabase, servants, period.start_date, period.end_date),
     ])
+
+    // Sem a lista completa, a tela mostraria vagas e respostas faltando
+    const failed = [availabilitiesResult, assignmentsResult].find((r) => r.error)
+    if (failed) {
+      console.error("Erro ao carregar dados da montagem:", failed.error)
+      return NextResponse.json({ error: "Erro ao carregar os dados da escala" }, { status: 500 })
+    }
+    const availabilities = availabilitiesResult.data!
+    const assignments = assignmentsResult.data!
 
     const declineReasons: Record<string, string | null> = {}
     for (const d of (declines ?? []) as { assignment_id: string; reason: string | null }[]) {

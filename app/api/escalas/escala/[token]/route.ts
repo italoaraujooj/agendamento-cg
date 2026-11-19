@@ -19,7 +19,7 @@ export async function GET(
 
     const { data: period } = await supabase
       .from("schedule_periods")
-      .select("id, month, year, status, ministry:ministries(name, color)")
+      .select("id, month, year, end_date, status, ministry:ministries(name, color)")
       .eq("availability_token", token)
       .maybeSingle()
 
@@ -66,7 +66,7 @@ export async function GET(
 
     return NextResponse.json({
       servant: { id: servant.id, name: servant.name },
-      period: { id: period.id, month: period.month, year: period.year, ministry: period.ministry },
+      period: { id: period.id, month: period.month, year: period.year, end_date: period.end_date, ministry: period.ministry },
       assignments,
       calendar_token: signCalendarToken(servant.id),
     })

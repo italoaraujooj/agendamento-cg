@@ -18,8 +18,8 @@ import { Loader2 } from "lucide-react"
 import { toast } from "sonner"
 import { supabase } from "@/lib/supabase/client"
 import type { Ministry, SchedulePeriod } from "@/types/escalas"
-import { format, addDays } from "date-fns"
-import { ptBR } from "date-fns/locale"
+import { format } from "date-fns"
+import { MAX_PERIOD_MONTHS, periodLabel } from "@/lib/escalas/period-label"
 
 interface PeriodFormProps {
   period?: SchedulePeriod
@@ -43,6 +43,12 @@ const MONTHS = [
   { value: "12", label: "Dezembro" },
 ]
 
+/** Mês inicial + n meses, como { month, year }. */
+function addMonths(month: number, year: number, n: number) {
+  const idx = year * 12 + (month - 1) + n
+  return { month: (idx % 12) + 1, year: Math.floor(idx / 12) }
+}
+
 export function PeriodForm({ period, onSuccess, allowedMinistryIds }: PeriodFormProps) {
   const router = useRouter()
   const isEditing = !!period
@@ -64,6 +70,8 @@ export function PeriodForm({ period, onSuccess, allowedMinistryIds }: PeriodForm
     ministry_id: period?.ministry_id || "",
     month: period?.month?.toString() || defaultMonth.toString(),
     year: period?.year?.toString() || defaultYear.toString(),
+    // Quantos meses o período cobre a partir do inicial (1 = só o mês inicial)
+    month_count: "1",
     availability_deadline: period?.availability_deadline 
       ? format(new Date(period.availability_deadline), "yyyy-MM-dd'T'HH:mm")
       : format(defaultDeadlineDate, "yyyy-MM-dd'T'HH:mm"),
@@ -125,6 +133,7 @@ export function PeriodForm({ period, onSuccess, allowedMinistryIds }: PeriodForm
         ? `/api/escalas/schedule-periods/${period.id}`
         : "/api/escalas/schedule-periods"
       
+      const end = addMonths(parseInt(formData.month), parseInt(formData.year), parseInt(formData.month_count) - 1)
       const payload = isEditing 
         ? {
             availability_deadline: formData.availability_deadline 
@@ -136,6 +145,8 @@ export function PeriodForm({ period, onSuccess, allowedMinistryIds }: PeriodForm
             ministry_id: formData.ministry_id,
             month: parseInt(formData.month),
             year: parseInt(formData.year),
+            end_month: end.month,
+            end_year: end.year,
             availability_deadline: formData.availability_deadline 
               ? new Date(formData.availability_deadline).toISOString()
               : null,
@@ -170,7 +181,22 @@ export function PeriodForm({ period, onSuccess, allowedMinistryIds }: PeriodForm
   }
 
   const selectedMinistry = ministries.find(m => m.id === formData.ministry_id)
-  const monthName = MONTHS.find(m => m.value === formData.month)?.label
+  const summaryRange = {
+    month: parseInt(formData.month),
+    year: parseInt(formData.year),
+    end_date: (() => {
+      const end = addMonths(parseInt(formData.month), parseInt(formData.year), parseInt(formData.month_count) - 1)
+      return `${end.year}-${String(end.month).padStart(2, "0")}-01`
+    })(),
+  }
+  const monthCountOptions = Array.from({ length: MAX_PERIOD_MONTHS }, (_, i) => {
+    const end = addMonths(parseInt(formData.month), parseInt(formData.year), i)
+    const endName = MONTHS[end.month - 1].label
+    return {
+      value: String(i + 1),
+      label: i === 0 ? "1 mês (só o mês inicial)" : `${i + 1} meses (até ${endName} de ${end.year})`,
+    }
+  })
 
   return (
     <form onSubmit={handleSubmit}>
@@ -215,7 +241,7 @@ export function PeriodForm({ period, onSuccess, allowedMinistryIds }: PeriodForm
 
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <Label htmlFor="month">Mês *</Label>
+                  <Label htmlFor="month">Mês inicial *</Label>
                   <Select
                     value={formData.month}
                     onValueChange={(value) => setFormData({ ...formData, month: value })}
@@ -252,6 +278,29 @@ export function PeriodForm({ period, onSuccess, allowedMinistryIds }: PeriodForm
                   </Select>
                 </div>
               </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="month_count">Duração</Label>
+                <Select
+                  value={formData.month_count}
+                  onValueChange={(value) => setFormData({ ...formData, month_count: value })}
+                >
+                  <SelectTrigger id="month_count">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {monthCountOptions.map((opt) => (
+                      <SelectItem key={opt.value} value={opt.value}>
+                        {opt.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <p className="text-xs text-muted-foreground">
+                  Use mais de um mês para coletar a disponibilidade e montar a escala de uma vez
+                  (ex.: dezembro e janeiro)
+                </p>
+              </div>
             </>
           )}
 
@@ -265,7 +314,7 @@ export function PeriodForm({ period, onSuccess, allowedMinistryIds }: PeriodForm
                 <div>
                   <p className="font-medium">{period.ministry?.name}</p>
                   <p className="text-sm text-muted-foreground">
-                    {format(new Date(period.year, period.month - 1), "MMMM 'de' yyyy", { locale: ptBR })}
+                    <span className="first-letter:uppercase inline-block">{periodLabel(period)}</span>
                   </p>
                 </div>
               </div>
@@ -300,7 +349,7 @@ export function PeriodForm({ period, onSuccess, allowedMinistryIds }: PeriodForm
           {!isEditing && selectedMinistry && (
             <div className="p-4 rounded-lg bg-primary/5 border border-primary/20">
               <p className="text-sm">
-                <strong>Resumo:</strong> Criar escala de <strong>{monthName} de {formData.year}</strong> para o ministério{" "}
+                <strong>Resumo:</strong> Criar escala de <strong className="first-letter:uppercase inline-block">{periodLabel(summaryRange)}</strong> para o ministério{" "}
                 <strong>{selectedMinistry.name}</strong>
               </p>
             </div>

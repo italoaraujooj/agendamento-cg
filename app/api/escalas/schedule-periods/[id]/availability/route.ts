@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
 import { requireManagerOf } from "@/lib/escalas/auth"
+import { fetchAll } from "@/lib/supabase/fetch-all"
 
 // GET - Buscar respostas de disponibilidade do período
 export async function GET(
@@ -13,19 +14,23 @@ export async function GET(
     const { supabase } = auth
 
     // Buscar todas as respostas de disponibilidade do período com dados do servo e evento
-    const { data, error } = await supabase
-      .from("servant_availability")
-      .select(`
-        id,
-        servant_id,
-        event_id,
-        is_available,
-        notes,
-        submitted_at,
-        servant:servants(id, name, area:areas!servants_area_id_fkey(id, name))
-      `)
-      .eq("period_id", periodId)
-      .order("submitted_at", { ascending: false })
+    // Paginado: períodos de vários meses passam do limite de 1.000 linhas
+    const { data, error } = await fetchAll(() =>
+      supabase
+        .from("servant_availability")
+        .select(`
+          id,
+          servant_id,
+          event_id,
+          is_available,
+          notes,
+          submitted_at,
+          servant:servants(id, name, area:areas!servants_area_id_fkey(id, name))
+        `)
+        .eq("period_id", periodId)
+        .order("submitted_at", { ascending: false })
+        .order("id")
+    )
 
     if (error) {
       console.error("Erro ao buscar disponibilidades:", error)

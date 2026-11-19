@@ -63,7 +63,7 @@ export async function GET(request: NextRequest) {
   // Buscar períodos publicados dos ministérios, ordenado do mais recente
   const { data: periods } = await supabase
     .from("schedule_periods")
-    .select("id, month, year, ministry_id, published_at, ministry:ministries(name, color)")
+    .select("id, month, year, end_date, ministry_id, published_at, ministry:ministries(name, color)")
     .in("ministry_id", ministryIds)
     .eq("status", "published")
     .order("year", { ascending: false })
@@ -101,6 +101,7 @@ export async function GET(request: NextRequest) {
         id: period.id,
         month: period.month,
         year: period.year,
+        end_date: period.end_date,
         ministry: period.ministry,
         events: events.map((event) => ({
           id: event.id,

@@ -2,14 +2,26 @@ import { NextRequest, NextResponse } from "next/server"
 import { createAdminClient, createServerClient } from "@/lib/supabase/server"
 import { getEscalasCaller, requireMinistryManager } from "@/lib/escalas/auth"
 import { z } from "zod"
+import { MAX_PERIOD_MONTHS, monthRangeDates, monthSpan } from "@/lib/escalas/period-label"
 
-const schedulePeriodSchema = z.object({
-  ministry_id: z.string().uuid("Ministério inválido"),
-  month: z.number().int().min(1).max(12),
-  year: z.number().int().min(2024),
-  availability_deadline: z.string().datetime().optional().nullable(),
-  notes: z.string().max(1000).optional().nullable(),
-})
+const schedulePeriodSchema = z
+  .object({
+    ministry_id: z.string().uuid("Ministério inválido"),
+    month: z.number().int().min(1).max(12),
+    year: z.number().int().min(2024),
+    // Mês final (opcional): períodos de mais de um mês, ex. dezembro + janeiro
+    end_month: z.number().int().min(1).max(12).optional(),
+    end_year: z.number().int().min(2024).optional(),
+    availability_deadline: z.string().datetime().optional().nullable(),
+    notes: z.string().max(1000).optional().nullable(),
+  })
+  .refine(
+    (d) => {
+      const span = monthSpan(d.month, d.year, d.end_month ?? d.month, d.end_year ?? d.year)
+      return span >= 1 && span <= MAX_PERIOD_MONTHS
+    },
+    { message: `O mês final deve ser igual ou até ${MAX_PERIOD_MONTHS - 1} meses depois do inicial` }
+  )
 
 // GET - Listar períodos de escala
 export async function GET(request: NextRequest) {
@@ -73,20 +85,24 @@ export async function POST(request: NextRequest) {
 
     if (!validationResult.success) {
       return NextResponse.json(
-        { error: "Dados inválidos", details: validationResult.error.errors },
+        {
+          error: validationResult.error.errors[0]?.message || "Dados inválidos",
+          details: validationResult.error.errors,
+        },
         { status: 400 }
       )
     }
 
     const { ministry_id, month, year, availability_deadline, notes } = validationResult.data
+    const endMonth = validationResult.data.end_month ?? month
+    const endYear = validationResult.data.end_year ?? year
 
     const auth = await requireMinistryManager(ministry_id)
     if (!auth.ok) return auth.response
     const { supabase } = auth
 
-    // Calcular datas de início e fim do período
-    const startDate = new Date(year, month - 1, 1)
-    const endDate = new Date(year, month, 0) // Último dia do mês
+    // Do 1º dia do mês inicial ao último dia do mês final
+    const { start_date: startDateStr, end_date: endDateStr } = monthRangeDates(month, year, endMonth, endYear)
 
     const { data, error } = await supabase
       .from("schedule_periods")
@@ -94,8 +110,8 @@ export async function POST(request: NextRequest) {
         ministry_id,
         month,
         year,
-        start_date: startDate.toISOString().split("T")[0],
-        end_date: endDate.toISOString().split("T")[0],
+        start_date: startDateStr,
+        end_date: endDateStr,
         availability_deadline: availability_deadline || null,
         notes: notes || null,
         status: "draft",
@@ -108,9 +124,10 @@ export async function POST(request: NextRequest) {
 
     if (error) {
       console.error("Erro ao criar período:", error)
-      if (error.code === "23505") {
+      // 23505: unique antigo; 23P01: períodos do ministério se sobrepondo
+      if (error.code === "23505" || error.code === "23P01") {
         return NextResponse.json(
-          { error: "Já existe um período para este mês/ano neste ministério" },
+          { error: "Já existe um período deste ministério cobrindo algum desses meses" },
           { status: 409 }
         )
       }
@@ -129,9 +146,6 @@ export async function POST(request: NextRequest) {
 
     // Auto-importar agendamentos aprovados do Salão Principal que solicitaram apoio deste ministério
     try {
-      const startDateStr = startDate.toISOString().split("T")[0]
-      const endDateStr = endDate.toISOString().split("T")[0]
-
       // Buscar o ID do Salão Principal
       const { data: salaoEnv } = await supabase
         .from("environments")

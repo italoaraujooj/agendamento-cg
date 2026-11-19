@@ -2,6 +2,7 @@ import type { SupabaseClient } from "@supabase/supabase-js"
 import { format } from "date-fns"
 import { ptBR } from "date-fns/locale"
 import { signAvailabilityToken } from "@/lib/escalas/availability-token"
+import { periodLabel, type PeriodRange } from "@/lib/escalas/period-label"
 import { sendPushBatch, sendPushToEmails } from "@/lib/push"
 import {
   APP_URL,
@@ -29,6 +30,8 @@ export interface OpenPeriod {
   id: string
   month: number
   year: number
+  start_date: string
+  end_date: string
   status: string
   availability_deadline: string | null
   ministry: { id: string; name: string; color: string } | null
@@ -59,7 +62,7 @@ export async function findOpenPeriodByToken(
 ): Promise<PeriodLookup> {
   const { data: period, error } = await supabase
     .from("schedule_periods")
-    .select("id, month, year, status, availability_deadline, ministry:ministries(id, name, color)")
+    .select("id, month, year, start_date, end_date, status, availability_deadline, ministry:ministries(id, name, color)")
     .eq("availability_token", token)
     .maybeSingle()
 
@@ -175,8 +178,8 @@ export function personalAvailabilityLink(periodToken: string, servantId: string,
   return `${APP_URL}/disponibilidade/${periodToken}?s=${servantId}&k=${k}`
 }
 
-export const monthLabel = (month: number, year: number) =>
-  format(new Date(year, month - 1), "MMMM 'de' yyyy", { locale: ptBR })
+/** Nome do período, ex. "dezembro de 2026" ou "dezembro de 2026 a janeiro de 2027". */
+export const monthLabel = (period: PeriodRange) => periodLabel(period)
 
 export const deadlineLabel = (deadline: string | null) =>
   deadline
@@ -194,7 +197,7 @@ export async function sendAvailabilityInvites(
 ): Promise<{ sent: number; failed: number; withoutEmail: string[]; recipients: number }> {
   const { data: period } = await supabase
     .from("schedule_periods")
-    .select("id, month, year, availability_deadline, availability_token, ministry:ministries(id, name)")
+    .select("id, month, year, end_date, availability_deadline, availability_token, ministry:ministries(id, name)")
     .eq("id", periodId)
     .single()
 
@@ -213,7 +216,7 @@ export async function sendAvailabilityInvites(
   }
 
   const withoutEmail = servants.filter((s) => !s.email).map((s) => s.name)
-  const month = monthLabel(period.month, period.year)
+  const month = monthLabel(period)
   const deadline = deadlineLabel(period.availability_deadline)
   const withEmail = servants.filter((s) => s.email)
   const messages: EmailMessage[] = withEmail.map((s) => {
@@ -326,7 +329,7 @@ export async function notifyLateAvailabilityChange(
 
   const { data: period } = await supabase
     .from("schedule_periods")
-    .select("id, month, year, ministry:ministries(id, name)")
+    .select("id, month, year, end_date, ministry:ministries(id, name)")
     .eq("id", params.periodId)
     .single()
   const ministry = period?.ministry as unknown as { id: string; name: string } | null
@@ -352,7 +355,7 @@ export async function notifyLateAvailabilityChange(
   const { subject, html } = lateAvailabilityChangeEmail({
     servantName: params.servantName,
     ministryName: ministry.name,
-    monthLabel: monthLabel(period.month, period.year),
+    monthLabel: monthLabel(period),
     changes,
     link: `${APP_URL}/admin-escalas/montar/${period.id}`,
   })

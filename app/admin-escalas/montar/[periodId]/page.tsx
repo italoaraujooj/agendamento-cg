@@ -41,6 +41,7 @@ import { PERIOD_STATUS_LABELS } from "@/types/escalas"
 import { format } from "date-fns"
 import { ptBR } from "date-fns/locale"
 import { plural } from "@/lib/plural"
+import { periodLabel } from "@/lib/escalas/period-label"
 
 interface PeriodWithDetails extends SchedulePeriod {
   ministry: Ministry
@@ -210,7 +211,7 @@ export default function MontarEscalaPage() {
             <div>
               <h1 className="text-2xl font-bold">Montar Escala</h1>
               <p className="text-muted-foreground">
-                {period.ministry?.name} - {format(new Date(period.year, period.month - 1), "MMMM 'de' yyyy", { locale: ptBR })}
+                {period.ministry?.name} - {periodLabel(period)}
               </p>
             </div>
           </div>
@@ -253,7 +254,7 @@ export default function MontarEscalaPage() {
       ) : (
         <ScheduleBuilder
           periodId={periodId}
-          periodLabel={`${period.ministry?.name} · ${format(new Date(period.year, period.month - 1), "MMMM 'de' yyyy", { locale: ptBR })}`}
+          periodLabel={`${period.ministry?.name} · ${periodLabel(period)}`}
           availabilityDeadline={period.availability_deadline}
           conflicts={conflicts}
           blockouts={blockouts}

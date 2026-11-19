@@ -13,6 +13,7 @@ import { ptBR } from "date-fns/locale"
 import { toast } from "sonner"
 import type { Ministry } from "@/types/escalas"
 import { blockoutFor, type Blockout } from "@/lib/escalas/blockouts"
+import { periodLabel } from "@/lib/escalas/period-label"
 
 export interface AvailabilityEvent {
   id: string
@@ -38,6 +39,7 @@ interface AvailabilityFormProps {
     id: string
     month: number
     year: number
+    end_date?: string | null
     availability_deadline: string | null
     ministry: Pick<Ministry, 'id' | 'name' | 'color'> | null
     /** Prazo encerrado ou escala em montagem: resposta é aceita, mas avisa o líder */
@@ -316,7 +318,7 @@ export function AvailabilityForm({ periodToken, period, events, initialIdentity 
             </div>
             <CardTitle>Disponibilidade - {period.ministry?.name}</CardTitle>
             <CardDescription>
-              {format(new Date(period.year, period.month - 1), "MMMM 'de' yyyy", { locale: ptBR })}
+              {periodLabel(period)}
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -394,7 +396,7 @@ export function AvailabilityForm({ periodToken, period, events, initialIdentity 
             <div className="min-w-0">
               <h2 className="text-xl font-bold">{identity?.servant.name}</h2>
               <p className="text-sm text-muted-foreground">
-                {period.ministry?.name} - {format(new Date(period.year, period.month - 1), "MMMM 'de' yyyy", { locale: ptBR })}
+                {period.ministry?.name} - {periodLabel(period)}
               </p>
               <button
                 type="button"

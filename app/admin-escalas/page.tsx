@@ -24,6 +24,7 @@ import type { SchedulePeriod, Ministry } from "@/types/escalas"
 import { PERIOD_STATUS_LABELS, PERIOD_STATUS_COLORS } from "@/types/escalas"
 import { format } from "date-fns"
 import { ptBR } from "date-fns/locale"
+import { periodLabel } from "@/lib/escalas/period-label"
 
 interface PeriodWithMinistry extends SchedulePeriod {
   ministry: Ministry
@@ -204,7 +205,7 @@ export default function AdminEscalasPage() {
                       />
                       <div>
                         <h3 className="font-semibold">
-                          {format(new Date(period.year, period.month - 1), "MMMM 'de' yyyy", { locale: ptBR })}
+                          {periodLabel(period)}
                         </h3>
                         <p className="text-sm text-muted-foreground">
                           {period.ministry?.name}

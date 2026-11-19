@@ -27,18 +27,16 @@ async function identifiedPayload(
   period: OpenPeriod,
   servant: MinistryServant
 ) {
-  const monthStart = `${period.year}-${String(period.month).padStart(2, "0")}-01`
-  const monthEnd = new Date(Date.UTC(period.year, period.month, 0)).toISOString().slice(0, 10)
   const [saved, blockouts] = await Promise.all([
     loadSavedAnswers(supabase, period.id, servant.id),
-    loadBlockoutsForServants(supabase, [servant], monthStart, monthEnd),
+    loadBlockoutsForServants(supabase, [servant], period.start_date, period.end_date),
   ])
   return {
     servant: { id: servant.id, name: servant.name },
     access_token: signAvailabilityToken(servant.id, period.id),
     answers: saved.answers,
     submitted_at: saved.submitted_at,
-    // Datas bloqueadas da pessoa neste mês: o formulário já marca "Não posso"
+    // Datas bloqueadas da pessoa neste período: o formulário já marca "Não posso"
     blockouts: blockouts[servant.id] ?? [],
   }
 }
@@ -86,6 +84,8 @@ export async function GET(
         id: period.id,
         month: period.month,
         year: period.year,
+        start_date: period.start_date,
+        end_date: period.end_date,
         availability_deadline: period.availability_deadline,
         ministry: period.ministry,
         late,
