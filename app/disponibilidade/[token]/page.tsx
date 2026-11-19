@@ -13,11 +13,13 @@ import {
 import Link from "next/link"
 import { format } from "date-fns"
 import { ptBR } from "date-fns/locale"
+import { periodLabel } from "@/lib/escalas/period-label"
 
 interface PeriodData {
   id: string
   month: number
   year: number
+  end_date?: string | null
   availability_deadline: string | null
   ministry: {
     id: string
@@ -122,7 +124,7 @@ export default function DisponibilidadePage() {
                 Disponibilidade - {data.period.ministry?.name}
               </h1>
               <p className="text-sm text-muted-foreground">
-                {format(new Date(data.period.year, data.period.month - 1), "MMMM 'de' yyyy", { locale: ptBR })}
+                {periodLabel(data.period)}
               </p>
             </div>
           </div>

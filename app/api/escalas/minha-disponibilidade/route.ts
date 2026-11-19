@@ -44,7 +44,7 @@ export async function GET() {
 
     const { data: periods } = await supabase
       .from("schedule_periods")
-      .select("id, month, year, status, availability_deadline, availability_token, ministry:ministries(id, name, color)")
+      .select("id, month, year, end_date, status, availability_deadline, availability_token, ministry:ministries(id, name, color)")
       .in("ministry_id", Array.from(ministryIds))
       .in("status", ["collecting", "scheduling"])
       .order("year")
@@ -72,6 +72,7 @@ export async function GET() {
         id: period.id,
         month: period.month,
         year: period.year,
+        end_date: period.end_date,
         status: period.status,
         ministry: period.ministry,
         availability_deadline: period.availability_deadline,

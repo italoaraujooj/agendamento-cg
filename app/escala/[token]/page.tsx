@@ -12,10 +12,11 @@ import { AssignmentResponse } from "@/components/escalas/assignment-response"
 import { CalendarSubscribe } from "@/components/escalas/calendar-subscribe"
 import { PushOptIn } from "@/components/pwa/push-opt-in"
 import type { AssignmentStatus } from "@/types/escalas"
+import { periodLabel } from "@/lib/escalas/period-label"
 
 interface PersonalSchedule {
   servant: { id: string; name: string }
-  period: { id: string; month: number; year: number; ministry: { name: string; color: string } | null }
+  period: { id: string; month: number; year: number; end_date?: string | null; ministry: { name: string; color: string } | null }
   assignments: {
     id: string
     status: AssignmentStatus
@@ -87,7 +88,7 @@ export default function EscalaPessoalPage() {
     )
   }
 
-  const monthLabel = format(new Date(data.period.year, data.period.month - 1), "MMMM 'de' yyyy", { locale: ptBR })
+  const monthLabel = periodLabel(data.period)
   const pending = data.assignments.filter((a) => a.status === "pending").length
 
   return (

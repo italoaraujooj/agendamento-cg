@@ -6,6 +6,10 @@ import { isDateBlocked } from "@/lib/escalas/blockouts"
 /**
  * GET - Propõe copiar a escala do mês anterior do mesmo ministério.
  *
+ * O mês copiado é o último mês do período anterior (que pode ter mais de um
+ * mês). Se o período atual cobre vários meses, a escala copiada é proposta
+ * em cada um deles.
+ *
  * Os eventos são pareados por "Nª ocorrência do dia da semana + horário"
  * (ex.: 1º domingo 19:00), a mesma lógica do calendário regular. Só propõe:
  * quem está inativo, saiu da área, marcou indisponível no mês atual ou já
@@ -37,19 +41,19 @@ export async function GET(
 
     const { data: period } = await supabase
       .from("schedule_periods")
-      .select("id, ministry_id, month, year")
+      .select("id, ministry_id, start_date")
       .eq("id", periodId)
       .single()
     if (!period) return NextResponse.json({ error: "Período não encontrado" }, { status: 404 })
 
-    const prevMonth = period.month === 1 ? 12 : period.month - 1
-    const prevYear = period.month === 1 ? period.year - 1 : period.year
+    // Período imediatamente anterior: termina na véspera do início deste
+    const dayBefore = new Date(`${period.start_date}T12:00:00Z`)
+    dayBefore.setUTCDate(dayBefore.getUTCDate() - 1)
     const { data: previous } = await supabase
       .from("schedule_periods")
-      .select("id, month, year")
+      .select("id, end_date")
       .eq("ministry_id", period.ministry_id)
-      .eq("month", prevMonth)
-      .eq("year", prevYear)
+      .eq("end_date", dayBefore.toISOString().slice(0, 10))
       .maybeSingle()
 
     if (!previous) {
@@ -57,20 +61,31 @@ export async function GET(
     }
 
     const [{ data: prevEvents }, { data: curEvents }, servants, { data: availability }] = await Promise.all([
-      supabase.from("schedule_events").select("id, event_date, event_time, title").eq("period_id", previous.id),
+      // Só o último mês do período anterior
+      supabase
+        .from("schedule_events")
+        .select("id, event_date, event_time, title")
+        .eq("period_id", previous.id)
+        .gte("event_date", `${previous.end_date.slice(0, 7)}-01`),
       supabase.from("schedule_events").select("id, event_date, event_time, title").eq("period_id", periodId),
       findMinistryServants(supabase, period.ministry_id),
       supabase.from("servant_availability").select("servant_id, event_id, is_available").eq("period_id", periodId),
     ])
 
-    const curBySlot = new Map<string, EventRow>()
+    // Um evento por slot em cada mês do período atual
+    const curBySlot = new Map<string, EventRow[]>()
+    const seen = new Set<string>()
     for (const e of (curEvents ?? []) as EventRow[]) {
-      if (!curBySlot.has(slotKey(e))) curBySlot.set(slotKey(e), e)
+      const key = slotKey(e)
+      const perMonth = `${e.event_date.slice(0, 7)}|${key}`
+      if (seen.has(perMonth)) continue
+      seen.add(perMonth)
+      curBySlot.set(key, [...(curBySlot.get(key) ?? []), e])
     }
-    const prevToCur = new Map<string, EventRow>()
+    const prevToCur = new Map<string, EventRow[]>()
     for (const e of (prevEvents ?? []) as EventRow[]) {
-      const match = curBySlot.get(slotKey(e))
-      if (match) prevToCur.set(e.id, match)
+      const matches = curBySlot.get(slotKey(e))
+      if (matches) prevToCur.set(e.id, matches)
     }
 
     const prevEventIds = (prevEvents ?? []).map((e: EventRow) => e.id)
@@ -110,23 +125,29 @@ export async function GET(
 
     for (const a of (prevAssignments ?? []) as any[]) {
       if (a.status === "declined") continue
-      const cur = prevToCur.get(a.schedule_event_id)
-      if (!cur) { skipped.unmatchedEvent++; continue }
+      const matches = prevToCur.get(a.schedule_event_id)
+      if (!matches) { skipped.unmatchedEvent++; continue }
       if (!active.has(a.servant_id) || !inArea.has(`${a.servant_id}-${a.area_id}`)) { skipped.inactiveOrLeftArea++; continue }
-      if (unavailable.has(`${a.servant_id}-${cur.id}`)) { skipped.unavailable++; continue }
-      if (taken.has(`${a.servant_id}-${cur.id}`)) { skipped.alreadyAssigned++; continue }
-      taken.add(`${a.servant_id}-${cur.id}`)
-      proposals.push({
-        event_id: cur.id,
-        area_id: a.area_id,
-        servant_id: a.servant_id,
-        notes: responded.has(a.servant_id) ? [] : ["não respondeu a disponibilidade"],
-      })
+      for (const cur of matches) {
+        if (unavailable.has(`${a.servant_id}-${cur.id}`)) { skipped.unavailable++; continue }
+        if (taken.has(`${a.servant_id}-${cur.id}`)) { skipped.alreadyAssigned++; continue }
+        taken.add(`${a.servant_id}-${cur.id}`)
+        proposals.push({
+          event_id: cur.id,
+          area_id: a.area_id,
+          servant_id: a.servant_id,
+          notes: responded.has(a.servant_id) ? [] : ["não respondeu a disponibilidade"],
+        })
+      }
     }
 
     return NextResponse.json({
-      previous: { month: previous.month, year: previous.year },
-      matchedEvents: new Set([...prevToCur.values()].map((e) => e.id)).size,
+      // Mês de onde a escala foi copiada (último mês do período anterior)
+      previous: {
+        month: Number(previous.end_date.slice(5, 7)),
+        year: Number(previous.end_date.slice(0, 4)),
+      },
+      matchedEvents: new Set([...prevToCur.values()].flat().map((e) => e.id)).size,
       proposals,
       skipped,
     })

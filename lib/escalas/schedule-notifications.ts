@@ -51,7 +51,7 @@ export async function notifyPublishedChanges(
 
   const { data: period } = await supabase
     .from("schedule_periods")
-    .select("id, month, year, availability_token, ministry:ministries(name)")
+    .select("id, month, year, end_date, availability_token, ministry:ministries(name)")
     .eq("id", periodId)
     .single()
   if (!period) return empty
@@ -104,7 +104,7 @@ export async function notifyPublishedChanges(
   const withoutEmail: string[] = []
   const messages: EmailMessage[] = []
   const pushes: { email: string; payload: PushPayload }[] = []
-  const month = monthLabel(period.month, period.year)
+  const month = monthLabel(period)
   for (const [servantId, change] of byServant) {
     if (!change.email) {
       withoutEmail.push(change.name)
