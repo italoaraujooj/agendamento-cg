@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react"
 import QRCode from "qrcode"
-import { CalendarDays, Check, Clock, Copy, MapPin, PartyPopper, Ticket } from "lucide-react"
+import { ArrowUpRight, CalendarDays, Check, Clock, Copy, MapPin, PartyPopper, Ticket } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { toast } from "sonner"
 
@@ -14,6 +14,7 @@ export interface EventInfo {
   date: string | null
   time: string | null
   location: string | null
+  mapUrl?: string | null
   deadline: string | null
 }
 
@@ -33,9 +34,13 @@ export function EventHeader({ event, price }: { event: EventInfo; price?: number
   const chips = [
     date && { icon: CalendarDays, text: date.charAt(0).toUpperCase() + date.slice(1) },
     event.time && { icon: Clock, text: event.time },
-    event.location && { icon: MapPin, text: event.location },
+    (event.location || event.mapUrl) && {
+      icon: MapPin,
+      text: event.location || "Ver localização",
+      href: event.mapUrl || undefined,
+    },
     price !== undefined && { icon: Ticket, text: `${brl(price)} por pessoa` },
-  ].filter(Boolean) as { icon: React.ComponentType<{ className?: string }>; text: string }[]
+  ].filter(Boolean) as { icon: React.ComponentType<{ className?: string }>; text: string; href?: string }[]
 
   return (
     <header className="relative overflow-hidden rounded-xl border bg-card px-6 py-8 text-center shadow-sm md:px-10">
@@ -53,15 +58,31 @@ export function EventHeader({ event, price }: { event: EventInfo; price?: number
         </div>
         {chips.length > 0 && (
           <ul className="flex flex-wrap justify-center gap-2">
-            {chips.map(({ icon: Icon, text }) => (
-              <li
-                key={text}
-                className="flex items-center gap-1.5 rounded-full border bg-muted/40 px-3 py-1 text-sm text-foreground/80"
-              >
-                <Icon className="h-3.5 w-3.5 text-primary" />
-                {text}
-              </li>
-            ))}
+            {chips.map(({ icon: Icon, text, href }) => {
+              const chip = "flex items-center gap-1.5 rounded-full border bg-muted/40 px-3 py-1 text-sm text-foreground/80"
+              return (
+                <li key={text}>
+                  {href ? (
+                    <a
+                      href={href}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      title="Abrir no Google Maps"
+                      className={`${chip} transition-colors hover:border-primary/40 hover:bg-primary/5 hover:text-foreground`}
+                    >
+                      <Icon className="h-3.5 w-3.5 text-primary" />
+                      <span className="underline decoration-primary/40 underline-offset-4">{text}</span>
+                      <ArrowUpRight className="h-3.5 w-3.5 text-muted-foreground" />
+                    </a>
+                  ) : (
+                    <span className={chip}>
+                      <Icon className="h-3.5 w-3.5 text-primary" />
+                      {text}
+                    </span>
+                  )}
+                </li>
+              )
+            })}
           </ul>
         )}
       </div>

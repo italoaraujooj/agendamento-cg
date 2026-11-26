@@ -28,7 +28,11 @@ export function eventInfo() {
     /** AAAA-MM-DD */
     date: process.env.CONFRA_EVENTO_DATA || null,
     time: process.env.CONFRA_EVENTO_HORARIO || null,
-    location: process.env.CONFRA_EVENTO_LOCAL || null,
+    location: process.env.CONFRA_EVENTO_LOCAL || "Vila Forró",
+    /** Link do local no Google Maps */
+    mapUrl:
+      process.env.CONFRA_EVENTO_MAPA ||
+      "https://www.google.com/maps/place/Vila+Forr%C3%B3/@-7.2030206,-35.8756696,3919m/data=!3m1!1e3!4m6!3m5!1s0x7ac1e5cd87fc26b:0x4184729b56c162f9!8m2!3d-7.1807429!4d-35.875771!16s%2Fg%2F1thd1_zb",
     /** AAAA-MM-DD: último dia de inscrição (inclusive, horário de Brasília) */
     deadline: process.env.CONFRA_INSCRICOES_ATE || null,
   }
