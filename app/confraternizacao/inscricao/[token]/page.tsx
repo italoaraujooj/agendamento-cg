@@ -7,7 +7,7 @@ import { AlertCircle, Baby, CheckCircle2, Clock, HandHeart, Loader2, XCircle } f
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
-import { EventHeader, PixPayment, brl, type EventInfo } from "@/components/confraternizacao/shared"
+import { EventHeader, PixPayment, ReceiptWhatsAppCard, brl, type EventInfo } from "@/components/confraternizacao/shared"
 
 interface RegistrationData {
   event: EventInfo
@@ -110,6 +110,12 @@ export default function InscricaoStatusPage() {
             </div>
           </CardContent>
         </Card>
+      )}
+
+      {reg.status === "pending_payment" && (
+        <ReceiptWhatsAppCard
+          message={`Olá! Segue o comprovante do PIX de ${brl(reg.total_expected)} da inscrição de ${reg.contact_name} na confraternização.`}
+        />
       )}
 
       <Card>
