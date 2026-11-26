@@ -32,9 +32,11 @@ import {
   ClipboardList,
   UserCog,
   Megaphone,
+  PartyPopper,
 } from "lucide-react"
 import { ExternalRentalsManager } from "@/components/admin/external-rentals"
 import { AnnouncementsManager } from "@/components/admin/announcements-manager"
+import { ConfraternizacaoManager } from "@/components/admin/confraternizacao-manager"
 import { supabase } from "@/lib/supabase/client"
 import { toast } from "sonner"
 import Link from "next/link"
@@ -138,7 +140,12 @@ export default function AdminPage() {
       return
     }
     if (!adminChecked) return
-    const canEnterAdmin = isAdmin || hasPermission('approve_bookings') || hasPermission('manage_external_rentals')
+    const canEnterAdmin =
+      isAdmin ||
+      hasPermission('approve_bookings') ||
+      hasPermission('manage_external_rentals') ||
+      hasPermission('manage_avisos') ||
+      hasPermission('manage_confraternizacao')
     if (!canEnterAdmin) {
       toast.error('Acesso negado. Você não tem permissão para acessar o painel.')
       router.push('/')
@@ -150,7 +157,11 @@ export default function AdminPage() {
     if (!adminChecked) return
 
     const canFetchBookings = isAdmin || hasPermission('approve_bookings')
-    const canEnterAdmin = canFetchBookings || hasPermission('manage_external_rentals')
+    const canEnterAdmin =
+      canFetchBookings ||
+      hasPermission('manage_external_rentals') ||
+      hasPermission('manage_avisos') ||
+      hasPermission('manage_confraternizacao')
     if (!canEnterAdmin) return
 
     const fetchData = async () => {
@@ -790,8 +801,9 @@ export default function AdminPage() {
   const canSeeBookings = isAdmin || hasPermission('approve_bookings')
   const canSeeRentals = isAdmin || hasPermission('manage_external_rentals')
   const canSeeAvisos = isAdmin || hasPermission('manage_avisos')
+  const canSeeConfra = isAdmin || hasPermission('manage_confraternizacao')
   const canSeeUsers = isAdmin
-  const canEnterAdmin = canSeeBookings || canSeeRentals || canSeeAvisos
+  const canEnterAdmin = canSeeBookings || canSeeRentals || canSeeAvisos || canSeeConfra
 
   // Loading state - aguardar auth e verificação de permissões
   if (authLoading || loading || (isAuthenticated && !adminChecked)) {
@@ -831,7 +843,7 @@ export default function AdminPage() {
 
       <div className="container mx-auto px-4 py-6">
         {/* Tabs Principais no Subheader */}
-        <Tabs defaultValue={canSeeBookings ? 'bookings' : canSeeRentals ? 'rentals' : canSeeAvisos ? 'avisos' : 'users'} className="w-full">
+        <Tabs defaultValue={canSeeBookings ? 'bookings' : canSeeRentals ? 'rentals' : canSeeAvisos ? 'avisos' : canSeeConfra ? 'confra' : 'users'} className="w-full">
           <TabsList className="flex w-full mb-6 h-auto justify-start overflow-x-auto">
             {canSeeBookings && (
               <TabsTrigger value="bookings" className="flex flex-1 items-center gap-2 text-sm md:text-base py-3">
@@ -852,6 +864,13 @@ export default function AdminPage() {
                 <Megaphone className="h-4 w-4 md:h-5 md:w-5" />
                 <span className="hidden sm:inline">Avisos no Culto</span>
                 <span className="sm:hidden">Avisos</span>
+              </TabsTrigger>
+            )}
+            {canSeeConfra && (
+              <TabsTrigger value="confra" className="flex flex-1 items-center gap-2 text-sm md:text-base py-3">
+                <PartyPopper className="h-4 w-4 md:h-5 md:w-5" />
+                <span className="hidden sm:inline">Confraternização</span>
+                <span className="sm:hidden">Confra</span>
               </TabsTrigger>
             )}
             {canSeeUsers && (
@@ -1088,6 +1107,13 @@ export default function AdminPage() {
           {canSeeAvisos && (
             <TabsContent value="avisos">
               <AnnouncementsManager />
+            </TabsContent>
+          )}
+
+          {/* Conteúdo da Confraternização de fim de ano */}
+          {canSeeConfra && (
+            <TabsContent value="confra">
+              <ConfraternizacaoManager />
             </TabsContent>
           )}
 

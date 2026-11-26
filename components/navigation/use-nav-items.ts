@@ -44,7 +44,7 @@ export function useNavItems() {
   // Admin de agendamentos: qualquer permissão de gestão
   const canSeeAgendamentosAdmin =
     isAuthenticated &&
-    (isAdmin || hasPermission("approve_bookings") || hasPermission("manage_external_rentals") || hasPermission("manage_avisos"))
+    (isAdmin || hasPermission("approve_bookings") || hasPermission("manage_external_rentals") || hasPermission("manage_avisos") || hasPermission("manage_confraternizacao"))
   // Admin ou líder de algum ministério (as telas e APIs limitam aos ministérios que ele gerencia)
   const canSeeEscalasAdmin = isAuthenticated && (isAdmin || ministryRoles.length > 0)
 

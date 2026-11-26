@@ -137,6 +137,7 @@ const PERMISSIONS = [
   { key: "manage_external_rentals", label: "Gerenciar locações externas", description: "Acesso ao módulo de locações, pagamentos e custos" },
   { key: "access_escalas", label: "Acesso ao módulo de Escalas", description: "Pode acessar /escalas e visualizar ministérios" },
   { key: "manage_avisos", label: "Gerenciar Avisos", description: "Pode aprovar/rejeitar avisos e ver a listagem de avisos programados" },
+  { key: "manage_confraternizacao", label: "Confraternização", description: "Gerencia as inscrições da confraternização e confirma pagamentos" },
 ] as const
 
 const PERMISSIONS_BY_MODULE = [
@@ -162,6 +163,13 @@ const PERMISSIONS_BY_MODULE = [
       { key: "manage_avisos", label: "Gerenciar avisos", description: "Pode aprovar/rejeitar avisos e ver a listagem de avisos programados" },
     ],
   },
+  {
+    module: "Confraternização",
+    description: "Inscrições da confraternização de fim de ano",
+    permissions: [
+      { key: "manage_confraternizacao", label: "Gerenciar inscrições", description: "Vê os inscritos, confirma pagamentos e exporta a lista" },
+    ],
+  },
 ] as const
 
 const PERMISSION_LABELS: Record<string, string> = {
@@ -169,6 +177,7 @@ const PERMISSION_LABELS: Record<string, string> = {
   manage_external_rentals: "Locações externas",
   access_escalas: "Escalas",
   manage_avisos: "Avisos",
+  manage_confraternizacao: "Confraternização",
 }
 
 const ROLE_CONFIG = {
