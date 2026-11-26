@@ -5,6 +5,7 @@ import {
   MAX_DONATION,
   MAX_PARTICIPANTS,
   PRICE_PER_PERSON,
+  eventInfo,
   isFreeAge,
   registrationsOpen,
 } from "@/lib/confraternizacao/config"
@@ -44,7 +45,7 @@ const schema = z.object({
 // POST - Nova inscrição (público, sem login)
 export async function POST(request: NextRequest) {
   try {
-    if (!registrationsOpen()) {
+    if (!registrationsOpen(await eventInfo())) {
       return NextResponse.json({ error: "As inscrições estão encerradas" }, { status: 410 })
     }
 

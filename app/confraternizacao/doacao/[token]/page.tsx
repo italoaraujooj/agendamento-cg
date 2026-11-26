@@ -98,7 +98,7 @@ export default function DoacaoStatusPage() {
             )}
             <p className="rounded-lg bg-muted/50 p-4 text-sm text-muted-foreground">
               Faça o PIX com o valor exato, da conta com o nome que você informou. A confirmação é automática e pode
-              levar algumas horas.
+              levar até um dia.
             </p>
           </CardContent>
         </Card>

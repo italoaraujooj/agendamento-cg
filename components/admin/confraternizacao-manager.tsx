@@ -39,6 +39,7 @@ import {
 } from "@/components/ui/alert-dialog"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { maskPhone } from "@/lib/masks"
+import { ConfraternizacaoEvento, type EventSettings } from "./confraternizacao-evento"
 
 type Status = "pending_payment" | "paid" | "sponsored" | "cancelled"
 
@@ -61,7 +62,7 @@ interface Registration {
 }
 
 interface AdminData {
-  event: { title: string; date: string | null }
+  event: EventSettings
   price: number
   pluggy_configured: boolean
   pix_configured: boolean
@@ -322,6 +323,8 @@ export function ConfraternizacaoManager() {
           </div>
         </div>
       )}
+
+      <ConfraternizacaoEvento event={data.event} onSaved={load} />
 
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
         <Stat icon={Users} label="Participantes" value={s.participants} hint={`${s.registrations} inscrições`} />

@@ -105,7 +105,7 @@ export default function InscricaoStatusPage() {
                 É assim que reconhecemos o seu pagamento.
               </p>
               <p className="text-muted-foreground">
-                A confirmação é automática, mas pode levar algumas horas. Guarde este link para acompanhar.
+                A confirmação é automática, mas pode levar até um dia. Guarde este link para acompanhar.
               </p>
             </div>
           </CardContent>

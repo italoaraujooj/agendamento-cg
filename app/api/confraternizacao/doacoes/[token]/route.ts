@@ -33,7 +33,7 @@ export async function GET(_request: NextRequest, { params }: { params: Promise<{
       : null
 
   return NextResponse.json({
-    event: eventInfo(),
+    event: await eventInfo(),
     price: PRICE_PER_PERSON,
     donation: { amount, status: don.status, paid_at: don.paid_at, created_at: don.created_at },
     pix,

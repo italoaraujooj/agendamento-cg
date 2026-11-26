@@ -26,9 +26,10 @@ export async function GET() {
     console.error("Confraternização: erro no resumo de doações:", err)
   }
 
+  const event = await eventInfo()
   return NextResponse.json({
-    event: eventInfo(),
-    open: registrationsOpen(),
+    event,
+    open: registrationsOpen(event),
     price: PRICE_PER_PERSON,
     free_max_age: FREE_MAX_AGE,
     max_participants: MAX_PARTICIPANTS,
