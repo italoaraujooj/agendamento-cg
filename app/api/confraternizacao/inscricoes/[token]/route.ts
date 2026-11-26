@@ -39,7 +39,7 @@ export async function GET(_request: NextRequest, { params }: { params: Promise<{
     .map(({ name, age, is_child }) => ({ name, age, is_child }))
 
   return NextResponse.json({
-    event: eventInfo(),
+    event: await eventInfo(),
     price: PRICE_PER_PERSON,
     registration: {
       contact_name: reg.contact_name,

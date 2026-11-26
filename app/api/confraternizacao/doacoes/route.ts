@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { z } from "zod"
 import { createAdminClient } from "@/lib/supabase/server"
-import { MAX_DONATION, registrationsOpen } from "@/lib/confraternizacao/config"
+import { MAX_DONATION, eventInfo, registrationsOpen } from "@/lib/confraternizacao/config"
 import { newAccessToken } from "@/lib/confraternizacao/server"
 
 const schema = z.object({
@@ -17,7 +17,7 @@ const schema = z.object({
 
 // POST - Doação avulsa para custear inscrições (público, sem login)
 export async function POST(request: NextRequest) {
-  if (!registrationsOpen()) {
+  if (!registrationsOpen(await eventInfo())) {
     return NextResponse.json({ error: "As inscrições e doações estão encerradas" }, { status: 410 })
   }
 

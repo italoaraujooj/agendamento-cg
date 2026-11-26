@@ -87,7 +87,7 @@ export async function GET() {
   }
 
   return NextResponse.json({
-    event: eventInfo(),
+    event: await eventInfo(),
     price: PRICE_PER_PERSON,
     pluggy_configured: isPluggyConfigured(),
     pix_configured: !!pixReceiver(),
